@@ -1,4 +1,4 @@
-import { jsPDF } from 'jspdf'
+import type { jsPDF } from 'jspdf'
 import type { Report, Expense } from './types'
 import { formatMoney, formatTotal, formatDate, dayNumbersByDate } from './types'
 import { getImage } from './db'
@@ -54,6 +54,11 @@ function drawMealIcon(doc: jsPDF, cx: number, cy: number, size: number): void {
  * total, followed by one full page per receipt image with its details below.
  */
 export async function exportReportPdf(report: Report, expenses: Expense[]): Promise<void> {
+  // Loaded on demand, like pdfReceipt.ts's PDF.js — jsPDF is sizeable and its
+  // plugin-registration architecture means it doesn't tree-shake, so a static
+  // import would ship it to every app launch even for someone who never
+  // exports a PDF that session.
+  const { jsPDF } = await import('jspdf')
   const doc = new jsPDF({ unit: 'pt', format: 'a4' })
   const totalDisplay = formatTotal(expenses)
 

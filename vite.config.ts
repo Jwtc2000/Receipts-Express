@@ -23,8 +23,14 @@ const commitHash = (() => {
   }
 })()
 
+// frame-ancestors would be the real clickjacking defense, but it's ignored
+// entirely when a CSP is delivered via <meta> rather than an HTTP header
+// (per spec) — and GitHub Pages, this app's host, has no mechanism to send
+// custom response headers. base-uri/form-action are included anyway since
+// they *are* meta-compatible and cost nothing for a single-page app with no
+// external forms; see SECURITY.md for the frame-ancestors gap itself.
 const CSP =
-  "default-src 'self'; connect-src 'self'; img-src 'self' blob: data:; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; worker-src 'self' blob:"
+  "default-src 'self'; connect-src 'self'; img-src 'self' blob: data:; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; worker-src 'self' blob:; base-uri 'self'; form-action 'self'"
 
 // Build-only: Vite's dev server injects CSS via inline <style> tags for
 // HMR, which style-src without 'unsafe-inline' blocks. The deployed app —
@@ -127,7 +133,14 @@ export default defineConfig({
         // below), and the pilot deck is a standalone static page —
         // precaching it would otherwise bump the service worker (forcing a
         // re-download for every app user) on every unrelated slide-deck edit.
-        globIgnores: ['tesseract/**', 'pdfjs/**', 'docs/**'],
+        // The last three exclude jsPDF's optional .html()-renderer deps
+        // (canvg's polyfill chunk, html2canvas, dompurify) — this app never
+        // calls .html(), but Rollup can't prove that from jsPDF's own dynamic
+        // imports, so it emits them as separate chunks that would otherwise
+        // sit in the mandatory install-time precache with no code path that
+        // can ever execute them. Distinguished from the real `index-*.js`
+        // entry chunk by the `.es` suffix, which only these carry.
+        globIgnores: ['tesseract/**', 'pdfjs/**', 'docs/**', 'assets/index.es-*.js', 'assets/html2canvas.esm-*.js', 'assets/purify.es-*.js'],
         // vite-plugin-pwa's generateSW registers an SPA navigation route that
         // serves index.html (the app shell) for every navigation request. The
         // pilot deck is a real, standalone page under docs/, so without this

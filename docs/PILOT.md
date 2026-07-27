@@ -31,7 +31,7 @@
 | **Station / Region / Hub** | TBD — proposed for a single department or team first |
 | **Problem statement** | Travel expense filing is slow and error-prone when receipts are kept loose (paper or camera roll) until trip's end, then manually reconstructed into a report. |
 | **Current process** | Employee collects paper or photo receipts during travel, then at trip's end — often days or weeks later — manually transcribes merchant, date, and amount for each into whatever expense system the organization uses. |
-| **Proposed use case** | Employee scans each receipt with Receipts Express as it's incurred; the app extracts merchant/date/total via on-device OCR for the employee to review; at trip's end, the employee exports one polished PDF (or CSV) covering the whole trip and attaches it to their organization's actual expense system. Receipts Express does not replace or integrate with any expense or fiscal system — it standardizes and speeds up the capture step that happens before that system. |
+| **Proposed use case** | Employee scans each receipt with Receipts Express as it's incurred — by camera photo, or by uploading a PDF (single- or multi-page, e.g. an emailed invoice); the app extracts merchant/date/total via on-device OCR for the employee to review; at trip's end, the employee exports one polished PDF (or CSV) covering the whole trip and attaches it to their organization's actual expense system. Receipts Express does not replace or integrate with any expense or fiscal system — it standardizes and speeds up the capture step that happens before that system. |
 
 ## 2. Audience and Scope
 
@@ -48,7 +48,7 @@
 | --- | --- |
 | **Data sources** | Real personal/financial data — receipt images and the merchant, date, and amount extracted from them. Not public or synthetic data. |
 | **Data classification** | Confidential. Processed and stored exclusively on-device, never transmitted — see [SECURITY.md](../SECURITY.md) for the full classification and how it's enforced (including by a Content-Security-Policy, not just written policy). |
-| **AI tool** | On-device OCR only (self-hosted Tesseract.js). No cloud AI vendor, no API calls, nothing sent off-device for processing. |
+| **AI tool** | On-device OCR only (self-hosted Tesseract.js). PDF receipts are rasterized on-device the same way (self-hosted PDF.js) before OCR runs. No cloud AI vendor, no API calls, nothing sent off-device for processing. |
 | **Tool approval status** | Not yet reviewed by any organization's governance process — this document is the proposal to start that review. |
 | **Data retention** | Indefinite, but exclusively in the employee's own browser storage (IndexedDB), until they delete it or export and remove it themselves. See the durability note in [SECURITY.md](../SECURITY.md) — this is a capture-and-export tool, not an archive. |
 | **Access controls** | Device-level only — whoever has access to the employee's own browser profile. No server, no shared storage, no administrative visibility into any user's data. |

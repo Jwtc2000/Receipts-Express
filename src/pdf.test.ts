@@ -1,0 +1,134 @@
+// @vitest-environment jsdom
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { Expense, Report } from './types'
+
+// A minimal but structurally valid JPEG (287 bytes, real SOI/APP0/SOF
+// markers) — jsPDF's addImage() parses real JPEG bytes to build the PDF
+// image object even when width/height are supplied explicitly, so an
+// arbitrary string isn't enough here.
+const TINY_JPEG_B64 =
+  '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAMCAgICAgMCAgIDAwMDBAYEBAQEBAgGBgUGCQgKCgkICQkKDA8MCgsOCwkJDRENDg8QEBEQCgwSExIQEw8QEBD/2wBDAQMDAwQDBAgEBAgQCwkLEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBD/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k='
+
+vi.mock('./db', () => ({ getImage: vi.fn() }))
+vi.mock('./image', () => ({ blobToDataURL: vi.fn(), imageDimensions: vi.fn() }))
+vi.mock('./share', () => ({ shareOrDownloadFile: vi.fn().mockResolvedValue(true) }))
+
+function makeExpense(overrides: Partial<Expense> = {}): Expense {
+  return {
+    id: 'e1',
+    reportId: 'r1',
+    position: 0,
+    title: 'Lunch',
+    merchant: 'Cafe',
+    amount: 12.5,
+    currency: 'USD',
+    date: '2026-07-18',
+    category: 'Meals',
+    notes: '',
+    createdAt: 1,
+    ...overrides,
+  }
+}
+
+function makeReport(overrides: Partial<Report> = {}): Report {
+  return { id: 'r1', name: 'Trip', createdAt: 1, ...overrides }
+}
+
+/**
+ * jsPDF's default output isn't stream-compressed, so page objects are
+ * plain readable text in the file — `/Type /Page` marks each page, and
+ * `/Type /Pages` (the one parent tree node) is the only false-positive
+ * substring match to subtract back out.
+ */
+async function countPdfPages(file: File): Promise<number> {
+  const text = await file.text()
+  const pageMatches = text.match(/\/Type\s*\/Page(?!s)/g)?.length ?? 0
+  return pageMatches
+}
+
+beforeEach(() => {
+  // jsdom doesn't implement these, and jsPDF elsewhere calls `new URL(...)`
+  // internally — replacing the whole URL global (rather than patching just
+  // these two static methods) would break that constructor use.
+  URL.createObjectURL = vi.fn(() => 'blob:mock-url')
+  URL.revokeObjectURL = vi.fn()
+})
+
+afterEach(() => {
+  // @ts-expect-error -- removing the jsdom-absent methods we added above
+  delete URL.createObjectURL
+  // @ts-expect-error -- same
+  delete URL.revokeObjectURL
+  vi.clearAllMocks()
+})
+
+describe('exportReportPdf', () => {
+  it('produces one summary page plus one receipt page for a single no-image expense', async () => {
+    const { exportReportPdf } = await import('./pdf')
+    const { shareOrDownloadFile } = await import('./share')
+
+    await exportReportPdf(makeReport(), [makeExpense({ imageId: undefined })])
+
+    const file = (shareOrDownloadFile as ReturnType<typeof vi.fn>).mock.calls[0][0] as File
+    expect(await countPdfPages(file)).toBe(2)
+  })
+
+  it('embeds a receipt image via the mocked db/image path, without touching real canvas decoding', async () => {
+    const { getImage } = await import('./db')
+    const { blobToDataURL, imageDimensions } = await import('./image')
+    ;(getImage as ReturnType<typeof vi.fn>).mockResolvedValue({ id: 'img1', blob: new Blob(['x']) })
+    ;(blobToDataURL as ReturnType<typeof vi.fn>).mockResolvedValue(`data:image/jpeg;base64,${TINY_JPEG_B64}`)
+    ;(imageDimensions as ReturnType<typeof vi.fn>).mockResolvedValue({ width: 800, height: 600 })
+
+    const { exportReportPdf } = await import('./pdf')
+    const { shareOrDownloadFile } = await import('./share')
+
+    await exportReportPdf(makeReport(), [makeExpense({ imageId: 'img1' })])
+
+    expect(getImage).toHaveBeenCalledWith('img1')
+    const file = (shareOrDownloadFile as ReturnType<typeof vi.fn>).mock.calls[0][0] as File
+    expect(await countPdfPages(file)).toBe(2)
+  })
+
+  it('gives a multi-page receipt one PDF page per source page (the untested v1.10.0 mapping loop)', async () => {
+    const { getImage } = await import('./db')
+    const { blobToDataURL, imageDimensions } = await import('./image')
+    ;(getImage as ReturnType<typeof vi.fn>).mockResolvedValue({ id: 'img', blob: new Blob(['x']) })
+    ;(blobToDataURL as ReturnType<typeof vi.fn>).mockResolvedValue(`data:image/jpeg;base64,${TINY_JPEG_B64}`)
+    ;(imageDimensions as ReturnType<typeof vi.fn>).mockResolvedValue({ width: 800, height: 600 })
+
+    const { exportReportPdf } = await import('./pdf')
+    const { shareOrDownloadFile } = await import('./share')
+
+    // 1 expense, 3 receipt pages (imageId + two extraImageIds) -> summary
+    // page + 3 receipt pages = 4 total.
+    await exportReportPdf(
+      makeReport(),
+      [makeExpense({ imageId: 'img-1', extraImageIds: ['img-2', 'img-3'] })],
+    )
+
+    expect(getImage).toHaveBeenCalledTimes(3)
+    const file = (shareOrDownloadFile as ReturnType<typeof vi.fn>).mock.calls[0][0] as File
+    expect(await countPdfPages(file)).toBe(4)
+  })
+
+  it('gives every expense its own receipt page(s), mixing image and no-image expenses', async () => {
+    const { getImage } = await import('./db')
+    const { blobToDataURL, imageDimensions } = await import('./image')
+    ;(getImage as ReturnType<typeof vi.fn>).mockResolvedValue({ id: 'img', blob: new Blob(['x']) })
+    ;(blobToDataURL as ReturnType<typeof vi.fn>).mockResolvedValue(`data:image/jpeg;base64,${TINY_JPEG_B64}`)
+    ;(imageDimensions as ReturnType<typeof vi.fn>).mockResolvedValue({ width: 800, height: 600 })
+
+    const { exportReportPdf } = await import('./pdf')
+    const { shareOrDownloadFile } = await import('./share')
+
+    // summary (1) + no-image expense (1) + imaged expense (1) = 3.
+    await exportReportPdf(makeReport(), [
+      makeExpense({ id: 'e1', imageId: undefined }),
+      makeExpense({ id: 'e2', imageId: 'img-1' }),
+    ])
+
+    const file = (shareOrDownloadFile as ReturnType<typeof vi.fn>).mock.calls[0][0] as File
+    expect(await countPdfPages(file)).toBe(3)
+  })
+})

@@ -8,6 +8,47 @@ user-facing features, and `PATCH` for fixes with no visible feature change. The
 version lives in `package.json` and is shown in the app under Menu → About. Every
 merge to `main` that changes app behavior gets a version bump and a tag.
 
+## [1.10.2] - 2026-07-27
+
+### Changed
+- jsPDF is now loaded on demand (like PDF.js already was) instead of being
+  bundled into every app launch — the main JS chunk drops from ~617KB to
+  ~223KB raw for anyone who never exports a PDF that session.
+- The PWA's mandatory install-time precache no longer includes jsPDF's
+  unused optional `.html()`-renderer dependencies (html2canvas, DOMPurify,
+  canvg's polyfill chunk) — code that could never execute, since this app
+  never calls jsPDF's `.html()` method.
+- Added `base-uri 'self'; form-action 'self'` to the CSP (meta-compatible,
+  costs nothing for a single-page app with no external forms).
+
+### Fixed
+- Test suite honesty pass (remaining findings from the full repository
+  audit, `~/full-repo-audit.md`, not already covered by 1.10.1): added
+  jsdom + React Testing Library infrastructure, and closed every previously
+  zero-coverage gap it named — `share.ts`'s success/failure branches,
+  `pdf.ts`'s multi-page export/pagination logic, the `ExpenseEditor`
+  save-image-argument computation (attach/replace/remove), `pdfReceipt.ts`'s
+  page loop and page cap, `saveExpenseWithImage`'s failure branch,
+  `backup.test.ts`'s `extraImageIds` round-trip, and two `ocr.ts` messy-text
+  parsing gaps (a promotional-header line stealing the merchant slot;
+  European comma-decimal/currency-symbol totals).
+
+### Documentation
+- README.md, SECURITY.md, docs/PILOT.md, docs/PILOT_DECK.md,
+  docs/pilot-deck.html, and docs/governance/REVIEW.md now all mention the
+  PDF-upload input path (previously undocumented — only PDF *export* was
+  described).
+- SECURITY.md documents a known structural limitation: no clickjacking
+  defense is possible on the current GitHub Pages host, since
+  `frame-ancestors` is ignored when a CSP is delivered via `<meta>` rather
+  than a header.
+- Fixed the README's CI table wording, a stale "Restore from file" button
+  label in the pilot deck, and the PDF-export feature bullet's description
+  of where multi-page receipt details are drawn.
+- Documented the multi-page receipt page-removal scope gap (whole-receipt
+  Remove only, no per-page control) as an intentional decision, not an
+  oversight.
+
 ## [1.10.1] - 2026-07-27
 
 ### Fixed
