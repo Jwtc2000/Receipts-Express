@@ -75,8 +75,14 @@ export function newId(): string {
   return crypto.randomUUID()
 }
 
+/** Today's date in the user's local timezone — not UTC, which would read as
+ * tomorrow or yesterday for anyone west/east of UTC once local time crosses
+ * a UTC day boundary while it's still the same calendar day locally. */
 export function todayIso(): string {
-  return new Date().toISOString().slice(0, 10)
+  const d = new Date()
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${d.getFullYear()}-${mm}-${dd}`
 }
 
 /**

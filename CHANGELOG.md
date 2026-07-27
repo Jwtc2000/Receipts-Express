@@ -8,6 +8,45 @@ user-facing features, and `PATCH` for fixes with no visible feature change. The
 version lives in `package.json` and is shown in the app under Menu → About. Every
 merge to `main` that changes app behavior gets a version bump and a tag.
 
+## [1.10.1] - 2026-07-27
+
+### Fixed
+- Confirmed bugs from a full repository audit (`~/full-repo-audit.md`), in
+  priority order:
+  - Picking a receipt (photo or PDF) now shows a "Processing file…" banner
+    and disables Retake/Replace/Remove/capture/Save while the file is being
+    rendered/compressed — previously that stretch had no feedback and was
+    a window a second, faster pick could race into and corrupt.
+  - Save is now guarded against double-submit (e.g. a fast double-tap)
+    with a synchronous lock.
+  - Save now refetches the expense's current image IDs immediately before
+    computing which images are stale, narrowing (not eliminating) the
+    window where a save from a second tab could orphan an image that a
+    concurrent edit in another tab had just attached.
+  - PDF receipts are now capped at 25 pages, with a clear error instead of
+    rendering an unbounded document one page at a time with no way to
+    cancel.
+  - CSV export now neutralizes leading `=`, `+`, `-`, `@` characters in
+    text fields, closing a formula/DDE-injection path when a report is
+    opened in Excel/Sheets.
+  - CSV export now includes the "Personal Amount" column — present in the
+    data model and in PDF export, but silently missing from CSV.
+  - An app update no longer reloads out from under an in-progress,
+    unsaved expense; the update banner now confirms before discarding it.
+  - Reordering expenses in a report now shows an error and reverts the
+    list if the new order fails to save, instead of leaving the UI out of
+    sync with what's actually stored.
+  - The cached OCR/PDF engine files (tesseract.js, PDF.js) now expire
+    after 30 days instead of indefinitely, matching the fix already
+    shipped for the icon/shell cache.
+  - `todayIso()` — used to default a new expense's date — read UTC date
+    components, so it could show tomorrow's or yesterday's date for
+    anyone outside UTC once local time crossed the UTC day boundary while
+    still the same calendar day locally. It's now local-time-correct.
+  - The new-expense date field is now computed once, correctly, via a
+    lazy initializer instead of at module load — closing a related stale-
+    date gap for a session left open across a day boundary.
+
 ## [1.10.0] - 2026-07-27
 
 ### Added

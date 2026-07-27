@@ -21,7 +21,7 @@ function makeExpense(overrides: Partial<Expense> = {}): Expense {
 
 describe('buildExpenseCsv', () => {
   it('writes the header row even with no expenses', () => {
-    expect(buildExpenseCsv([])).toBe('Date,Title,Merchant,Category,Amount,Currency,Notes')
+    expect(buildExpenseCsv([])).toBe('Date,Title,Merchant,Category,Amount,Personal Amount,Currency,Notes')
   })
 
   it('writes one row per expense, in order, with amount formatted to two decimals', () => {
@@ -30,11 +30,41 @@ describe('buildExpenseCsv', () => {
       makeExpense({ title: 'Dinner', amount: 30.5 }),
     ])
     const lines = csv.split('\r\n')
-    expect(lines[0]).toBe('Date,Title,Merchant,Category,Amount,Currency,Notes')
+    expect(lines[0]).toBe('Date,Title,Merchant,Category,Amount,Personal Amount,Currency,Notes')
     expect(lines[1]).toContain('Lunch')
     expect(lines[1]).toContain('12.00')
     expect(lines[2]).toContain('Dinner')
     expect(lines[2]).toContain('30.50')
+  })
+
+  it('includes the personal (non-reimbursable) portion of an expense (regression)', () => {
+    const csv = buildExpenseCsv([makeExpense({ amount: 150, personalAmount: 20 })])
+    const cols = csv.split('\r\n')[1].split(',')
+    expect(cols[4]).toBe('150.00')
+    expect(cols[5]).toBe('20.00')
+  })
+
+  it('writes 0.00 for the personal amount column when there is no personal portion', () => {
+    const csv = buildExpenseCsv([makeExpense({ personalAmount: undefined })])
+    const cols = csv.split('\r\n')[1].split(',')
+    expect(cols[5]).toBe('0.00')
+  })
+
+  it('neutralizes a leading formula character in free-text fields (CSV injection regression)', () => {
+    const csv = buildExpenseCsv([
+      makeExpense({ title: '-15% discount', merchant: '=cmd', notes: '+1 212 555 0199' }),
+    ])
+    const cols = csv.split('\r\n')[1].split(',')
+    expect(cols[1]).toBe("'-15% discount")
+    expect(cols[2]).toBe("'=cmd")
+    expect(cols[7]).toBe("'+1 212 555 0199")
+  })
+
+  it('does not mangle a genuinely negative amount with the formula guard', () => {
+    const csv = buildExpenseCsv([makeExpense({ amount: -5, personalAmount: -2 })])
+    const cols = csv.split('\r\n')[1].split(',')
+    expect(cols[4]).toBe('-5.00')
+    expect(cols[5]).toBe('-2.00')
   })
 
   it('quotes fields containing commas', () => {
