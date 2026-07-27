@@ -1,7 +1,7 @@
 {
   "name": "receipts-express",
   "private": true,
-  "version": "1.10.2",
+  "version": "1.11.0",
   "description": "Scan receipts, organize expense reports, export polished PDFs.",
   "type": "module",
   "engines": {

@@ -101,6 +101,35 @@ describe('validateBackup', () => {
     expect(() => validateBackup(bad)).toThrow(/malformed/i)
   })
 
+  it('accepts a report with valid exchange rates', async () => {
+    const { validateBackup } = await import('./backup')
+    const backup = validBackup({
+      reports: [{ id: 'r1', name: 'Trip', createdAt: 1, exchangeRates: { EUR: 1.08, GBP: 1.27 } }],
+    })
+    const { reports } = validateBackup(backup)
+    expect(reports[0].exchangeRates).toEqual({ EUR: 1.08, GBP: 1.27 })
+  })
+
+  it('rejects a report with a non-numeric exchange rate (regression)', async () => {
+    // A malformed rate would otherwise silently corrupt usdTotal's
+    // arithmetic (or a string rate would produce NaN) the first time the
+    // report's USD total is computed.
+    const { validateBackup } = await import('./backup')
+    const bad = validBackup({
+      // @ts-expect-error intentionally malformed for the test
+      reports: [{ id: 'r1', name: 'Trip', createdAt: 1, exchangeRates: { EUR: '1.08' } }],
+    })
+    expect(() => validateBackup(bad)).toThrow(/malformed/i)
+  })
+
+  it('rejects a report with a zero or negative exchange rate (regression)', async () => {
+    const { validateBackup } = await import('./backup')
+    const bad = validBackup({
+      reports: [{ id: 'r1', name: 'Trip', createdAt: 1, exchangeRates: { EUR: -1.08 } }],
+    })
+    expect(() => validateBackup(bad)).toThrow(/malformed/i)
+  })
+
   it('rejects a malformed expense (non-numeric amount)', async () => {
     const { validateBackup } = await import('./backup')
     const bad = validBackup()

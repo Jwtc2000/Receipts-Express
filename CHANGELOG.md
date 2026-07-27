@@ -8,6 +8,19 @@ user-facing features, and `PATCH` for fixes with no visible feature change. The
 version lives in `package.json` and is shown in the app under Menu → About. Every
 merge to `main` that changes app behavior gets a version bump and a tag.
 
+## [1.11.0] - 2026-07-27
+
+### Added
+- A FOREIGN→USD total conversion, using manually-entered exchange rates (no
+  network calls are made to fetch one — this app makes none beyond loading
+  itself). Set a rate per foreign currency at the top of the Report Menu
+  drawer ("Total (USD)"); the converted total shows there and, once a
+  report has any non-USD expense, as a "TOTAL (USD)" line on the PDF
+  export's first page. A currency with no rate set is excluded from the
+  total and called out explicitly rather than silently treated as 1:1.
+- Currency entry was already unrestricted (free text, not a fixed list) —
+  confirmed and left as-is, no code change needed.
+
 ## [1.10.2] - 2026-07-27
 
 ### Changed

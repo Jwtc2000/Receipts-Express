@@ -1,6 +1,6 @@
 import type { jsPDF } from 'jspdf'
 import type { Report, Expense } from './types'
-import { formatMoney, formatTotal, formatDate, dayNumbersByDate } from './types'
+import { formatMoney, formatTotal, formatDate, dayNumbersByDate, usdTotal } from './types'
 import { getImage } from './db'
 import { blobToDataURL, imageDimensions } from './image'
 import { getProfile, profileSummaryLines } from './profile'
@@ -192,6 +192,31 @@ export async function exportReportPdf(report: Report, expenses: Expense[]): Prom
     doc.setTextColor(...PAYBACK_ORANGE)
     doc.text('Employee pays credit card company', cols.title, y)
     doc.text(personalTotal, cols.amount, y, { align: 'right' })
+  }
+
+  // FOREIGN -> USD total, using the manually-entered rates from the Report
+  // Menu (see types.ts's usdTotal — this app makes no network calls, so
+  // there is no live rate to fetch). Only shown when the report actually
+  // has a non-USD expense; an all-USD report's TOTAL line above already is
+  // the USD total.
+  const foreignCurrencyCount = new Set(
+    expenses.map((e) => e.currency.trim().toUpperCase()).filter((c) => c && c !== 'USD'),
+  ).size
+  if (foreignCurrencyCount > 0) {
+    const converted = usdTotal(expenses, report.exchangeRates)
+    y += 20
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(11)
+    doc.setTextColor(...SLATE)
+    doc.text('TOTAL (USD)', cols.title, y)
+    doc.text(formatMoney(converted.total, 'USD'), cols.amount, y, { align: 'right' })
+    if (converted.missingRates.length > 0) {
+      y += 13
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(8)
+      doc.setTextColor(...MUTED_GRAY)
+      doc.text(`Excludes ${converted.missingRates.join(', ')} — no exchange rate set`, cols.title, y)
+    }
   }
 
   // ---------- One PDF page per receipt page ----------
