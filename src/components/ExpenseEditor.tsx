@@ -3,6 +3,7 @@ import type { Expense } from '../types'
 import { CATEGORIES, newId } from '../types'
 import { getExpense, saveExpenseWithImage, getImage, nextPosition } from '../db'
 import { compressImage } from '../image'
+import { isPdfFile } from '../pdfDetect'
 import { extractReceipt } from '../ocr'
 import Icon from './icons'
 import { HeaderPlanes } from './decorative'
@@ -40,6 +41,10 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
   const [existing, setExisting] = useState<Expense | null>(null)
   const [imageBlob, setImageBlob] = useState<Blob | null>(null)
   const [imageUrl, setImageUrl] = useState<string | null>(null)
+  // Pages 2+ of a multi-page receipt (e.g. an uploaded PDF) — empty for a
+  // single photo or single-page PDF.
+  const [extraImageBlobs, setExtraImageBlobs] = useState<Blob[]>([])
+  const [extraImageUrls, setExtraImageUrls] = useState<string[]>([])
   const [imageChanged, setImageChanged] = useState(false)
   const [scanState, setScanState] = useState<'idle' | 'scanning' | 'done' | 'failed'>('idle')
   const [scanPct, setScanPct] = useState(0)
@@ -75,6 +80,12 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
           setImageUrl(URL.createObjectURL(img.blob))
         }
       }
+      if (expense.extraImageIds?.length) {
+        const extras = await Promise.all(expense.extraImageIds.map((id) => getImage(id)))
+        const blobs = extras.filter((img): img is NonNullable<typeof img> => !!img).map((img) => img.blob)
+        setExtraImageBlobs(blobs)
+        setExtraImageUrls(blobs.map((b) => URL.createObjectURL(b)))
+      }
     })()
   }, [expenseId])
 
@@ -83,6 +94,12 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
       if (imageUrl) URL.revokeObjectURL(imageUrl)
     }
   }, [imageUrl])
+
+  useEffect(() => {
+    return () => {
+      for (const url of extraImageUrls) URL.revokeObjectURL(url)
+    }
+  }, [extraImageUrls])
 
   // Warn the browser before it unloads (tab close, refresh, PWA back-gesture, or
   // the service-worker update reload) while there's an unsaved draft — otherwise
@@ -105,30 +122,48 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
   const onImagePicked = async (file: File | undefined) => {
     if (!file) return
     setCaptureError(null)
-    // Compression can genuinely fail (an unsupported format like HEIC on some
-    // browsers, a corrupt file, or canvas.toBlob returning null). Without this
-    // catch the rejection was swallowed by the `void onImagePicked(...)` caller
-    // and the freshly captured photo vanished with no message.
-    let compressed: Blob
+    // Rendering/compression can genuinely fail (an unsupported photo format
+    // like HEIC on some browsers, a corrupt file, a password-protected or
+    // malformed PDF, or canvas.toBlob returning null). Without this catch
+    // the rejection was swallowed by the `void onImagePicked(...)` caller
+    // and the freshly picked receipt vanished with no message.
+    let pages: Blob[]
     try {
-      compressed = await compressImage(file)
+      if (isPdfFile(file)) {
+        // Loaded on demand so the PDF.js engine — sizeable — never ships to
+        // someone who only ever attaches photos.
+        const { renderPdfPages } = await import('../pdfReceipt')
+        pages = await renderPdfPages(file)
+      } else {
+        pages = [await compressImage(file)]
+      }
     } catch {
-      setCaptureError("Couldn't process that photo — try again, or pick a different image.")
+      setCaptureError(
+        isPdfFile(file)
+          ? "Couldn't read that PDF — it may be password-protected or corrupted. Try again, or pick a different file."
+          : "Couldn't process that photo — try again, or pick a different image.",
+      )
       return
     }
+    const [firstPage, ...restPages] = pages
     setDirty(true)
-    setImageBlob(compressed)
+    setImageBlob(firstPage)
     setImageChanged(true)
     setImageUrl((old) => {
       if (old) URL.revokeObjectURL(old)
-      return URL.createObjectURL(compressed)
+      return URL.createObjectURL(firstPage)
+    })
+    setExtraImageBlobs(restPages)
+    setExtraImageUrls((old) => {
+      for (const url of old) URL.revokeObjectURL(url)
+      return restPages.map((b) => URL.createObjectURL(b))
     })
 
-    // Auto-extract details with on-device OCR
+    // Auto-extract details with on-device OCR, from the receipt's first page
     setScanState('scanning')
     setScanPct(0)
     try {
-      const extracted = await extractReceipt(compressed, setScanPct)
+      const extracted = await extractReceipt(firstPage, setScanPct)
       setDraft((d) => ({
         ...d,
         merchant: extracted.merchant ?? d.merchant,
@@ -138,7 +173,7 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
       }))
       setScanState('done')
     } catch {
-      // The photo is already attached; OCR failing just means manual entry.
+      // The receipt is already attached; OCR failing just means manual entry.
       setScanState('failed')
     }
   }
@@ -147,6 +182,11 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
     setDirty(true)
     setImageBlob(null)
     setImageChanged(true)
+    setExtraImageBlobs([])
+    setExtraImageUrls((old) => {
+      for (const url of old) URL.revokeObjectURL(url)
+      return []
+    })
     setImageUrl((old) => {
       if (old) URL.revokeObjectURL(old)
       return null
@@ -168,20 +208,31 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
     setSaveError(null)
     try {
       const previousImageId = existing?.imageId
-      // Three cases: untouched (keep imageId as-is); replaced with a new
-      // blob (new imageId, old one deleted); removed entirely (imageId
-      // cleared, old one deleted). imageChanged with a null blob means the
-      // user explicitly removed the photo, not that nothing changed.
+      const previousExtraImageIds = existing?.extraImageIds ?? []
+      // Three cases: untouched (keep imageId/extraImageIds as-is); replaced
+      // with new pages (fresh ids for every page, all old pages deleted);
+      // removed entirely (ids cleared, old pages deleted). imageChanged
+      // with a null blob means the user explicitly removed the receipt,
+      // not that nothing changed.
       let imageId = previousImageId
-      let newImage: { id: string; blob: Blob } | undefined
-      let staleImageId: string | undefined
+      let extraImageIds = previousExtraImageIds.length ? previousExtraImageIds : undefined
+      const newImages: { id: string; blob: Blob }[] = []
+      let staleImageIds: string[] = []
       if (imageChanged) {
-        staleImageId = previousImageId
+        staleImageIds = [previousImageId, ...previousExtraImageIds].filter((id): id is string => !!id)
         if (imageBlob) {
           imageId = newId()
-          newImage = { id: imageId, blob: imageBlob }
+          newImages.push({ id: imageId, blob: imageBlob })
+          extraImageIds = extraImageBlobs.length
+            ? extraImageBlobs.map((blob) => {
+                const id = newId()
+                newImages.push({ id, blob })
+                return id
+              })
+            : undefined
         } else {
           imageId = undefined
+          extraImageIds = undefined
         }
       }
       // Clamped to [0, amount] — the personal portion can't exceed the
@@ -199,10 +250,11 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
         category: draft.category,
         notes: draft.notes.trim(),
         imageId,
+        extraImageIds,
         createdAt: existing?.createdAt ?? Date.now(),
         personalAmount,
       }
-      await saveExpenseWithImage(expense, newImage, staleImageId)
+      await saveExpenseWithImage(expense, newImages, staleImageIds)
       setDirty(false)
       onDone()
     } catch (err) {
@@ -253,7 +305,7 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
         <input
           ref={fileInput}
           type="file"
-          accept="image/*"
+          accept="image/*,application/pdf"
           hidden
           onChange={(e) => {
             const file = e.target.files?.[0]
@@ -264,13 +316,28 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
 
         {imageUrl ? (
           <div className="receipt-preview">
-            <img src={imageUrl} alt="Receipt" />
+            <div className="receipt-preview-main">
+              <img src={imageUrl} alt="Receipt, page 1" />
+              {extraImageUrls.length > 0 && (
+                <span className="page-badge">{extraImageUrls.length + 1} pages</span>
+              )}
+            </div>
+            {extraImageUrls.length > 0 && (
+              <div className="receipt-pages">
+                {extraImageUrls.map((url, i) => (
+                  <div className="receipt-page-thumb" key={url}>
+                    <img src={url} alt={`Receipt, page ${i + 2}`} />
+                    <span>{i + 2}</span>
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="preview-actions">
               <button className="btn ghost small with-icon" onClick={() => cameraInput.current?.click()}>
                 <Icon name="camera" size={16} /> Retake
               </button>
               <button className="btn ghost small with-icon" onClick={() => fileInput.current?.click()}>
-                <Icon name="image" size={16} /> Replace
+                <Icon name="file" size={16} /> Replace
               </button>
               <button className="btn ghost small with-icon" onClick={removeImage}>
                 <Icon name="trash" size={16} /> Remove
@@ -287,9 +354,9 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
             </button>
             <button className="capture-btn" onClick={() => fileInput.current?.click()}>
               <span className="capture-icon">
-                <Icon name="image" size={32} />
+                <Icon name="file" size={32} />
               </span>
-              Choose photo
+              Choose photo or PDF
             </button>
           </div>
         )}

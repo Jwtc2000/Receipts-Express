@@ -24,6 +24,8 @@ export interface Expense {
   category: string
   notes: string
   imageId?: string
+  /** Pages 2+ of a multi-page receipt (e.g. an uploaded PDF); page 1 is `imageId`. */
+  extraImageIds?: string[]
   createdAt: number
   /** Portion of `amount` the employee is personally covering (not reimbursable). */
   personalAmount?: number
