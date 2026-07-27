@@ -292,6 +292,21 @@ body {
   min-width: 0;
 }
 
+.topbar-title h1.logo-heading {
+  display: flex;
+  align-items: center;
+  margin: 0;
+  padding: 0;
+  overflow: visible;
+}
+
+.logo-title-svg {
+  height: 38px;
+  width: auto;
+  max-width: 100%;
+  display: block;
+}
+
 .express-arrow {
   display: inline-flex;
   align-items: center;
