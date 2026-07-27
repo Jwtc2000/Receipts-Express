@@ -1,14 +1,14 @@
 {
   "name": "receipts-express",
   "private": true,
-  "version": "1.9.4",
+  "version": "1.10.0",
   "description": "Scan receipts, organize expense reports, export polished PDFs.",
   "type": "module",
   "engines": {
     "node": ">=26"
   },
   "scripts": {
-    "prepare-assets": "node scripts/copy-tesseract-assets.mjs",
+    "prepare-assets": "node scripts/copy-tesseract-assets.mjs && node scripts/copy-pdfjs-assets.mjs",
     "predev": "npm run prepare-assets",
     "prebuild": "npm run prepare-assets",
     "dev": "vite",
@@ -21,6 +21,7 @@
     "@tesseract.js-data/eng": "^1.0.0",
     "idb": "^8.0.0",
     "jspdf": "^4.2.1",
+    "pdfjs-dist": "^6.1.200",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "tesseract.js": "^5.1.1"

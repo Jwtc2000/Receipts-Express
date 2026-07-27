@@ -8,6 +8,21 @@ user-facing features, and `PATCH` for fixes with no visible feature change. The
 version lives in `package.json` and is shown in the app under Menu → About. Every
 merge to `main` that changes app behavior gets a version bump and a tag.
 
+## [1.10.0] - 2026-07-27
+
+### Added
+- Receipts can now be attached as a PDF instead of a photo, from the same
+  "Choose photo or PDF" picker. Both single-page and multi-page PDFs are
+  supported: each page is rasterized on-device (via a self-hosted PDF.js,
+  loaded only when a PDF is actually picked) and stored the same way a
+  photographed receipt is, so OCR, thumbnails and backup/restore all work
+  unchanged. On-device OCR runs against the PDF's first page.
+- The expense editor shows a "N pages" badge and a thumbnail strip for
+  every page of a multi-page receipt.
+- PDF report export now gives a multi-page receipt one full PDF page per
+  source page (labeled "page N of M"), each scaled to fit without cropping;
+  the expense's title/amount/notes are shown once, under the last page.
+
 ## [1.9.4] - 2026-07-20
 
 ### Fixed

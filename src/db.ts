@@ -52,13 +52,17 @@ export async function saveReport(report: Report): Promise<void> {
   await db.put('reports', report)
 }
 
+function expenseImageIds(expense: Pick<Expense, 'imageId' | 'extraImageIds'>): string[] {
+  return [expense.imageId, ...(expense.extraImageIds ?? [])].filter((id): id is string => !!id)
+}
+
 export async function deleteReport(id: string): Promise<void> {
   const db = await getDB()
   const expenses = await db.getAllFromIndex('expenses', 'by-report', id)
   const tx = db.transaction(['reports', 'expenses', 'images'], 'readwrite')
   for (const expense of expenses) {
     void tx.objectStore('expenses').delete(expense.id)
-    if (expense.imageId) void tx.objectStore('images').delete(expense.imageId)
+    for (const imageId of expenseImageIds(expense)) void tx.objectStore('images').delete(imageId)
   }
   void tx.objectStore('reports').delete(id)
   await tx.done
@@ -83,22 +87,23 @@ export async function saveExpense(expense: Expense): Promise<void> {
 }
 
 /**
- * Save an expense together with an optional image swap, in one transaction:
- * the new image (if any) and the expense record are written, and the old
- * image is only removed once that succeeds. This way a failure (e.g. quota
+ * Save an expense together with an optional receipt-image swap (one image
+ * per page, for a multi-page PDF receipt), in one transaction: the new
+ * images (if any) and the expense record are written, and the old images
+ * are only removed once that succeeds. This way a failure (e.g. quota
  * exceeded) aborts the whole write instead of deleting the old receipt
- * image and losing it before the replacement is safely stored.
+ * pages and losing them before the replacement is safely stored.
  */
 export async function saveExpenseWithImage(
   expense: Expense,
-  newImage: ReceiptImage | undefined,
-  staleImageId: string | undefined,
+  newImages: ReceiptImage[],
+  staleImageIds: string[],
 ): Promise<void> {
   const db = await getDB()
   const tx = db.transaction(['expenses', 'images'], 'readwrite')
-  if (newImage) void tx.objectStore('images').put(newImage)
+  for (const image of newImages) void tx.objectStore('images').put(image)
   void tx.objectStore('expenses').put(expense)
-  if (staleImageId) void tx.objectStore('images').delete(staleImageId)
+  for (const id of staleImageIds) void tx.objectStore('images').delete(id)
   await tx.done
 }
 
@@ -114,7 +119,7 @@ export async function deleteExpense(id: string): Promise<void> {
   const expense = await db.get('expenses', id)
   const tx = db.transaction(['expenses', 'images'], 'readwrite')
   void tx.objectStore('expenses').delete(id)
-  if (expense?.imageId) void tx.objectStore('images').delete(expense.imageId)
+  if (expense) for (const imageId of expenseImageIds(expense)) void tx.objectStore('images').delete(imageId)
   await tx.done
 }
 

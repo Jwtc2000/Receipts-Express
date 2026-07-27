@@ -119,15 +119,15 @@ export default defineConfig({
       },
       workbox: {
         maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
-        // OCR engine files are large, so they're cached on first use
+        // OCR/PDF engine files are large, so they're cached on first use
         // instead of being precached (see runtimeCaching below)
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
-        // Neither is part of the app itself: the OCR engine is cached on
-        // first use instead (see runtimeCaching below), and the pilot deck
-        // is a standalone static page — precaching it would otherwise bump
-        // the service worker (forcing a re-download for every app user) on
-        // every unrelated slide-deck edit.
-        globIgnores: ['tesseract/**', 'docs/**'],
+        // None of these are part of the app bundle itself: the OCR and PDF
+        // engines are cached on first use instead (see runtimeCaching
+        // below), and the pilot deck is a standalone static page —
+        // precaching it would otherwise bump the service worker (forcing a
+        // re-download for every app user) on every unrelated slide-deck edit.
+        globIgnores: ['tesseract/**', 'pdfjs/**', 'docs/**'],
         // vite-plugin-pwa's generateSW registers an SPA navigation route that
         // serves index.html (the app shell) for every navigation request. The
         // pilot deck is a real, standalone page under docs/, so without this
@@ -143,6 +143,14 @@ export default defineConfig({
             options: {
               cacheName: 'tesseract-engine',
               expiration: { maxEntries: 12 }
+            }
+          },
+          {
+            urlPattern: /\/pdfjs\//,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'pdfjs-engine',
+              expiration: { maxEntries: 40 }
             }
           }
         ]

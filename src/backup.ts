@@ -62,6 +62,8 @@ function isValidExpense(v: unknown): v is Expense {
     typeof v.category === 'string' &&
     typeof v.notes === 'string' &&
     (v.imageId === undefined || typeof v.imageId === 'string') &&
+    (v.extraImageIds === undefined ||
+      (Array.isArray(v.extraImageIds) && v.extraImageIds.every((x) => typeof x === 'string'))) &&
     typeof v.createdAt === 'number' &&
     Number.isFinite(v.createdAt) &&
     (v.personalAmount === undefined ||
