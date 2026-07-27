@@ -8,6 +8,13 @@ user-facing features, and `PATCH` for fixes with no visible feature change. The
 version lives in `package.json` and is shown in the app under Menu → About. Every
 merge to `main` that changes app behavior gets a version bump and a tag.
 
+## [1.11.1] - 2026-07-27
+
+### Changed
+- Replaced the main page's plain-text title and separate receipt/express-arrow
+  icons with a single responsive stacked SVG logo (`LogoTitle.tsx`) — "Receipts"
+  over "EXPRESS" — that scales to fit any screen width.
+
 ## [1.11.0] - 2026-07-27
 
 ### Added
