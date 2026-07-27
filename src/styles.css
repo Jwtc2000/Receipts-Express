@@ -278,12 +278,6 @@ body {
   min-width: 0;
 }
 
-.logo {
-  display: inline-flex;
-  align-items: center;
-  flex-shrink: 0;
-}
-
 .topbar-title h1 {
   /* Must be allowed to shrink (and min-width:0, since flex items default to
      min-width:auto) so the title ellipsizes on narrow screens instead of
@@ -305,17 +299,6 @@ body {
   width: auto;
   max-width: 100%;
   display: block;
-}
-
-.express-arrow {
-  display: inline-flex;
-  align-items: center;
-  flex-shrink: 0;
-  /* Plain white (inherited from .topbar), not a separate accent color:
-     the old light-orange accent (#fdba74) had strong contrast against the
-     previous solid teal header but nearly vanishes (1.74:1) against the
-     orange end of the new gradient. */
-  color: #fff;
 }
 
 .report-title {
