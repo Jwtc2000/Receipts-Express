@@ -9,7 +9,10 @@ accordingly:
 
 - **All processing happens in-browser.** OCR runs against a self-hosted
   copy of Tesseract.js — the engine, WASM core, and language data are
-  served from this app's own origin, never a CDN.
+  served from this app's own origin, never a CDN. PDF receipts (single- or
+  multi-page) are rasterized the same way, against a self-hosted copy of
+  PDF.js — worker, WASM codecs, standard fonts, and color profiles are all
+  served from this app's own origin as well.
 - **Storage is exclusively on-device IndexedDB.** Nothing is written to
   a server or a third-party service.
 - **Export is exclusively a local PDF** (or CSV), generated in-browser and
@@ -24,6 +27,17 @@ This last point is not just a policy promise — it's enforced by a
 `'self'`, injected into every production build, so the browser itself
 blocks any script (including a compromised dependency) from making a
 network request anywhere else.
+
+**Known limitation: no clickjacking defense.** The CSP is delivered via a
+`<meta>` tag, since GitHub Pages (this app's static host) has no mechanism
+to send custom HTTP response headers. Per spec, `frame-ancestors` is
+ignored entirely when a CSP arrives via `<meta>` rather than a header — so
+this app cannot embed a working clickjacking defense as currently hosted,
+and nothing in `vite.config.ts` claims otherwise. Practical impact is low:
+the app has no login, session, or server-side action to trick a user into
+triggering from within an iframe — all data is local to the device. Closing
+this gap for real would require moving to a host that can set response
+headers (e.g. Cloudflare Pages, an edge proxy in front of GitHub Pages).
 
 ## Durability note
 

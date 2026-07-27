@@ -383,6 +383,11 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
               )}
             </div>
             {extraImageUrls.length > 0 && (
+              // Intentionally no per-page delete/reorder control here — the
+              // only removal affordance for a multi-page receipt is the
+              // whole-receipt Remove button below. A wrong/blank page means
+              // Remove + re-pick the corrected file; scoped out rather than
+              // half-built.
               <div className="receipt-pages">
                 {extraImageUrls.map((url, i) => (
                   <div className="receipt-page-thumb" key={url}>

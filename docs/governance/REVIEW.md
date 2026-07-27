@@ -40,7 +40,7 @@ This checklist prepares the **Receipts Express** application for governance revi
 ## 3. AI Behavior
 
 * **What does the AI produce?**
-  * Heuristically parses text scanned from a receipt image (via client-side OCR) to identify merchant name, transaction date, and total amount, pre-filling a form.
+  * Heuristically parses text scanned from a receipt image (via client-side OCR) to identify merchant name, transaction date, and total amount, pre-filling a form. The image is either a camera photo or a page rasterized on-device (via client-side PDF.js, same no-cloud-vendor model as the OCR step) from an uploaded PDF receipt.
 * **Can the AI take actions, or does it only draft and summarize?**
   * It only drafts/pre-fills inputs in the local user interface. It cannot take actions or interact with external systems.
 * **Who is the named human owner responsible for reviewing outputs?**

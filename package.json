@@ -1,7 +1,7 @@
 {
   "name": "receipts-express",
   "private": true,
-  "version": "1.10.1",
+  "version": "1.10.2",
   "description": "Scan receipts, organize expense reports, export polished PDFs.",
   "type": "module",
   "engines": {
@@ -27,11 +27,15 @@
     "tesseract.js": "^5.1.1"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^7.0.0",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/node": "^26.1.1",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",
     "fake-indexeddb": "^6.2.5",
+    "jsdom": "^30.0.0",
     "typescript": "^5.6.3",
     "vite": "^6.0.3",
     "vite-plugin-pwa": "^0.21.1",

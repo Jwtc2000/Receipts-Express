@@ -37,4 +37,25 @@ describe('parseReceiptText', () => {
     const text = ['0000123456789', 'Corner Bakery', 'Total 8.00'].join('\n')
     expect(parseReceiptText(text).merchant).toBe('Corner Bakery')
   })
+
+  it('lets a promotional header line steal the merchant slot from the real store name below it (documents current behavior)', () => {
+    // The merchant heuristic picks the first short, non-numeric line among
+    // the first 6 — it has no way to distinguish a promo/greeting header
+    // from the actual store name. Asserted here so a future change to the
+    // heuristic is a deliberate decision, not a silent regression; the
+    // misparse is a reviewable inconvenience since all fields stay editable
+    // before save.
+    const text = ['*** WELCOME ***', 'Starbucks', '123 Main St', 'Total 5.00'].join('\n')
+    expect(parseReceiptText(text).merchant).toBe('Welcome')
+  })
+
+  it('parses a comma-decimal, currency-symbol total (European format)', () => {
+    const text = ['Cafe Central', 'Total €19,50'].join('\n')
+    expect(parseReceiptText(text).total).toBe(19.5)
+  })
+
+  it('parses a pound-sterling total', () => {
+    const text = ['Corner Shop', 'Total £7.99'].join('\n')
+    expect(parseReceiptText(text).total).toBe(7.99)
+  })
 })

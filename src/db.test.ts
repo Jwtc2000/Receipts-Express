@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { IDBObjectStore } from 'fake-indexeddb'
 import { resetFakeIndexedDB } from './test/idb-reset'
 import type { Expense } from './types'
 
@@ -96,6 +97,32 @@ describe('saveExpenseWithImage', () => {
     for (const img of oldPages) expect(await db.getImage(img.id)).toBeUndefined()
     for (const img of newPages) expect(await db.getImage(img.id)).toBeDefined()
     expect(await db.getExpense(updated.id)).toMatchObject({ imageId: 'new-1', extraImageIds: ['new-2', 'new-3'] })
+  })
+
+  it('leaves the old image and expense untouched when a mid-transaction put throws (regression)', async () => {
+    const db = await import('./db')
+    const oldImage = { id: 'image-old', blob: new Blob(['old']) }
+    await db.saveImage(oldImage)
+    await db.saveExpense(makeExpense({ imageId: oldImage.id }))
+
+    // Simulates e.g. a QuotaExceededError on the first write in the
+    // transaction (the new image put) — asserts the doc comment's atomicity
+    // claim: nothing downstream (the expense update, the old-image delete)
+    // takes effect, and the pre-existing state survives untouched.
+    const putSpy = vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementationOnce(() => {
+      throw new Error('simulated write failure')
+    })
+    try {
+      const newImage = { id: 'image-new', blob: new Blob(['new']) }
+      const updated = makeExpense({ imageId: newImage.id })
+      await expect(db.saveExpenseWithImage(updated, [newImage], [oldImage.id])).rejects.toThrow()
+
+      expect(await db.getImage('image-new')).toBeUndefined()
+      expect(await db.getImage(oldImage.id)).toBeDefined()
+      expect(await db.getExpense('expense-1')).toMatchObject({ imageId: oldImage.id })
+    } finally {
+      putSpy.mockRestore()
+    }
   })
 })
 
