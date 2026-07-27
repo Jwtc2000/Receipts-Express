@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { formatTotal, dayNumbersByDate, sortExpensesByDate, resolveDateAfterMove, todayIso } from './types'
+import { formatTotal, usdTotal, dayNumbersByDate, sortExpensesByDate, resolveDateAfterMove, todayIso } from './types'
 import type { Expense } from './types'
 
 function makeExpense(overrides: Partial<Expense> = {}): Expense {
@@ -50,6 +50,56 @@ describe('formatTotal', () => {
         { amount: 15, currency: 'usd' },
       ]),
     ).toBe('$35.00')
+  })
+})
+
+describe('usdTotal', () => {
+  it('sums USD expenses with no rates needed', () => {
+    const result = usdTotal([{ amount: 20, currency: 'USD' }, { amount: 15, currency: 'usd' }], undefined)
+    expect(result).toEqual({ total: 35, missingRates: [] })
+  })
+
+  it('converts a rated foreign currency and adds it to the USD total', () => {
+    const result = usdTotal(
+      [
+        { amount: 20, currency: 'USD' },
+        { amount: 100, currency: 'EUR' },
+      ],
+      { EUR: 1.08 },
+    )
+    expect(result.total).toBeCloseTo(20 + 100 * 1.08)
+    expect(result.missingRates).toEqual([])
+  })
+
+  it('excludes an unrated currency from the total and reports it as missing', () => {
+    const result = usdTotal(
+      [
+        { amount: 20, currency: 'USD' },
+        { amount: 100, currency: 'EUR' },
+      ],
+      undefined,
+    )
+    expect(result.total).toBe(20)
+    expect(result.missingRates).toEqual(['EUR'])
+  })
+
+  it('treats a zero or negative rate as missing rather than zeroing out the total', () => {
+    const result = usdTotal([{ amount: 100, currency: 'EUR' }], { EUR: 0 })
+    expect(result.total).toBe(0)
+    expect(result.missingRates).toEqual(['EUR'])
+  })
+
+  it('handles multiple foreign currencies, some rated and some not', () => {
+    const result = usdTotal(
+      [
+        { amount: 100, currency: 'EUR' },
+        { amount: 50, currency: 'GBP' },
+        { amount: 30, currency: 'CHF' },
+      ],
+      { EUR: 1.08, CHF: 1.12 },
+    )
+    expect(result.total).toBeCloseTo(100 * 1.08 + 30 * 1.12)
+    expect(result.missingRates).toEqual(['GBP'])
   })
 })
 

@@ -46,6 +46,16 @@ async function countPdfPages(file: File): Promise<number> {
   return pageMatches
 }
 
+/**
+ * jsPDF's default output isn't stream-compressed, so a `doc.text(...)` call
+ * shows up as readable ASCII in the content stream (with `(`/`)` escaped to
+ * `\(`/`\)` per PDF string syntax) — good enough to assert a line is present
+ * without needing a real PDF text-extraction library.
+ */
+async function pdfText(file: File): Promise<string> {
+  return file.text()
+}
+
 beforeEach(() => {
   // jsdom doesn't implement these, and jsPDF elsewhere calls `new URL(...)`
   // internally — replacing the whole URL global (rather than patching just
@@ -130,5 +140,44 @@ describe('exportReportPdf', () => {
 
     const file = (shareOrDownloadFile as ReturnType<typeof vi.fn>).mock.calls[0][0] as File
     expect(await countPdfPages(file)).toBe(3)
+  })
+
+  it('omits the TOTAL (USD) line entirely for an all-USD report', async () => {
+    const { exportReportPdf } = await import('./pdf')
+    const { shareOrDownloadFile } = await import('./share')
+
+    await exportReportPdf(makeReport(), [makeExpense({ imageId: undefined, currency: 'USD' })])
+
+    const file = (shareOrDownloadFile as ReturnType<typeof vi.fn>).mock.calls[0][0] as File
+    const text = await pdfText(file)
+    // Only the plain grand-total line's "TOTAL" — no second "TOTAL (USD)" line.
+    expect(text.match(/TOTAL/g)?.length).toBe(1)
+  })
+
+  it('shows a converted TOTAL (USD) line using the report\'s manually-entered rate', async () => {
+    const { exportReportPdf } = await import('./pdf')
+    const { shareOrDownloadFile } = await import('./share')
+
+    await exportReportPdf(makeReport({ exchangeRates: { EUR: 1.08 } }), [
+      makeExpense({ imageId: undefined, currency: 'EUR', amount: 100 }),
+    ])
+
+    const file = (shareOrDownloadFile as ReturnType<typeof vi.fn>).mock.calls[0][0] as File
+    const text = await pdfText(file)
+    expect(text.match(/TOTAL/g)?.length).toBe(2)
+    expect(text).toContain('108.00') // 100 EUR * 1.08
+  })
+
+  it('shows an "excludes" note instead of a wrong total when no rate is set for the currency used', async () => {
+    const { exportReportPdf } = await import('./pdf')
+    const { shareOrDownloadFile } = await import('./share')
+
+    await exportReportPdf(makeReport(), [makeExpense({ imageId: undefined, currency: 'EUR', amount: 100 })])
+
+    const file = (shareOrDownloadFile as ReturnType<typeof vi.fn>).mock.calls[0][0] as File
+    const text = await pdfText(file)
+    expect(text.match(/TOTAL/g)?.length).toBe(2)
+    expect(text).toContain('Excludes EUR')
+    expect(text).toContain('no exchange rate set')
   })
 })

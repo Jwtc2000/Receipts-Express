@@ -622,6 +622,24 @@ body {
   gap: 12px;
 }
 
+.usd-total-display {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.usd-total-display strong {
+  font-size: 1.4rem;
+  color: var(--teal-dark);
+}
+
+.usd-total-note {
+  font-size: 0.78rem;
+  color: var(--orange);
+}
+
 .drawer-footer {
   padding: 14px 16px calc(env(safe-area-inset-bottom, 0px) + 14px);
   border-top: 1px solid var(--border);
