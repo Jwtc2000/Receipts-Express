@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { formatTotal, dayNumbersByDate, sortExpensesByDate, resolveDateAfterMove } from './types'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { formatTotal, dayNumbersByDate, sortExpensesByDate, resolveDateAfterMove, todayIso } from './types'
 import type { Expense } from './types'
 
 function makeExpense(overrides: Partial<Expense> = {}): Expense {
@@ -166,5 +166,34 @@ describe('resolveDateAfterMove', () => {
       makeExpense({ id: 'after', date: '2026-07-20' }),
     ]
     expect(resolveDateAfterMove(list, 1)).toBe('2026-07-20')
+  })
+})
+
+describe('todayIso', () => {
+  const originalTz = process.env.TZ
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    process.env.TZ = originalTz
+  })
+
+  it('returns the local calendar date, not the UTC date (regression)', () => {
+    // 11pm on the 27th in Los Angeles is already 6am on the 28th in UTC —
+    // a UTC-based implementation would wrongly report "tomorrow".
+    process.env.TZ = 'America/Los_Angeles'
+    vi.setSystemTime(new Date('2026-07-27T23:00:00-07:00'))
+    expect(todayIso()).toBe('2026-07-27')
+  })
+
+  it('also holds true east of UTC, where local time is already the next UTC day (regression)', () => {
+    // 1am on the 28th in Tokyo is still the 27th in UTC — a UTC-based
+    // implementation would wrongly report "yesterday".
+    process.env.TZ = 'Asia/Tokyo'
+    vi.setSystemTime(new Date('2026-07-28T01:00:00+09:00'))
+    expect(todayIso()).toBe('2026-07-28')
   })
 })

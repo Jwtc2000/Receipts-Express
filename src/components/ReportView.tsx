@@ -36,6 +36,7 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
   const [movingId, setMovingId] = useState<string | null>(null)
   const [exporting, setExporting] = useState<'pdf' | 'csv' | null>(null)
   const [exportError, setExportError] = useState<string | null>(null)
+  const [reorderError, setReorderError] = useState<string | null>(null)
   const [exportMenuOpen, setExportMenuOpen] = useState(false)
   const [renaming, setRenaming] = useState(false)
   const [nameDraft, setNameDraft] = useState('')
@@ -126,8 +127,18 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
 
   const persistOrder = async (list: Expense[]) => {
     const renumbered = list.map((e, i) => ({ ...e, position: i }))
+    const previous = expenses
     setExpenses(renumbered)
-    await saveExpenses(renumbered)
+    try {
+      await saveExpenses(renumbered)
+      setReorderError(null)
+    } catch {
+      // The optimistic reorder above already changed what's on screen —
+      // revert it so the displayed order matches what's actually persisted,
+      // instead of looking successfully reordered when it silently wasn't.
+      setExpenses(previous)
+      setReorderError("Couldn't save the new order — please try again.")
+    }
   }
 
   const moveBy = (index: number, delta: number) => {
@@ -401,6 +412,16 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
           <Icon name="warning" size={14} />
           <span>{exportError}</span>
           <button className="icon-btn" aria-label="Dismiss" onClick={() => setExportError(null)}>
+            <Icon name="close" size={14} />
+          </button>
+        </div>
+      )}
+
+      {reorderError && (
+        <div className="report-export-error" role="alert">
+          <Icon name="warning" size={14} />
+          <span>{reorderError}</span>
+          <button className="icon-btn" aria-label="Dismiss" onClick={() => setReorderError(null)}>
             <Icon name="close" size={14} />
           </button>
         </div>

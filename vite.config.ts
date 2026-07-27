@@ -142,7 +142,11 @@ export default defineConfig({
             handler: 'CacheFirst',
             options: {
               cacheName: 'tesseract-engine',
-              expiration: { maxEntries: 12 }
+              // Without maxAgeSeconds these entries never expire, so a
+              // future security patch to tesseract.js/pdfjs-dist would
+              // never reach an already-onboarded device short of manually
+              // clearing site data.
+              expiration: { maxEntries: 12, maxAgeSeconds: 30 * 24 * 60 * 60 }
             }
           },
           {
@@ -150,7 +154,7 @@ export default defineConfig({
             handler: 'CacheFirst',
             options: {
               cacheName: 'pdfjs-engine',
-              expiration: { maxEntries: 40 }
+              expiration: { maxEntries: 40, maxAgeSeconds: 30 * 24 * 60 * 60 }
             }
           }
         ]

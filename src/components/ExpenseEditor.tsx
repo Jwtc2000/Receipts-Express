@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Expense } from '../types'
-import { CATEGORIES, newId } from '../types'
+import { CATEGORIES, newId, todayIso } from '../types'
 import { getExpense, saveExpenseWithImage, getImage, nextPosition } from '../db'
 import { compressImage } from '../image'
 import { isPdfFile } from '../pdfDetect'
 import { extractReceipt } from '../ocr'
+import { setHasUnsavedWork } from '../unsavedWork'
 import Icon from './icons'
 import { HeaderPlanes } from './decorative'
 
@@ -30,14 +31,17 @@ const emptyDraft: Draft = {
   merchant: '',
   amount: '',
   currency: 'USD',
-  date: new Date().toISOString().slice(0, 10),
+  // Overwritten with todayIso() at mount time below — this placeholder is
+  // never shown. A frozen value here would go stale for a session that
+  // spans local midnight without a full reload.
+  date: '',
   category: 'Other',
   notes: '',
   personalAmount: '',
 }
 
 export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
-  const [draft, setDraft] = useState<Draft>(emptyDraft)
+  const [draft, setDraft] = useState<Draft>(() => ({ ...emptyDraft, date: todayIso() }))
   const [existing, setExisting] = useState<Expense | null>(null)
   const [imageBlob, setImageBlob] = useState<Blob | null>(null)
   const [imageUrl, setImageUrl] = useState<string | null>(null)
@@ -48,6 +52,10 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
   const [imageChanged, setImageChanged] = useState(false)
   const [scanState, setScanState] = useState<'idle' | 'scanning' | 'done' | 'failed'>('idle')
   const [scanPct, setScanPct] = useState(0)
+  // True while a picked file is being rendered/compressed, before OCR even
+  // starts — the only feedback during that stretch otherwise was none at
+  // all, which is also the window a second, faster pick could race into.
+  const [picking, setPicking] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [captureError, setCaptureError] = useState<string | null>(null)
@@ -56,6 +64,14 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
   const [dirty, setDirty] = useState(false)
   const cameraInput = useRef<HTMLInputElement>(null)
   const fileInput = useRef<HTMLInputElement>(null)
+  // Bumped on every pick; a still-in-flight pick whose generation no longer
+  // matches when it resolves has been superseded by a newer one and must
+  // not overwrite whatever the newer pick already applied.
+  const pickGenRef = useRef(0)
+  // Synchronous re-entry lock for save() — the `saving` state above only
+  // takes effect after a render commits, which doesn't block two save()
+  // calls dispatched within the same tick (e.g. a fast double-tap).
+  const submittingRef = useRef(false)
 
   useEffect(() => {
     if (!expenseId) return
@@ -114,6 +130,16 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
     return () => window.removeEventListener('beforeunload', onBeforeUnload)
   }, [dirty])
 
+  // Mirrors `dirty` into a module-level signal UpdateBanner can check — it's
+  // an unrelated sibling with no shared state, and beforeunload above isn't
+  // reliable on iOS Safari (browser tab or installed Home Screen PWA).
+  useEffect(() => {
+    setHasUnsavedWork(dirty)
+  }, [dirty])
+  useEffect(() => {
+    return () => setHasUnsavedWork(false)
+  }, [])
+
   const set = (patch: Partial<Draft>) => {
     setDirty(true)
     setDraft((d) => ({ ...d, ...patch }))
@@ -122,6 +148,12 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
   const onImagePicked = async (file: File | undefined) => {
     if (!file) return
     setCaptureError(null)
+    // Bump the generation before any await — if a second pick starts before
+    // this one resolves, this run's `gen` stops matching pickGenRef.current
+    // and every check below skips applying its (now-stale) result instead
+    // of overwriting whatever the newer pick already applied.
+    const gen = ++pickGenRef.current
+    setPicking(true)
     // Rendering/compression can genuinely fail (an unsupported photo format
     // like HEIC on some browsers, a corrupt file, a password-protected or
     // malformed PDF, or canvas.toBlob returning null). Without this catch
@@ -137,14 +169,20 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
       } else {
         pages = [await compressImage(file)]
       }
-    } catch {
+    } catch (err) {
+      if (gen !== pickGenRef.current) return
+      setPicking(false)
+      const tooManyPages = err instanceof Error && err.name === 'PdfTooManyPages'
       setCaptureError(
-        isPdfFile(file)
-          ? "Couldn't read that PDF — it may be password-protected or corrupted. Try again, or pick a different file."
-          : "Couldn't process that photo — try again, or pick a different image.",
+        tooManyPages
+          ? err.message
+          : isPdfFile(file)
+            ? "Couldn't read that PDF — it may be password-protected or corrupted. Try again, or pick a different file."
+            : "Couldn't process that photo — try again, or pick a different image.",
       )
       return
     }
+    if (gen !== pickGenRef.current) return
     const [firstPage, ...restPages] = pages
     setDirty(true)
     setImageBlob(firstPage)
@@ -158,12 +196,17 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
       for (const url of old) URL.revokeObjectURL(url)
       return restPages.map((b) => URL.createObjectURL(b))
     })
+    // The picked file is fully rendered/compressed and attached — the race
+    // window `picking` guards against is over, so it's safe to save again
+    // even though OCR (below) is still running in the background.
+    setPicking(false)
 
     // Auto-extract details with on-device OCR, from the receipt's first page
     setScanState('scanning')
     setScanPct(0)
     try {
       const extracted = await extractReceipt(firstPage, setScanPct)
+      if (gen !== pickGenRef.current) return
       setDraft((d) => ({
         ...d,
         merchant: extracted.merchant ?? d.merchant,
@@ -174,11 +217,15 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
       setScanState('done')
     } catch {
       // The receipt is already attached; OCR failing just means manual entry.
-      setScanState('failed')
+      if (gen === pickGenRef.current) setScanState('failed')
     }
   }
 
   const removeImage = () => {
+    // Invalidate any pick still in flight so its result can't land after
+    // the user has explicitly removed the receipt.
+    pickGenRef.current++
+    setPicking(false)
     setDirty(true)
     setImageBlob(null)
     setImageChanged(true)
@@ -202,13 +249,25 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
   }
 
   const save = async () => {
+    // Synchronous re-entry lock: `saving` (below) only takes effect once a
+    // render commits, which doesn't stop two save() calls dispatched in the
+    // same tick (e.g. a fast double-tap) from both passing the disabled
+    // check and each creating their own duplicate expense record.
+    if (submittingRef.current) return
     const amount = parseFloat(draft.amount)
     if (isNaN(amount)) return
+    submittingRef.current = true
     setSaving(true)
     setSaveError(null)
     try {
-      const previousImageId = existing?.imageId
-      const previousExtraImageIds = existing?.extraImageIds ?? []
+      // When this tab isn't touching the receipt image, re-fetch the
+      // current record rather than trusting `existing` (captured when this
+      // tab loaded) — otherwise saving an unrelated field edit (e.g. Notes)
+      // after another tab/session replaced the image would silently revert
+      // the expense back to the image that replacement just deleted.
+      const latest = imageChanged || !existing ? existing : await getExpense(existing.id)
+      const previousImageId = latest?.imageId
+      const previousExtraImageIds = latest?.extraImageIds ?? []
       // Three cases: untouched (keep imageId/extraImageIds as-is); replaced
       // with new pages (fresh ids for every page, all old pages deleted);
       // removed entirely (ids cleared, old pages deleted). imageChanged
@@ -269,6 +328,7 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
       )
     } finally {
       setSaving(false)
+      submittingRef.current = false
     }
   }
 
@@ -282,7 +342,7 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
           <Icon name="chevron-left" size={22} />
         </button>
         <h1>{expenseId ? 'Edit Expense' : 'New Expense'}</h1>
-        <button className="btn primary small" onClick={() => void save()} disabled={!canSave || saving}>
+        <button className="btn primary small" onClick={() => void save()} disabled={!canSave || saving || picking}>
           {saving ? 'Saving…' : 'Save'}
         </button>
       </header>
@@ -333,26 +393,26 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
               </div>
             )}
             <div className="preview-actions">
-              <button className="btn ghost small with-icon" onClick={() => cameraInput.current?.click()}>
+              <button className="btn ghost small with-icon" disabled={picking} onClick={() => cameraInput.current?.click()}>
                 <Icon name="camera" size={16} /> Retake
               </button>
-              <button className="btn ghost small with-icon" onClick={() => fileInput.current?.click()}>
+              <button className="btn ghost small with-icon" disabled={picking} onClick={() => fileInput.current?.click()}>
                 <Icon name="file" size={16} /> Replace
               </button>
-              <button className="btn ghost small with-icon" onClick={removeImage}>
+              <button className="btn ghost small with-icon" disabled={picking} onClick={removeImage}>
                 <Icon name="trash" size={16} /> Remove
               </button>
             </div>
           </div>
         ) : (
           <div className="capture-buttons">
-            <button className="capture-btn" onClick={() => cameraInput.current?.click()}>
+            <button className="capture-btn" disabled={picking} onClick={() => cameraInput.current?.click()}>
               <span className="capture-icon">
                 <Icon name="camera" size={32} />
               </span>
               Scan with camera
             </button>
-            <button className="capture-btn" onClick={() => fileInput.current?.click()}>
+            <button className="capture-btn" disabled={picking} onClick={() => fileInput.current?.click()}>
               <span className="capture-icon">
                 <Icon name="file" size={32} />
               </span>
@@ -361,6 +421,12 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
           </div>
         )}
 
+        {picking && scanState !== 'scanning' && (
+          <div className="scan-banner">
+            <div className="spinner" />
+            Processing file…
+          </div>
+        )}
         {scanState === 'scanning' && (
           <div className="scan-banner">
             <div className="spinner" />

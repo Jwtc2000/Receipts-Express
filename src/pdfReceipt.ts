@@ -7,6 +7,10 @@ const ASSET_BASE = `${import.meta.env.BASE_URL}pdfjs`
 pdfjsLib.GlobalWorkerOptions.workerSrc = `${ASSET_BASE}/pdf.worker.min.mjs`
 
 const MAX_RENDER_DIM = 1800
+// A real receipt/invoice is a handful of pages; a much larger PDF is almost
+// always a mis-pick (an itinerary, a statement) and would otherwise render
+// every page in an unbroken, uncancellable sequence with no feedback.
+const MAX_PAGES = 25
 
 /**
  * Rasterize every page of a PDF receipt into compressed JPEG blobs, one per
@@ -28,6 +32,13 @@ export async function renderPdfPages(file: Blob): Promise<Blob[]> {
   try {
     const pdf = await loadingTask.promise
     if (pdf.numPages === 0) throw new Error('PDF has no pages')
+    if (pdf.numPages > MAX_PAGES) {
+      const err = new Error(
+        `This PDF has ${pdf.numPages} pages — receipts are limited to ${MAX_PAGES} pages per file. Try a shorter document.`,
+      )
+      err.name = 'PdfTooManyPages'
+      throw err
+    }
     const pages: Blob[] = []
     for (let i = 1; i <= pdf.numPages; i++) {
       const page = await pdf.getPage(i)
