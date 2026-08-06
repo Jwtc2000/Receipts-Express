@@ -8,7 +8,7 @@ user-facing features, and `PATCH` for fixes with no visible feature change. The
 version lives in `package.json` and is shown in the app under Menu → About. Every
 merge to `main` that changes app behavior gets a version bump and a tag.
 
-## [1.10.0] - 2026-08-06
+## [1.12.0] - 2026-08-06
 
 ### Added
 - Multiple project numbers: save a list of the projects you charge to
@@ -19,7 +19,132 @@ merge to `main` that changes app behavior gets a version bump and a tag.
   project numbers are per-device (localStorage) like the rest of the
   profile; a report's project number travels with it in backups.
 
-## [1.9.3] - 2026-07-21
+## [1.11.1] - 2026-07-27
+
+### Changed
+- Replaced the main page's plain-text title and separate receipt/express-arrow
+  icons with a single responsive stacked SVG logo (`LogoTitle.tsx`) — "Receipts"
+  over "EXPRESS" — that scales to fit any screen width.
+
+## [1.11.0] - 2026-07-27
+
+### Added
+- A FOREIGN→USD total conversion, using manually-entered exchange rates (no
+  network calls are made to fetch one — this app makes none beyond loading
+  itself). Set a rate per foreign currency at the top of the Report Menu
+  drawer ("Total (USD)"); the converted total shows there and, once a
+  report has any non-USD expense, as a "TOTAL (USD)" line on the PDF
+  export's first page. A currency with no rate set is excluded from the
+  total and called out explicitly rather than silently treated as 1:1.
+- Currency entry was already unrestricted (free text, not a fixed list) —
+  confirmed and left as-is, no code change needed.
+
+## [1.10.2] - 2026-07-27
+
+### Changed
+- jsPDF is now loaded on demand (like PDF.js already was) instead of being
+  bundled into every app launch — the main JS chunk drops from ~617KB to
+  ~223KB raw for anyone who never exports a PDF that session.
+- The PWA's mandatory install-time precache no longer includes jsPDF's
+  unused optional `.html()`-renderer dependencies (html2canvas, DOMPurify,
+  canvg's polyfill chunk) — code that could never execute, since this app
+  never calls jsPDF's `.html()` method.
+- Added `base-uri 'self'; form-action 'self'` to the CSP (meta-compatible,
+  costs nothing for a single-page app with no external forms).
+
+### Fixed
+- Test suite honesty pass (remaining findings from the full repository
+  audit, `~/full-repo-audit.md`, not already covered by 1.10.1): added
+  jsdom + React Testing Library infrastructure, and closed every previously
+  zero-coverage gap it named — `share.ts`'s success/failure branches,
+  `pdf.ts`'s multi-page export/pagination logic, the `ExpenseEditor`
+  save-image-argument computation (attach/replace/remove), `pdfReceipt.ts`'s
+  page loop and page cap, `saveExpenseWithImage`'s failure branch,
+  `backup.test.ts`'s `extraImageIds` round-trip, and two `ocr.ts` messy-text
+  parsing gaps (a promotional-header line stealing the merchant slot;
+  European comma-decimal/currency-symbol totals).
+
+### Documentation
+- README.md, SECURITY.md, docs/PILOT.md, docs/PILOT_DECK.md,
+  docs/pilot-deck.html, and docs/governance/REVIEW.md now all mention the
+  PDF-upload input path (previously undocumented — only PDF *export* was
+  described).
+- SECURITY.md documents a known structural limitation: no clickjacking
+  defense is possible on the current GitHub Pages host, since
+  `frame-ancestors` is ignored when a CSP is delivered via `<meta>` rather
+  than a header.
+- Fixed the README's CI table wording, a stale "Restore from file" button
+  label in the pilot deck, and the PDF-export feature bullet's description
+  of where multi-page receipt details are drawn.
+- Documented the multi-page receipt page-removal scope gap (whole-receipt
+  Remove only, no per-page control) as an intentional decision, not an
+  oversight.
+
+## [1.10.1] - 2026-07-27
+
+### Fixed
+- Confirmed bugs from a full repository audit (`~/full-repo-audit.md`), in
+  priority order:
+  - Picking a receipt (photo or PDF) now shows a "Processing file…" banner
+    and disables Retake/Replace/Remove/capture/Save while the file is being
+    rendered/compressed — previously that stretch had no feedback and was
+    a window a second, faster pick could race into and corrupt.
+  - Save is now guarded against double-submit (e.g. a fast double-tap)
+    with a synchronous lock.
+  - Save now refetches the expense's current image IDs immediately before
+    computing which images are stale, narrowing (not eliminating) the
+    window where a save from a second tab could orphan an image that a
+    concurrent edit in another tab had just attached.
+  - PDF receipts are now capped at 25 pages, with a clear error instead of
+    rendering an unbounded document one page at a time with no way to
+    cancel.
+  - CSV export now neutralizes leading `=`, `+`, `-`, `@` characters in
+    text fields, closing a formula/DDE-injection path when a report is
+    opened in Excel/Sheets.
+  - CSV export now includes the "Personal Amount" column — present in the
+    data model and in PDF export, but silently missing from CSV.
+  - An app update no longer reloads out from under an in-progress,
+    unsaved expense; the update banner now confirms before discarding it.
+  - Reordering expenses in a report now shows an error and reverts the
+    list if the new order fails to save, instead of leaving the UI out of
+    sync with what's actually stored.
+  - The cached OCR/PDF engine files (tesseract.js, PDF.js) now expire
+    after 30 days instead of indefinitely, matching the fix already
+    shipped for the icon/shell cache.
+  - `todayIso()` — used to default a new expense's date — read UTC date
+    components, so it could show tomorrow's or yesterday's date for
+    anyone outside UTC once local time crossed the UTC day boundary while
+    still the same calendar day locally. It's now local-time-correct.
+  - The new-expense date field is now computed once, correctly, via a
+    lazy initializer instead of at module load — closing a related stale-
+    date gap for a session left open across a day boundary.
+
+## [1.10.0] - 2026-07-27
+
+### Added
+- Receipts can now be attached as a PDF instead of a photo, from the same
+  "Choose photo or PDF" picker. Both single-page and multi-page PDFs are
+  supported: each page is rasterized on-device (via a self-hosted PDF.js,
+  loaded only when a PDF is actually picked) and stored the same way a
+  photographed receipt is, so OCR, thumbnails and backup/restore all work
+  unchanged. On-device OCR runs against the PDF's first page.
+- The expense editor shows a "N pages" badge and a thumbnail strip for
+  every page of a multi-page receipt.
+- PDF report export now gives a multi-page receipt one full PDF page per
+  source page (labeled "page N of M"), each scaled to fit without cropping;
+  the expense's title/amount/notes are shown once, under the last page.
+
+## [1.9.4] - 2026-07-20
+
+### Fixed
+- PDF export now goes through the same hardened share/download path as CSV
+  export instead of calling jsPDF's `doc.save()` directly. `doc.save()` was
+  fire-and-forget internally, so a blocked or failed download wouldn't
+  reject and the export would look like it succeeded when nothing was
+  saved — the exact "failed export reported as success" bug the 1.9.3
+  data-loss hardening pass fixed for CSV but missed for PDF.
+
+## [1.9.3] - 2026-07-20
 
 ### Fixed
 - Data-loss hardening (top findings from the data-loss audit):

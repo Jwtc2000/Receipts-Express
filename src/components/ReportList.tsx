@@ -16,6 +16,7 @@ import Icon from './icons'
 import DrawerSection from './DrawerSection'
 import ProjectSelect from './ProjectSelect'
 import { ArrowDivider, HeaderPlanes } from './decorative'
+import { LogoTitle } from './LogoTitle'
 
 interface ReportSummary {
   report: Report
@@ -155,13 +156,9 @@ export default function ReportList({ onOpenReport, onEditExpense }: Props) {
       <header className="topbar">
         <HeaderPlanes />
         <div className="topbar-title">
-          <span className="logo">
-            <Icon name="receipt" size={24} />
-          </span>
-          <h1>Receipts Express</h1>
-          <span className="express-arrow">
-            <Icon name="express-arrow" size={26} />
-          </span>
+          <h1 className="logo-heading" title="Receipts Express">
+            <LogoTitle />
+          </h1>
         </div>
         <button
           className="icon-btn"

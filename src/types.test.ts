@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { formatTotal, dayNumbersByDate, sortExpensesByDate, resolveDateAfterMove } from './types'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { formatTotal, usdTotal, dayNumbersByDate, sortExpensesByDate, resolveDateAfterMove, todayIso } from './types'
 import type { Expense } from './types'
 
 function makeExpense(overrides: Partial<Expense> = {}): Expense {
@@ -50,6 +50,56 @@ describe('formatTotal', () => {
         { amount: 15, currency: 'usd' },
       ]),
     ).toBe('$35.00')
+  })
+})
+
+describe('usdTotal', () => {
+  it('sums USD expenses with no rates needed', () => {
+    const result = usdTotal([{ amount: 20, currency: 'USD' }, { amount: 15, currency: 'usd' }], undefined)
+    expect(result).toEqual({ total: 35, missingRates: [] })
+  })
+
+  it('converts a rated foreign currency and adds it to the USD total', () => {
+    const result = usdTotal(
+      [
+        { amount: 20, currency: 'USD' },
+        { amount: 100, currency: 'EUR' },
+      ],
+      { EUR: 1.08 },
+    )
+    expect(result.total).toBeCloseTo(20 + 100 * 1.08)
+    expect(result.missingRates).toEqual([])
+  })
+
+  it('excludes an unrated currency from the total and reports it as missing', () => {
+    const result = usdTotal(
+      [
+        { amount: 20, currency: 'USD' },
+        { amount: 100, currency: 'EUR' },
+      ],
+      undefined,
+    )
+    expect(result.total).toBe(20)
+    expect(result.missingRates).toEqual(['EUR'])
+  })
+
+  it('treats a zero or negative rate as missing rather than zeroing out the total', () => {
+    const result = usdTotal([{ amount: 100, currency: 'EUR' }], { EUR: 0 })
+    expect(result.total).toBe(0)
+    expect(result.missingRates).toEqual(['EUR'])
+  })
+
+  it('handles multiple foreign currencies, some rated and some not', () => {
+    const result = usdTotal(
+      [
+        { amount: 100, currency: 'EUR' },
+        { amount: 50, currency: 'GBP' },
+        { amount: 30, currency: 'CHF' },
+      ],
+      { EUR: 1.08, CHF: 1.12 },
+    )
+    expect(result.total).toBeCloseTo(100 * 1.08 + 30 * 1.12)
+    expect(result.missingRates).toEqual(['GBP'])
   })
 })
 
@@ -166,5 +216,34 @@ describe('resolveDateAfterMove', () => {
       makeExpense({ id: 'after', date: '2026-07-20' }),
     ]
     expect(resolveDateAfterMove(list, 1)).toBe('2026-07-20')
+  })
+})
+
+describe('todayIso', () => {
+  const originalTz = process.env.TZ
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    process.env.TZ = originalTz
+  })
+
+  it('returns the local calendar date, not the UTC date (regression)', () => {
+    // 11pm on the 27th in Los Angeles is already 6am on the 28th in UTC —
+    // a UTC-based implementation would wrongly report "tomorrow".
+    process.env.TZ = 'America/Los_Angeles'
+    vi.setSystemTime(new Date('2026-07-27T23:00:00-07:00'))
+    expect(todayIso()).toBe('2026-07-27')
+  })
+
+  it('also holds true east of UTC, where local time is already the next UTC day (regression)', () => {
+    // 1am on the 28th in Tokyo is still the 27th in UTC — a UTC-based
+    // implementation would wrongly report "yesterday".
+    process.env.TZ = 'Asia/Tokyo'
+    vi.setSystemTime(new Date('2026-07-28T01:00:00+09:00'))
+    expect(todayIso()).toBe('2026-07-28')
   })
 })

@@ -42,6 +42,7 @@ This markdown file represents the content of the interactive slide deck designed
 #### Key Pilot Features:
 * **On-Device OCR**: [Tesseract.js](https://tesseract.projectnaptha.com/) scans receipts and extracts fields locally. No external APIs, no cloud processing.
     > **What is OCR?** OCR (Optical Character Recognition) is the automated technology that reads the text inside receipt images (merchant names, dates, and amounts) and converts it into editable digital text. Running it fully on-device via WebAssembly means no images or transcripts are ever sent over the network to external systems.
+* **Photo or PDF Capture**: Receipts can be added as a camera photo or an uploaded PDF (single- or multi-page, e.g. an emailed invoice). PDFs are rasterized on-device via a self-hosted PDF.js, then flow through the same on-device OCR, storage, and export path as a photographed receipt.
 * **Reports Manager**: Create, name, and drag-and-drop receipts to reorder. Group expenses easily by business trip.
 * **Secure Storage**: Data stays safely in your local browser sandbox ([IndexedDB](https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API)). Zero servers are involved.
 * **Local PDF Export**: Generates a comprehensive trip summary followed by full-page receipt images.
@@ -64,13 +65,13 @@ Receipts Express's pilot governance structure is formatted after the **AI Pilot 
 | Field | Value / Response |
 | --- | --- |
 | **Data Classification** | Confidential (Receipts contain real personal/financial data) |
-| **AI Engine Location** | On-Device Only (Self-hosted Tesseract.js WASM engine) |
+| **AI Engine Location** | On-Device Only (Self-hosted Tesseract.js OCR + PDF.js rasterization, both WASM) |
 | **Data Egress Control** | Enforced by Content-Security-Policy (`connect-src 'self'`) |
 | **Human-in-the-Loop** | Active (User must verify and edit OCR drafts before saving) |
 
 > **How Governance Applies to this Pilot:**
 > * **Data Classification**: Receipts contain names, merchant locations, purchase itemizations, and partial card numbers. Since this is Confidential employee financial data, it is governed under strict corporate privacy requirements. Receipts Express complies by keeping all data local inside your browser profile's sandboxed storage.
-> * **AI Engine Location**: Corporate policies restrict transmitting private data to unapproved cloud AI endpoints. Receipts Express mitigates this by self-hosting the Tesseract.js OCR engine locally. All text recognition runs on your device inside your browser sandbox, requiring no internet connection.
+> * **AI Engine Location**: Corporate policies restrict transmitting private data to unapproved cloud AI endpoints. Receipts Express mitigates this by self-hosting the Tesseract.js OCR engine locally, and self-hosting PDF.js for PDF-receipt rasterization the same way. All text recognition and PDF processing runs on your device inside your browser sandbox, requiring no internet connection.
 > * **Data Egress Control**: Policy compliance is enforced at the browser level via a Content-Security-Policy (CSP). The header `connect-src 'self'` programmatically blocks the browser from sending data to any external server or API, meaning even a compromised dependency cannot exfiltrate your receipts.
 > * **Human-in-the-Loop**: AI algorithms can misread numbers or dates. To ensure financial audit readiness, the OCR engine only populates editable draft inputs. The user is the responsible human owner who must review and manually verify all dates and amounts before exporting the PDF.
 
@@ -129,7 +130,7 @@ To ensure zero loss of receipt data while piloting the web application, particip
 
 1. **Save JSON Backups — Local First, Then Cloud**: When clicking "Back up now", the app generates a single `.json` file containing all data. **Easiest:** save it straight to your device's local storage (Downloads or Files app) first — no login, no upload wait. **Then**, for redundancy, copy that same file into corporate/secured cloud storage under an `Expenses-Backup` folder, in this order: OneDrive, then Google Drive, then iCloud or SharePoint — whichever your organization provides.
 2. **Backup Frequency Rule**: Always export a fresh backup after scanning new receipts on a trip. Do not ignore the in-app "Backup stale" warning. Treat Receipts Express as a **capture utility, not a long-term archive**. Export the final expense report PDF promptly.
-3. **Cross-Device Restore**: If you upgrade your phone or switch browsers, export a backup JSON from your old device and click **Restore from file** on the new device to seamlessly merge all your reports, receipts, and images.
+3. **Cross-Device Restore**: If you upgrade your phone or switch browsers, export a backup JSON from your old device and click **Restore** on the new device to seamlessly merge all your reports, receipts, and images.
 
 ![Receipts Express home screen showing the Back up your receipts card](../assets/backup_view.jpg)
 

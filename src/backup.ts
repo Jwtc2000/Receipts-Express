@@ -41,7 +41,10 @@ function isValidReport(v: unknown): v is Report {
     (v.endDate === undefined || typeof v.endDate === 'string') &&
     (v.dailyMealAllowance === undefined ||
       (typeof v.dailyMealAllowance === 'number' && Number.isFinite(v.dailyMealAllowance))) &&
-    (v.projectNumber === undefined || typeof v.projectNumber === 'string')
+    (v.projectNumber === undefined || typeof v.projectNumber === 'string') &&
+    (v.exchangeRates === undefined ||
+      (isPlainObject(v.exchangeRates) &&
+        Object.values(v.exchangeRates).every((r) => typeof r === 'number' && Number.isFinite(r) && r > 0)))
   )
 }
 
@@ -63,6 +66,8 @@ function isValidExpense(v: unknown): v is Expense {
     typeof v.category === 'string' &&
     typeof v.notes === 'string' &&
     (v.imageId === undefined || typeof v.imageId === 'string') &&
+    (v.extraImageIds === undefined ||
+      (Array.isArray(v.extraImageIds) && v.extraImageIds.every((x) => typeof x === 'string'))) &&
     typeof v.createdAt === 'number' &&
     Number.isFinite(v.createdAt) &&
     (v.personalAmount === undefined ||

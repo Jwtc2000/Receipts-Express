@@ -1,11 +1,12 @@
-import { jsPDF } from 'jspdf'
+import type { jsPDF } from 'jspdf'
 import type { Report, Expense } from './types'
-import { formatMoney, formatTotal, formatDate, dayNumbersByDate } from './types'
+import { formatMoney, formatTotal, formatDate, dayNumbersByDate, usdTotal } from './types'
 import { getImage } from './db'
 import { blobToDataURL, imageDimensions } from './image'
 import { getProfile, profileSummaryLines } from './profile'
 import { dayColor, contrastText } from './colors'
 import { foodBalanceForDate, formatFoodBalance, formatPersonalTotal } from './mealAllowance'
+import { shareOrDownloadFile } from './share'
 
 const PAGE_W = 595.28 // A4 portrait, points
 const PAGE_H = 841.89
@@ -53,6 +54,11 @@ function drawMealIcon(doc: jsPDF, cx: number, cy: number, size: number): void {
  * total, followed by one full page per receipt image with its details below.
  */
 export async function exportReportPdf(report: Report, expenses: Expense[]): Promise<void> {
+  // Loaded on demand, like pdfReceipt.ts's PDF.js — jsPDF is sizeable and its
+  // plugin-registration architecture means it doesn't tree-shake, so a static
+  // import would ship it to every app launch even for someone who never
+  // exports a PDF that session.
+  const { jsPDF } = await import('jspdf')
   const doc = new jsPDF({ unit: 'pt', format: 'a4' })
   const totalDisplay = formatTotal(expenses)
 
@@ -189,99 +195,154 @@ export async function exportReportPdf(report: Report, expenses: Expense[]): Prom
     doc.text(personalTotal, cols.amount, y, { align: 'right' })
   }
 
-  // ---------- One page per receipt ----------
-  for (const [index, expense] of expenses.entries()) {
-    doc.addPage()
-
-    // Header strip
-    doc.setFillColor(...LIGHT)
-    doc.rect(0, 0, PAGE_W, 40, 'F')
-    doc.setTextColor(...SLATE)
+  // FOREIGN -> USD total, using the manually-entered rates from the Report
+  // Menu (see types.ts's usdTotal — this app makes no network calls, so
+  // there is no live rate to fetch). Only shown when the report actually
+  // has a non-USD expense; an all-USD report's TOTAL line above already is
+  // the USD total.
+  const foreignCurrencyCount = new Set(
+    expenses.map((e) => e.currency.trim().toUpperCase()).filter((c) => c && c !== 'USD'),
+  ).size
+  if (foreignCurrencyCount > 0) {
+    const converted = usdTotal(expenses, report.exchangeRates)
+    y += 20
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(11)
-    doc.text(expense.title || expense.merchant || 'Untitled expense', MARGIN, 25)
-    doc.setFont('helvetica', 'normal')
-    doc.text(`Receipt ${index + 1} of ${expenses.length}`, PAGE_W - MARGIN, 25, { align: 'right' })
-
-    // Day banner, matching the summary table's day dividers
-    const dayNumber = expense.date ? dayNumberByDate.get(expense.date) : undefined
-    const pageFoodBalance =
-      dayNumber !== undefined && report.dailyMealAllowance
-        ? foodBalanceForDate(expenses, expense.date, report.dailyMealAllowance)
-        : null
-    let contentTop = 56
-    if (dayNumber !== undefined) {
-      const bannerH = pageFoodBalance ? 32 : 20
-      const bg = dayColor(dayNumber)
-      doc.setFillColor(...bg)
-      doc.rect(0, 40, PAGE_W, bannerH, 'F')
-      doc.setTextColor(...contrastText(bg))
-      doc.setFont('helvetica', 'bold')
-      doc.setFontSize(9)
-      doc.text(`DAY ${dayNumber}`, MARGIN, 40 + 14)
-      doc.setFont('helvetica', 'normal')
-      doc.text(formatDate(expense.date), MARGIN + 55, 40 + 14)
-      if (pageFoodBalance) {
-        doc.setFontSize(8)
-        doc.text(formatFoodBalance(pageFoodBalance), MARGIN, 40 + 26)
-      }
-      contentTop = 40 + bannerH + 16
-    }
-
-    // Receipt image, as large as fits above the details block
-    const detailsTop = PAGE_H - 150
-    const imgArea = { x: MARGIN, y: contentTop, w: PAGE_W - 2 * MARGIN, h: detailsTop - contentTop - 16 }
-    const stored = expense.imageId ? await getImage(expense.imageId) : undefined
-    if (stored) {
-      const dataUrl = await blobToDataURL(stored.blob)
-      const dim = await imageDimensions(dataUrl)
-      const scale = Math.min(imgArea.w / dim.width, imgArea.h / dim.height)
-      const w = dim.width * scale
-      const h = dim.height * scale
-      const x = imgArea.x + (imgArea.w - w) / 2
-      doc.addImage(dataUrl, 'JPEG', x, imgArea.y, w, h)
-    } else {
-      const centerX = PAGE_W / 2
-      const centerY = imgArea.y + imgArea.h / 2 - 24
-      drawNoReceiptIcon(doc, centerX, centerY, 36)
-      doc.setTextColor(...MUTED_GRAY)
-      doc.setFont('helvetica', 'normal')
-      doc.setFontSize(12)
-      doc.text('No receipt image', centerX, centerY + 56, { align: 'center' })
-    }
-
-    // Details block
-    doc.setDrawColor(...TEAL)
-    doc.setLineWidth(2)
-    doc.line(MARGIN, detailsTop, PAGE_W - MARGIN, detailsTop)
-
-    let dy = detailsTop + 24
-    doc.setTextColor(...TEAL)
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(15)
-    doc.text(expense.title || expense.merchant || 'Untitled expense', MARGIN, dy)
     doc.setTextColor(...SLATE)
-    doc.setFontSize(15)
-    doc.text(formatMoney(expense.amount, expense.currency), PAGE_W - MARGIN, dy, { align: 'right' })
+    doc.text('TOTAL (USD)', cols.title, y)
+    doc.text(formatMoney(converted.total, 'USD'), cols.amount, y, { align: 'right' })
+    if (converted.missingRates.length > 0) {
+      y += 13
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(8)
+      doc.setTextColor(...MUTED_GRAY)
+      doc.text(`Excludes ${converted.missingRates.join(', ')} — no exchange rate set`, cols.title, y)
+    }
+  }
 
-    dy += 22
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(10)
-    const parts = [
-      expense.merchant && expense.merchant !== expense.title ? expense.merchant : null,
-      formatDate(expense.date),
-      expense.category,
-    ].filter(Boolean)
-    doc.text(parts.join('   ·   '), MARGIN, dy)
+  // ---------- One PDF page per receipt page ----------
+  // A photographed receipt is one image; an uploaded multi-page PDF receipt
+  // is several (imageId is page 1, extraImageIds the rest) — each becomes
+  // its own full page here, in receipt order, so nothing is cropped or
+  // merged into a page too small to hold it.
+  for (const [index, expense] of expenses.entries()) {
+    const pageImageIds = [expense.imageId, ...(expense.extraImageIds ?? [])].filter(
+      (id): id is string => !!id,
+    )
+    const totalPages = Math.max(pageImageIds.length, 1)
 
-    if (expense.notes) {
-      dy += 18
-      doc.setTextColor(100, 116, 139)
-      const noteLines = doc.splitTextToSize(expense.notes, PAGE_W - 2 * MARGIN)
-      doc.text(noteLines.slice(0, 3), MARGIN, dy)
+    for (let p = 0; p < totalPages; p++) {
+      doc.addPage()
+      const isLastPage = p === totalPages - 1
+
+      // Header strip
+      doc.setFillColor(...LIGHT)
+      doc.rect(0, 0, PAGE_W, 40, 'F')
+      doc.setTextColor(...SLATE)
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(11)
+      doc.text(expense.title || expense.merchant || 'Untitled expense', MARGIN, 25)
+      doc.setFont('helvetica', 'normal')
+      const receiptLabel =
+        totalPages > 1
+          ? `Receipt ${index + 1} of ${expenses.length}  ·  page ${p + 1} of ${totalPages}`
+          : `Receipt ${index + 1} of ${expenses.length}`
+      doc.text(receiptLabel, PAGE_W - MARGIN, 25, { align: 'right' })
+
+      // Day banner, matching the summary table's day dividers
+      const dayNumber = expense.date ? dayNumberByDate.get(expense.date) : undefined
+      const pageFoodBalance =
+        dayNumber !== undefined && report.dailyMealAllowance
+          ? foodBalanceForDate(expenses, expense.date, report.dailyMealAllowance)
+          : null
+      let contentTop = 56
+      if (dayNumber !== undefined) {
+        const bannerH = pageFoodBalance ? 32 : 20
+        const bg = dayColor(dayNumber)
+        doc.setFillColor(...bg)
+        doc.rect(0, 40, PAGE_W, bannerH, 'F')
+        doc.setTextColor(...contrastText(bg))
+        doc.setFont('helvetica', 'bold')
+        doc.setFontSize(9)
+        doc.text(`DAY ${dayNumber}`, MARGIN, 40 + 14)
+        doc.setFont('helvetica', 'normal')
+        doc.text(formatDate(expense.date), MARGIN + 55, 40 + 14)
+        if (pageFoodBalance) {
+          doc.setFontSize(8)
+          doc.text(formatFoodBalance(pageFoodBalance), MARGIN, 40 + 26)
+        }
+        contentTop = 40 + bannerH + 16
+      }
+
+      // Receipt image, as large as fits above the details block. Only the
+      // last page of a multi-page receipt carries the details block below
+      // it, so every other page gets the full page height for the image.
+      const detailsTop = isLastPage ? PAGE_H - 150 : PAGE_H - MARGIN
+      const imgArea = { x: MARGIN, y: contentTop, w: PAGE_W - 2 * MARGIN, h: detailsTop - contentTop - 16 }
+      const stored = pageImageIds[p] ? await getImage(pageImageIds[p]) : undefined
+      if (stored) {
+        const dataUrl = await blobToDataURL(stored.blob)
+        const dim = await imageDimensions(dataUrl)
+        // Scale to fit entirely within the available area — never crop —
+        // shrinking the larger dimension down as needed so tall receipts
+        // and wide ones both stay fully visible.
+        const scale = Math.min(imgArea.w / dim.width, imgArea.h / dim.height)
+        const w = dim.width * scale
+        const h = dim.height * scale
+        const x = imgArea.x + (imgArea.w - w) / 2
+        const y = imgArea.y + (imgArea.h - h) / 2
+        doc.addImage(dataUrl, 'JPEG', x, y, w, h)
+      } else {
+        const centerX = PAGE_W / 2
+        const centerY = imgArea.y + imgArea.h / 2 - 24
+        drawNoReceiptIcon(doc, centerX, centerY, 36)
+        doc.setTextColor(...MUTED_GRAY)
+        doc.setFont('helvetica', 'normal')
+        doc.setFontSize(12)
+        doc.text('No receipt image', centerX, centerY + 56, { align: 'center' })
+      }
+
+      if (!isLastPage) continue
+
+      // Details block
+      doc.setDrawColor(...TEAL)
+      doc.setLineWidth(2)
+      doc.line(MARGIN, detailsTop, PAGE_W - MARGIN, detailsTop)
+
+      let dy = detailsTop + 24
+      doc.setTextColor(...TEAL)
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(15)
+      doc.text(expense.title || expense.merchant || 'Untitled expense', MARGIN, dy)
+      doc.setTextColor(...SLATE)
+      doc.setFontSize(15)
+      doc.text(formatMoney(expense.amount, expense.currency), PAGE_W - MARGIN, dy, { align: 'right' })
+
+      dy += 22
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(10)
+      const parts = [
+        expense.merchant && expense.merchant !== expense.title ? expense.merchant : null,
+        formatDate(expense.date),
+        expense.category,
+      ].filter(Boolean)
+      doc.text(parts.join('   ·   '), MARGIN, dy)
+
+      if (expense.notes) {
+        dy += 18
+        doc.setTextColor(100, 116, 139)
+        const noteLines = doc.splitTextToSize(expense.notes, PAGE_W - 2 * MARGIN)
+        doc.text(noteLines.slice(0, 3), MARGIN, dy)
+      }
     }
   }
 
   const safeName = report.name.replace(/[^\w-]+/g, '_') || 'expense_report'
-  doc.save(`${safeName}.pdf`)
+  // Go through the same hardened share/download path CSV export uses, rather
+  // than jsPDF's own doc.save() — that call is fire-and-forget internally, so
+  // a blocked/failed download wouldn't reject and this export would look like
+  // it succeeded when nothing was saved.
+  const blob = doc.output('blob')
+  const file = new File([blob], `${safeName}.pdf`, { type: 'application/pdf' })
+  await shareOrDownloadFile(file, `${report.name} — PDF export`)
 }

@@ -45,10 +45,10 @@ Most free receipt-scanner apps are ad-supported products. Their advertising tool
 
 ## Features
 
-* <img src="./assets/camera.svg" width="18" height="18" align="center" /> **Scan receipts with your camera** (or upload a photo). On-device text recognition (Tesseract.js OCR) automatically extracts the merchant, date, and total — you just review and adjust.
+* <img src="./assets/camera.svg" width="18" height="18" align="center" /> **Scan receipts with your camera, or upload a photo or PDF** — single-page and multi-page PDF receipts are both supported, rasterized on-device page by page. On-device text recognition (Tesseract.js OCR) automatically extracts the merchant, date, and total — you just review and adjust.
 * <img src="./assets/reports.svg" width="18" height="18" align="center" /> **Multiple expense reports**, each with its own timeline of expenses.
 * <img src="./assets/reorder.svg" width="18" height="18" align="center" /> **Reorganize freely** — drag expenses to reorder them on the timeline (or use the arrow buttons on mobile), and move expenses between reports.
-* <img src="./assets/pdf.svg" width="18" height="18" align="center" /> **One-tap PDF export** — a summary page listing every expense with the grand total, followed by a full page for each receipt image with its title and details below.
+* <img src="./assets/pdf.svg" width="18" height="18" align="center" /> **One-tap PDF export** — a summary page listing every expense with the grand total, followed by a full page for each receipt image (one page per page, for multi-page PDF receipts), with the expense's title and details shown once, beneath the last page.
 * <img src="./assets/lock.svg" width="18" height="18" align="center" /> **Private by design** — everything is stored in your browser's secure sandbox database (IndexedDB). Nothing leaves your device.
 
 ---
@@ -79,7 +79,7 @@ Hosted on GitHub's own runners. Every Action is pinned to a full 40-character co
 
 | Job | Runs on | What it does |
 | --- | --- | --- |
-| **`test`** | Every push and every pull request | Checks out the code, installs dependencies (`npm ci`), then runs `npm run typecheck` (TypeScript type checking), `npm test` (the Vitest test suite), and `npm audit --audit-level=high` (fails the build if any dependency has a known high-or-worse severity vulnerability). |
+| **`test`** | Every push to `main` and every pull request | Checks out the code, installs dependencies (`npm ci`), then runs `npm run typecheck` (TypeScript type checking), `npm test` (the Vitest test suite), and `npm audit --audit-level=high` (fails the build if any dependency has a known high-or-worse severity vulnerability). |
 | **`build`** | Only a push to `main`, or a manual run (`workflow_dispatch`) | Runs `npm run build` to compile the production bundle, then hands it to GitHub Pages' `configure-pages`/`upload-pages-artifact` actions. Never runs on PRs or feature branches, so in-progress work can never reach the live site. |
 | **`deploy`** | Same restriction as `build`, and only after `build` succeeds | Publishes the built artifact to GitHub Pages using GitHub's official `deploy-pages` action, with `id-token: write` permission scoped to just this job. |
 
@@ -109,11 +109,12 @@ Branch protection on `main` requires **both** systems to report success before a
 | --- | --- | --- |
 | **User Interface (UI)** | React 18 + TypeScript + Vite | **React** handles rendering the screens and components; **TypeScript** is a programming language that catches bugs early by checking code types; **Vite** is a packager (build tool) that compiles files for the web. |
 | **Receipt OCR** | Tesseract.js (runs fully in-browser) | An offline engine that runs in-browser to transcribe text out of pictures using **WebAssembly (WASM)**, which lets native binary code run fast in the browser. |
+| **PDF Receipt Rasterization** | PDF.js (runs fully in-browser) | Converts an uploaded PDF receipt into one image per page on-device, so it flows through the same OCR/storage/export path as a photographed receipt. |
 | **Storage** | IndexedDB via `idb` | A secure local database inside your browser that holds reports, expenses, and receipt images. |
 | **PDF Export** | jsPDF | A library that packages receipt details and images into a PDF file entirely on your machine. |
 | **Offline Support** | `vite-plugin-pwa` service worker + manifest | Technology that allows the app to be installed onto your home screen and run offline without an internet connection (**Progressive Web App**). |
 
-The text recognition engine (worker, WASM core, English language data) is **self-hosted**: the build process copies it from the program's library folder (`node_modules`) into the public distribution folder (`public/tesseract/`) automatically, so the app never calls a CDN and scanning works fully offline once the app has loaded.
+The text recognition engine (worker, WASM core, English language data) is **self-hosted**: the build process copies it from the program's library folder (`node_modules`) into the public distribution folder (`public/tesseract/`) automatically, so the app never calls a CDN and scanning works fully offline once the app has loaded. The PDF rasterization engine (PDF.js's worker, WASM codecs, standard fonts, and color profiles) is self-hosted the same way, into `public/pdfjs/` — see [`scripts/copy-pdfjs-assets.mjs`](./scripts/copy-pdfjs-assets.mjs).
 
 ---
 

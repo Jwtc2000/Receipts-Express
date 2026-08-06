@@ -895,7 +895,7 @@
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
               <div>
                 <strong style="color: #ffffff; display: block; margin-bottom: 0.4rem;"><svg class="slide-icon" viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>On-Device OCR<span class="info-tip" tabindex="0" aria-label="What is OCR?">?<span class="tip-bubble"><strong>OCR (Optical Character Recognition):</strong> the automated technology that reads the text inside receipt images (merchant names, dates, and amounts) and converts it into editable digital text. Running it fully on-device via WebAssembly means no images or transcripts are ever sent over the network to external systems.</span></span></strong>
-                <span style="font-size: 0.9rem; color: #cbd5e1;">Tesseract.js scans receipts and extracts merchant, date, and amount fields locally.</span>
+                <span style="font-size: 0.9rem; color: #cbd5e1;">Tesseract.js scans a photo or uploaded PDF receipt (PDFs rasterized on-device via self-hosted PDF.js) and extracts merchant, date, and amount fields locally.</span>
               </div>
               <div>
                 <strong style="color: #ffffff; display: block; margin-bottom: 0.4rem;"><svg class="slide-icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>Reports Manager</strong>
@@ -948,7 +948,7 @@
                 <td><span class="table-badge badge-orange">Confidential</span></td>
               </tr>
               <tr>
-                <td><strong>AI Engine Location</strong> <span class="info-tip" tabindex="0" aria-label="Governance application: AI Engine Location">?<span class="tip-bubble"><strong>AI Engine Location:</strong> corporate policies restrict transmitting private data to unapproved cloud AI endpoints. Receipts Express mitigates this by self-hosting the Tesseract.js OCR engine locally. All text recognition runs on your device inside your browser sandbox, requiring no internet connection.</span></span></td>
+                <td><strong>AI Engine Location</strong> <span class="info-tip" tabindex="0" aria-label="Governance application: AI Engine Location">?<span class="tip-bubble"><strong>AI Engine Location:</strong> corporate policies restrict transmitting private data to unapproved cloud AI endpoints. Receipts Express mitigates this by self-hosting the Tesseract.js OCR engine locally, and self-hosting PDF.js for PDF-receipt rasterization the same way. All text recognition and PDF processing runs on your device inside your browser sandbox, requiring no internet connection.</span></span></td>
                 <td><span class="table-badge badge-teal">On-Device Only</span></td>
               </tr>
               <tr>
@@ -1077,7 +1077,7 @@
             <div class="glass-card" style="padding: 0.75rem 1rem;">
               <strong style="color: #7c3aed; display: block; font-size: 1.05rem; margin-bottom: 0.25rem;"><svg class="slide-icon" viewBox="0 0 24 24"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>Cross-Device Restore</strong>
               <p style="font-size: 0.82rem; color: #cbd5e1; line-height: 1.35;">
-                If you upgrade your phone or switch browsers, export a backup JSON from your old device and click "Restore from file" on your new device to seamlessly merge all your reports, receipts, and images.
+                If you upgrade your phone or switch browsers, export a backup JSON from your old device and click "Restore" on your new device to seamlessly merge all your reports, receipts, and images.
               </p>
             </div>
           </div>

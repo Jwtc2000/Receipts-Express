@@ -119,6 +119,35 @@ describe('validateBackup', () => {
     expect(() => validateBackup(bad)).toThrow(/malformed/i)
   })
 
+  it('accepts a report with valid exchange rates', async () => {
+    const { validateBackup } = await import('./backup')
+    const backup = validBackup({
+      reports: [{ id: 'r1', name: 'Trip', createdAt: 1, exchangeRates: { EUR: 1.08, GBP: 1.27 } }],
+    })
+    const { reports } = validateBackup(backup)
+    expect(reports[0].exchangeRates).toEqual({ EUR: 1.08, GBP: 1.27 })
+  })
+
+  it('rejects a report with a non-numeric exchange rate (regression)', async () => {
+    // A malformed rate would otherwise silently corrupt usdTotal's
+    // arithmetic (or a string rate would produce NaN) the first time the
+    // report's USD total is computed.
+    const { validateBackup } = await import('./backup')
+    const bad = validBackup({
+      // @ts-expect-error intentionally malformed for the test
+      reports: [{ id: 'r1', name: 'Trip', createdAt: 1, exchangeRates: { EUR: '1.08' } }],
+    })
+    expect(() => validateBackup(bad)).toThrow(/malformed/i)
+  })
+
+  it('rejects a report with a zero or negative exchange rate (regression)', async () => {
+    const { validateBackup } = await import('./backup')
+    const bad = validBackup({
+      reports: [{ id: 'r1', name: 'Trip', createdAt: 1, exchangeRates: { EUR: -1.08 } }],
+    })
+    expect(() => validateBackup(bad)).toThrow(/malformed/i)
+  })
+
   it('rejects a malformed expense (non-numeric amount)', async () => {
     const { validateBackup } = await import('./backup')
     const bad = validBackup()
@@ -219,6 +248,29 @@ describe('importBackup', () => {
 
     await expect(importBackup(file)).rejects.toThrow()
     expect(await db.getReport('r1')).toBeUndefined()
+  })
+
+  it('round-trips a multi-page receipt: imageId, extraImageIds, and every page survive import (regression)', async () => {
+    const db = await import('./db')
+    const { importBackup } = await import('./backup')
+    const backup = validBackup({
+      images: [
+        { id: 'img1', dataUrl: `data:image/png;base64,${TINY_PNG_BASE64}` },
+        { id: 'img2', dataUrl: `data:image/png;base64,${TINY_PNG_BASE64}` },
+        { id: 'img3', dataUrl: `data:image/png;base64,${TINY_PNG_BASE64}` },
+      ],
+    })
+    backup.expenses[0].imageId = 'img1'
+    backup.expenses[0].extraImageIds = ['img2', 'img3']
+    const file = new File([JSON.stringify(backup)], 'backup.json', { type: 'application/json' })
+
+    const result = await importBackup(file)
+
+    expect(result).toEqual({ reports: 1, expenses: 1 })
+    expect(await db.getExpense('e1')).toMatchObject({ imageId: 'img1', extraImageIds: ['img2', 'img3'] })
+    expect(await db.getImage('img1')).toBeDefined()
+    expect(await db.getImage('img2')).toBeDefined()
+    expect(await db.getImage('img3')).toBeDefined()
   })
 })
 

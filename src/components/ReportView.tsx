@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
 import type { Report, Expense } from '../types'
-import { formatMoney, formatTotal, formatDate, dayNumbersByDate, resolveDateAfterMove, todayIso } from '../types'
+import { formatMoney, formatTotal, formatDate, dayNumbersByDate, resolveDateAfterMove, todayIso, usdTotal } from '../types'
 import {
   getReport,
   saveReport,
@@ -38,6 +38,7 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
   const [movingId, setMovingId] = useState<string | null>(null)
   const [exporting, setExporting] = useState<'pdf' | 'csv' | null>(null)
   const [exportError, setExportError] = useState<string | null>(null)
+  const [reorderError, setReorderError] = useState<string | null>(null)
   const [exportMenuOpen, setExportMenuOpen] = useState(false)
   const [renaming, setRenaming] = useState(false)
   const [nameDraft, setNameDraft] = useState('')
@@ -48,6 +49,7 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
   const [tripEndDraft, setTripEndDraft] = useState('')
   const [mealAllowanceDraft, setMealAllowanceDraft] = useState('')
   const [profile, setProfile] = useState<Profile>(() => getProfile())
+  const [exchangeRateDrafts, setExchangeRateDrafts] = useState<Record<string, string>>({})
   const dragIndex = useRef<number | null>(null)
   const thumbsRef = useRef<Map<string, string>>(new Map())
 
@@ -93,6 +95,13 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
   const totalDisplay = formatTotal(expenses)
   const personalTotal = formatPersonalTotal(expenses)
 
+  // ---- FOREIGN -> USD conversion (manually-entered rates; see Report Menu) ----
+
+  const foreignCurrencies = [
+    ...new Set(expenses.map((e) => e.currency.trim().toUpperCase()).filter((c) => c && c !== 'USD')),
+  ].sort()
+  const usdConversion = usdTotal(expenses, report?.exchangeRates)
+
   // ---- Search ----
 
   const query = searchQuery.trim()
@@ -129,8 +138,18 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
 
   const persistOrder = async (list: Expense[]) => {
     const renumbered = list.map((e, i) => ({ ...e, position: i }))
+    const previous = expenses
     setExpenses(renumbered)
-    await saveExpenses(renumbered)
+    try {
+      await saveExpenses(renumbered)
+      setReorderError(null)
+    } catch {
+      // The optimistic reorder above already changed what's on screen —
+      // revert it so the displayed order matches what's actually persisted,
+      // instead of looking successfully reordered when it silently wasn't.
+      setExpenses(previous)
+      setReorderError("Couldn't save the new order — please try again.")
+    }
   }
 
   const moveBy = (index: number, delta: number) => {
@@ -218,7 +237,29 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
     setMealAllowanceDraft(report.dailyMealAllowance ? String(report.dailyMealAllowance) : '')
     // Re-read in case the saved project list was edited since this screen opened.
     setProfile(getProfile())
+    const drafts: Record<string, string> = {}
+    for (const currency of foreignCurrencies) {
+      const rate = report.exchangeRates?.[currency]
+      drafts[currency] = rate !== undefined ? String(rate) : ''
+    }
+    setExchangeRateDrafts(drafts)
     setMenuOpen(true)
+  }
+
+  const saveExchangeRate = async (currency: string, value: string) => {
+    if (!report) return
+    const rate = parseFloat(value)
+    const current = { ...report.exchangeRates }
+    if (Number.isFinite(rate) && rate > 0) {
+      current[currency] = rate
+    } else {
+      // An empty/invalid entry clears the rate rather than storing 0/NaN —
+      // that currency's total goes back to "missing" instead of $0.
+      delete current[currency]
+    }
+    const updated = { ...report, exchangeRates: current }
+    await saveReport(updated)
+    setReport(updated)
   }
 
   const saveProjectNumber = async (projectNumber: string) => {
@@ -323,6 +364,42 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
             </div>
 
             <div className="drawer-section">
+              {foreignCurrencies.length > 0 && (
+                <DrawerSection title="Total (USD)">
+                  <p className="muted">
+                    Manually-entered rates — 1 unit of foreign currency in US dollars. This app makes no
+                    network calls, so there's no live rate to fetch automatically. Used for this total and
+                    the PDF export's summary page.
+                  </p>
+                  <div className="usd-total-display">
+                    <strong>{formatMoney(usdConversion.total, 'USD')}</strong>
+                    {usdConversion.missingRates.length > 0 && (
+                      <span className="usd-total-note">
+                        excludes {usdConversion.missingRates.join(', ')} — no rate set
+                      </span>
+                    )}
+                  </div>
+                  <div className="field-grid">
+                    {foreignCurrencies.map((currency) => (
+                      <label className="field" key={currency}>
+                        <span>1 {currency} =</span>
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          step="0.0001"
+                          min="0"
+                          placeholder="e.g. 1.08"
+                          value={exchangeRateDrafts[currency] ?? ''}
+                          onChange={(e) =>
+                            setExchangeRateDrafts((d) => ({ ...d, [currency]: e.target.value }))
+                          }
+                          onBlur={(e) => void saveExchangeRate(currency, e.target.value)}
+                        />
+                      </label>
+                    ))}
+                  </div>
+                </DrawerSection>
+              )}
               <DrawerSection title="Trip Dates">
                 <p className="muted">
                   Sets Day 1 for this report's timeline and PDF export — expenses are grouped by the
@@ -433,6 +510,16 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
           <Icon name="warning" size={14} />
           <span>{exportError}</span>
           <button className="icon-btn" aria-label="Dismiss" onClick={() => setExportError(null)}>
+            <Icon name="close" size={14} />
+          </button>
+        </div>
+      )}
+
+      {reorderError && (
+        <div className="report-export-error" role="alert">
+          <Icon name="warning" size={14} />
+          <span>{reorderError}</span>
+          <button className="icon-btn" aria-label="Dismiss" onClick={() => setReorderError(null)}>
             <Icon name="close" size={14} />
           </button>
         </div>

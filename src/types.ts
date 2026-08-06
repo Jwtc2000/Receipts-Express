@@ -13,6 +13,13 @@ export interface Report {
    * the profile. Unset falls back to the profile's default project number.
    */
   projectNumber?: string
+  /**
+   * Manually-entered FOREIGN→USD rate per non-USD currency used in this
+   * report — 1 unit of that currency in US dollars (e.g. `{ EUR: 1.08 }`).
+   * Entered by the user, never fetched: this app makes no network calls
+   * beyond loading itself, so there is no live-rate source to call.
+   */
+  exchangeRates?: Record<string, number>
 }
 
 export interface Expense {
@@ -29,6 +36,8 @@ export interface Expense {
   category: string
   notes: string
   imageId?: string
+  /** Pages 2+ of a multi-page receipt (e.g. an uploaded PDF); page 1 is `imageId`. */
+  extraImageIds?: string[]
   createdAt: number
   /** Portion of `amount` the employee is personally covering (not reimbursable). */
   personalAmount?: number
@@ -74,12 +83,58 @@ export function formatTotal(expenses: { amount: number; currency: string }[]): s
   return [...totals].map(([currency, amount]) => formatMoney(amount, currency)).join(' + ')
 }
 
+export interface UsdTotal {
+  /** Sum of every USD expense plus every rated foreign-currency total, converted. */
+  total: number
+  /** Non-USD currencies present in `expenses` with no (or an invalid) rate in `exchangeRates` — excluded from `total`. */
+  missingRates: string[]
+}
+
+/**
+ * Convert a mixed-currency report total to USD using manually-entered rates
+ * (1 unit of foreign currency = N USD) — there is no live-rate source since
+ * this app makes no network calls beyond loading itself. A currency with no
+ * rate set is excluded from the total and reported in `missingRates` rather
+ * than silently treated as 1:1 with USD.
+ */
+export function usdTotal(
+  expenses: { amount: number; currency: string }[],
+  exchangeRates: Record<string, number> | undefined,
+): UsdTotal {
+  const totals = new Map<string, number>()
+  for (const e of expenses) {
+    const currency = e.currency.trim().toUpperCase()
+    totals.set(currency, (totals.get(currency) ?? 0) + e.amount)
+  }
+  let total = 0
+  const missingRates: string[] = []
+  for (const [currency, amount] of totals) {
+    if (currency === 'USD') {
+      total += amount
+      continue
+    }
+    const rate = exchangeRates?.[currency]
+    if (rate === undefined || !Number.isFinite(rate) || rate <= 0) {
+      missingRates.push(currency)
+      continue
+    }
+    total += amount * rate
+  }
+  return { total, missingRates: missingRates.sort() }
+}
+
 export function newId(): string {
   return crypto.randomUUID()
 }
 
+/** Today's date in the user's local timezone — not UTC, which would read as
+ * tomorrow or yesterday for anyone west/east of UTC once local time crosses
+ * a UTC day boundary while it's still the same calendar day locally. */
 export function todayIso(): string {
-  return new Date().toISOString().slice(0, 10)
+  const d = new Date()
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${d.getFullYear()}-${mm}-${dd}`
 }
 
 /**
