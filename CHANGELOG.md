@@ -8,6 +8,17 @@ user-facing features, and `PATCH` for fixes with no visible feature change. The
 version lives in `package.json` and is shown in the app under Menu → About. Every
 merge to `main` that changes app behavior gets a version bump and a tag.
 
+## [1.10.0] - 2026-08-06
+
+### Added
+- Multiple project numbers: save a list of the projects you charge to
+  (Menu → Project Numbers, with one marked as the default) and charge
+  each report to its own — picked when creating the report or later from
+  the report's menu. The report's project number is what prints on its
+  PDF summary page; reports without one fall back to the default. Saved
+  project numbers are per-device (localStorage) like the rest of the
+  profile; a report's project number travels with it in backups.
+
 ## [1.9.3] - 2026-07-21
 
 ### Fixed

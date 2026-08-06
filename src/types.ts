@@ -8,6 +8,11 @@ export interface Report {
   endDate?: string
   /** Per-day cap on reimbursable Meals spending; unset/0 disables the food-balance feature. */
   dailyMealAllowance?: number
+  /**
+   * Project number this report is charged to, picked from the saved list in
+   * the profile. Unset falls back to the profile's default project number.
+   */
+  projectNumber?: string
 }
 
 export interface Expense {
