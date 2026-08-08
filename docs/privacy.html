@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Receipts Express — Privacy Policy</title>
+  <meta name="description" content="How Receipts Express handles your receipt data: entirely on your own device.">
+  <link rel="icon" type="image/svg+xml" href="../icons/icon.svg">
+  <meta name="theme-color" content="#0f766e">
+
+  <!--
+    Deliberately self-contained: system fonts, inline styles, no external
+    stylesheet, script, or image. A privacy policy that itself calls out to a
+    third-party CDN would contradict the page's own central claim, so this
+    page makes no network request beyond being fetched. src/legalPages.test.ts
+    enforces that.
+  -->
+  <style>
+    :root {
+      /* Mirrors the palette in src/styles.css */
+      --teal: #0f766e;
+      --purple: #7c3aed;
+      --orange: #ea580c;
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --text: #0f172a;
+      --muted: #64748b;
+      --border: #e2e8f0;
+      --header-gradient-a: #660099;
+      --header-gradient-b: #ff6600;
+      --radius: 14px;
+      --shadow: 0 1px 3px rgba(15, 23, 42, 0.08), 0 4px 12px rgba(15, 23, 42, 0.05);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    header.page-header {
+      background: linear-gradient(135deg, var(--header-gradient-a) 0%, var(--header-gradient-b) 100%);
+      color: #fff;
+      padding: calc(env(safe-area-inset-top, 0px) + 32px) 20px 32px;
+      text-align: center;
+    }
+
+    header.page-header h1 {
+      font-size: 1.75rem;
+      letter-spacing: -0.02em;
+    }
+
+    header.page-header .eyebrow {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      opacity: 0.85;
+      margin-bottom: 6px;
+    }
+
+    header.page-header .dates {
+      margin-top: 10px;
+      font-size: 0.85rem;
+      opacity: 0.9;
+    }
+
+    main {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 28px 20px calc(env(safe-area-inset-bottom, 0px) + 56px);
+    }
+
+    .callout {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--teal);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 18px 20px;
+      margin-bottom: 32px;
+    }
+
+    .callout p + p { margin-top: 10px; }
+
+    section { margin-bottom: 34px; }
+
+    h2 {
+      font-size: 1.15rem;
+      letter-spacing: -0.01em;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--border);
+    }
+
+    h2 .num {
+      color: var(--purple);
+      font-variant-numeric: tabular-nums;
+      margin-right: 8px;
+    }
+
+    h3 {
+      font-size: 0.95rem;
+      margin: 18px 0 6px;
+      color: var(--teal);
+    }
+
+    p + p, p + ul, ul + p, p + table, table + p { margin-top: 12px; }
+
+    ul { padding-left: 22px; }
+    li + li { margin-top: 6px; }
+
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.85em;
+      background: #f1f5f9;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: 1px 5px;
+    }
+
+    a { color: var(--teal); }
+    a:hover { color: var(--orange); }
+
+    .muted { color: var(--muted); font-size: 0.9rem; }
+
+    .table-wrap { overflow-x: auto; }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      font-size: 0.9rem;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    th, td {
+      text-align: left;
+      padding: 9px 12px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+
+    th { background: #f1f5f9; font-weight: 600; }
+    tbody tr:last-child td { border-bottom: none; }
+
+    footer.page-footer {
+      border-top: 1px solid var(--border);
+      margin-top: 8px;
+      padding-top: 20px;
+      font-size: 0.85rem;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    footer.page-footer p + p { margin-top: 8px; }
+
+    @media (max-width: 480px) {
+      header.page-header h1 { font-size: 1.4rem; }
+      main { padding-left: 16px; padding-right: 16px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="page-header">
+    <p class="eyebrow">Receipts Express</p>
+    <h1>Privacy Policy</h1>
+    <p class="dates">Effective 8 August 2026 · Last updated 8 August 2026</p>
+  </header>
+
+  <main>
+    <div class="callout">
+      <p>
+        <strong>Receipts Express has no accounts and no servers.</strong> Your receipt images,
+        the details read from them, and your expense reports are created and stored entirely
+        on your own device, and are never sent to us or to anyone else.
+      </p>
+      <p class="muted">
+        Nobody operating this project can see your data, because it never reaches us. The
+        rest of this page explains exactly what is stored, where, and what the few remaining
+        edges are.
+      </p>
+    </div>
+
+    <section>
+      <h2><span class="num">1.</span>What this policy covers</h2>
+      <p>
+        This policy covers the Receipts Express web app, an installable Progressive Web App
+        served from GitHub Pages. It is an independent personal project, not a service
+        operated by or on behalf of any employer or organisation.
+      </p>
+      <p>
+        It does not cover what happens to a PDF, CSV, or backup file <em>after</em> you export
+        it and save or send it somewhere else — at that point the file is yours to handle
+        under your own organisation's rules, and this app has no visibility into it.
+      </p>
+    </section>
+
+    <section>
+      <h2><span class="num">2.</span>What is stored on your device</h2>
+      <p>
+        All of it stays in your browser's own storage for this site. Nothing here is
+        transmitted anywhere.
+      </p>
+
+      <h3>Browser database (IndexedDB)</h3>
+      <p>
+        A database named <code>best-receipts</code> holds three collections:
+      </p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Collection</th><th>What it contains</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>reports</code></td>
+              <td>Report name, creation date, optional trip start/end dates, daily meal allowance, project number, and any currency exchange rates you entered by hand.</td>
+            </tr>
+            <tr>
+              <td><code>expenses</code></td>
+              <td>Title, merchant, amount, currency, date, category, your notes, personal-portion amount, and ordering position.</td>
+            </tr>
+            <tr>
+              <td><code>images</code></td>
+              <td>The receipt photo itself, stored as a JPEG. Images are resized to a maximum of 1800&nbsp;px and re-encoded before saving, which also drops any EXIF metadata the original photo carried.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Browser local storage</h3>
+      <p>Four small values, and nothing else:</p>
+      <ul>
+        <li><code>br.profile</code> — the optional details you choose to print on exported PDFs: your name, employee ID, cost centre, and project numbers. You type these yourself; they are never verified against anything or sent anywhere.</li>
+        <li><code>br.lastBackupAt</code> — when you last exported a backup, so the app can remind you.</li>
+        <li><code>br.backupWarningDismissedAt</code> and <code>br.storageWarningDismissedAt</code> — when you last dismissed a reminder, so it doesn't reappear immediately.</li>
+      </ul>
+
+      <h3>Offline cache</h3>
+      <p>
+        The app's service worker caches the app's own files — code, icons, and the text
+        recognition and PDF engines — so it works offline. No receipt data is stored there.
+      </p>
+    </section>
+
+    <section>
+      <h2><span class="num">3.</span>What is never collected</h2>
+      <ul>
+        <li><strong>No account.</strong> There is no sign-up, sign-in, password, or email address. The app never asks who you are.</li>
+        <li><strong>No analytics or telemetry.</strong> No usage statistics, no event tracking, no crash or error reporting. Errors are shown to you on-screen and go no further.</li>
+        <li><strong>No advertising</strong> and no advertising SDKs.</li>
+        <li><strong>No cookies.</strong> The app never sets or reads one.</li>
+        <li><strong>No tracking identifiers.</strong> No device ID, advertising ID, session ID, or fingerprinting. Records get random IDs purely so the local database can reference them.</li>
+        <li><strong>No location data.</strong> The app never requests geolocation.</li>
+        <li><strong>No payments.</strong> There is no purchase, subscription, or billing of any kind.</li>
+        <li><strong>No full receipt transcript.</strong> Text recognition reads the whole receipt in order to find the merchant, date, and total, but only those three values are passed to the form for you to review. The full transcribed text is discarded as soon as recognition finishes and is never saved.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2><span class="num">4.</span>Text recognition and PDF reading happen on your device</h2>
+      <p>
+        Receipts are read by Tesseract.js, and PDF receipts are converted to images by
+        PDF.js. Both engines run inside your browser, and both are served from this app's own
+        address — the app does not load code from external CDNs, and your receipts are
+        never uploaded to a cloud recognition service.
+      </p>
+      <p class="muted">
+        This is the single most common place other receipt apps send your data. Here, the
+        image never leaves the page it was opened in.
+      </p>
+    </section>
+
+    <section>
+      <h2><span class="num">5.</span>The one network interaction: loading the app</h2>
+      <p>
+        The app is hosted on <strong>GitHub Pages</strong>. When you open or update it, your
+        browser fetches the app's files from GitHub, and GitHub — like any web host —
+        necessarily sees the ordinary details of that request: your IP address, your browser's
+        user agent, and the time. That handling is governed by
+        <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement" target="_blank" rel="noopener noreferrer">GitHub's Privacy Statement</a>,
+        not by this policy, and it is outside this project's control.
+      </p>
+      <p>
+        <strong>This is the only third party involved, and it only ever sees a request for the
+        app itself — never your receipts.</strong> Once the app has loaded, it can work fully
+        offline.
+      </p>
+      <p>
+        That boundary is enforced by your browser, not merely promised: every production build
+        carries a Content-Security-Policy of <code>connect-src 'self'</code>, which blocks any
+        script on the page — including one smuggled in through a compromised dependency —
+        from sending data anywhere other than the app's own address. An automated test asserts
+        the policy is present on every build.
+      </p>
+    </section>
+
+    <section>
+      <h2><span class="num">6.</span>Device permissions</h2>
+      <ul>
+        <li><strong>Camera and photos.</strong> Adding a receipt opens your device's standard camera or file picker, one receipt at a time, at your request. The app has no continuous camera access and never opens a live camera stream — your browser's own permission prompt governs this.</li>
+        <li><strong>Files.</strong> Choosing a photo, a PDF receipt, or a backup file to restore uses the same standard picker. The app can only read the file you pick.</li>
+        <li><strong>Sharing.</strong> When you export, the app may hand the finished file to your device's share sheet so you can choose where it goes. You choose the destination, not the app.</li>
+        <li><strong>Persistent storage.</strong> The app asks your browser to mark its storage as persistent, which makes automatic cleanup less likely to delete your reports. This is a request about durability; it transmits nothing.</li>
+      </ul>
+      <p class="muted">
+        The app never requests your microphone, location, contacts, notifications, or
+        clipboard.
+      </p>
+    </section>
+
+    <section>
+      <h2><span class="num">7.</span>Exporting and sharing</h2>
+      <p>
+        PDF reports, CSV summaries, and full JSON backups are all generated inside your
+        browser and handed straight to your device's download or share mechanism. There is no
+        upload step at any point.
+      </p>
+      <p>
+        Once you save or send an exported file, it is an ordinary file on your device or in
+        whatever system you sent it to. Exported receipts still contain personal and financial
+        information, so handle them according to your own organisation's data-handling rules.
+        This app has no visibility into, or control over, what happens to a file after it
+        leaves the app.
+      </p>
+    </section>
+
+    <section>
+      <h2><span class="num">8.</span>Your control over your data</h2>
+      <p>You hold the only copy, so you control it directly:</p>
+      <ul>
+        <li><strong>Take it with you.</strong> The Backup card on the home screen exports everything — every report, expense, and receipt image — as a single JSON file you can restore later or keep elsewhere. Individual reports also export as PDF or CSV.</li>
+        <li><strong>Delete a report.</strong> Deleting a report also deletes all of its expenses and their receipt images.</li>
+        <li><strong>Delete an expense.</strong> Deleting an expense also deletes its receipt images. Replacing a receipt image deletes the one it replaced.</li>
+        <li><strong>Erase everything.</strong> There is currently <em>no</em> single "delete all data" button in the app. To remove everything at once, use your browser's own "clear site data" or website-data controls for this site. That erases the database and the stored settings together.</li>
+      </ul>
+      <p class="muted">
+        Deletion is immediate and local. There is no server copy, no backup held by us, and no
+        retention period — once it is gone from your device, it is gone.
+      </p>
+    </section>
+
+    <section>
+      <h2><span class="num">9.</span>How your data is protected — and what that does not mean</h2>
+      <p>
+        Your data sits in your browser's storage sandbox, which keeps it separate from other
+        websites and other apps. It is <strong>not</strong> separately encrypted by this app.
+        In practice, what protects it is your device: your screen lock, your account password,
+        and your device's disk encryption. Treat the app the way you would treat a folder of
+        paper receipts in your bag.
+      </p>
+      <p>
+        Anyone with access to your unlocked device and browser profile can open the app and
+        read what is in it. There is no separate app passcode.
+      </p>
+      <h3>Your data can also disappear on its own</h3>
+      <p>
+        Browser storage is not guaranteed to last. Clearing site data, switching browsers or
+        devices, or an operating-system storage cleanup can erase it permanently — on iOS,
+        Safari may clear it after roughly seven days without a visit. There is no server copy
+        to restore from. Receipts Express is a capture-and-export tool, not an archive:
+        export your report as soon as it is complete, and back up regularly.
+      </p>
+    </section>
+
+    <section>
+      <h2><span class="num">10.</span>Your privacy rights</h2>
+      <p>
+        Privacy rights such as access, correction, portability, and erasure normally apply to
+        an organisation that holds data about you. This project holds none: it never receives
+        your receipts, never stores them, and keeps no record that you use the app at all.
+      </p>
+      <p>
+        So there is nothing for us to look up, hand over, correct, or delete on your behalf.
+        The equivalent capabilities are built into the app itself and described in section 8 —
+        you exercise them directly, without asking anyone.
+      </p>
+    </section>
+
+    <section>
+      <h2><span class="num">11.</span>Children</h2>
+      <p>
+        Receipts Express is a workplace expense tool intended for adults filing expense
+        reports. It is not directed at children, and it collects nothing from anyone.
+      </p>
+    </section>
+
+    <section>
+      <h2><span class="num">12.</span>Changes to this policy</h2>
+      <p>
+        If the app's data handling ever changes, this page will be updated and the "last
+        updated" date at the top will change with it. Because the whole project is public,
+        every revision is visible in its history — you do not have to take this page's word
+        for what changed.
+      </p>
+    </section>
+
+    <section>
+      <h2><span class="num">13.</span>Contact</h2>
+      <p>
+        Receipts Express is an independent personal project maintained by Jwtc2000. Questions
+        about this policy are best raised as an issue on the project's repository:
+      </p>
+      <p>
+        <a href="https://github.com/Jwtc2000/Receipts-Express/issues" target="_blank" rel="noopener noreferrer">github.com/Jwtc2000/Receipts-Express/issues</a>
+      </p>
+      <p>
+        If you have found a security vulnerability, please report it privately through
+        <a href="https://github.com/Jwtc2000/Receipts-Express/security/advisories/new" target="_blank" rel="noopener noreferrer">GitHub Security Advisories</a>
+        rather than in a public issue.
+      </p>
+    </section>
+
+    <footer class="page-footer">
+      <p>
+        See also the <a href="./terms.html">Terms of Use</a> and the project's
+        <a href="https://github.com/Jwtc2000/Receipts-Express/blob/main/SECURITY.md" target="_blank" rel="noopener noreferrer">security policy</a>,
+        which documents the technical claims above in detail.
+      </p>
+      <p>
+        Independent personal project — no affiliation with, endorsement from, or approval by
+        FedEx or any employer.
+      </p>
+    </footer>
+  </main>
+</body>
+</html>

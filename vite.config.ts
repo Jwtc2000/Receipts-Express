@@ -52,16 +52,21 @@ function cspPlugin(): Plugin {
   }
 }
 
-// The pilot slide deck (docs/pilot-deck.html) is linked from the app's About
-// drawer, but Vite's build only ever outputs the app itself — docs/ and the
-// repo-root assets/ screenshots it references aren't part of the bundle, so
-// the link 404s once deployed. Copy just what the deck needs into dist/ so
-// the link resolves the same in production as it does from the repo.
-function copyPilotDeckPlugin(): Plugin {
+// Standalone pages under docs/ — the pilot slide deck, and the privacy and
+// terms pages — are linked from the app's About drawer, but Vite's build only
+// ever outputs the app itself, so docs/ and the repo-root assets/ screenshots
+// the deck references aren't part of the bundle and the links 404 once
+// deployed. Copy just what those pages need into dist/ so they resolve the
+// same in production as they do from the repo. Anything added here is already
+// covered by the docs/ entries in globIgnores and navigateFallbackDenylist
+// below.
+const STATIC_DOC_PAGES = ['pilot-deck.html', 'privacy.html', 'terms.html']
+
+function copyStaticDocsPlugin(): Plugin {
   const root = fileURLToPath(new URL('.', import.meta.url))
   let outDir = ''
   return {
-    name: 'copy-pilot-deck',
+    name: 'copy-static-docs',
     apply: 'build',
     configResolved(config: ResolvedConfig) {
       // Respect whatever outDir this build actually resolved to (normally
@@ -70,7 +75,9 @@ function copyPilotDeckPlugin(): Plugin {
     },
     closeBundle() {
       mkdirSync(resolve(outDir, 'docs'), { recursive: true })
-      copyFileSync(resolve(root, 'docs/pilot-deck.html'), resolve(outDir, 'docs/pilot-deck.html'))
+      for (const page of STATIC_DOC_PAGES) {
+        copyFileSync(resolve(root, 'docs', page), resolve(outDir, 'docs', page))
+      }
       mkdirSync(resolve(outDir, 'assets'), { recursive: true })
       for (const file of readdirSync(resolve(root, 'assets'))) {
         if (file.endsWith('.jpg')) {
@@ -91,7 +98,7 @@ export default defineConfig({
   },
   plugins: [
     cspPlugin(),
-    copyPilotDeckPlugin(),
+    copyStaticDocsPlugin(),
     react(),
     VitePWA({
       registerType: 'prompt',
@@ -130,9 +137,10 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
         // None of these are part of the app bundle itself: the OCR and PDF
         // engines are cached on first use instead (see runtimeCaching
-        // below), and the pilot deck is a standalone static page —
-        // precaching it would otherwise bump the service worker (forcing a
-        // re-download for every app user) on every unrelated slide-deck edit.
+        // below), and everything under docs/ is a standalone static page —
+        // precaching those would otherwise bump the service worker (forcing a
+        // re-download for every app user) on every unrelated slide-deck or
+        // policy-wording edit.
         // The last three exclude jsPDF's optional .html()-renderer deps
         // (canvg's polyfill chunk, html2canvas, dompurify) — this app never
         // calls .html(), but Rollup can't prove that from jsPDF's own dynamic
@@ -143,9 +151,10 @@ export default defineConfig({
         globIgnores: ['tesseract/**', 'pdfjs/**', 'docs/**', 'assets/index.es-*.js', 'assets/html2canvas.esm-*.js', 'assets/purify.es-*.js'],
         // vite-plugin-pwa's generateSW registers an SPA navigation route that
         // serves index.html (the app shell) for every navigation request. The
-        // pilot deck is a real, standalone page under docs/, so without this
-        // the deck link keeps the URL bar at docs/pilot-deck.html but renders
-        // the app instead. Exempt docs/ so the browser fetches the real page.
+        // pilot deck and the privacy/terms pages are real, standalone pages
+        // under docs/, so without this their links keep the URL bar at e.g.
+        // docs/privacy.html but render the app instead. Exempt docs/ so the
+        // browser fetches the real page.
         // Matched against the full pathname, which includes the /<repo>/ base
         // on GitHub Pages, so this stays unanchored rather than /^\/docs\//.
         navigateFallbackDenylist: [/\/docs\//],

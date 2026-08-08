@@ -700,6 +700,17 @@ body {
   color: var(--orange);
 }
 
+/* Links out of the drawer to the standalone pages under docs/ (pilot deck,
+   privacy policy, terms of use). Uses the brand --teal rather than the
+   teal-400 (#2dd4bf) the pilot-deck link previously hardcoded inline: the
+   drawer panel is --card (white), against which teal-400 lands around 1.8:1
+   and fails WCAG AA. --teal is 5.4:1 on white. */
+.drawer-link {
+  color: var(--teal);
+  text-decoration: underline;
+  font-weight: 600;
+}
+
 .drawer-footer {
   padding: 14px 16px calc(env(safe-area-inset-bottom, 0px) + 14px);
   border-top: 1px solid var(--border);

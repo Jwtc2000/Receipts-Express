@@ -64,6 +64,7 @@ This checklist prepares the **Receipts Express** application for governance revi
   * *Mitigation*: Clear warnings in the README and SECURITY.md emphasize that it is not an archive and files should be exported immediately.
 * **Legal or Compliance Risk**: Low.
   * *Mitigation*: App is licensed under Apache-2.0 and has clear disclaimers that exported files are subject to standard corporate file-handling policies once saved.
+  * *Mitigation*: A [Privacy Policy](../privacy.html) and [Terms of Use](../terms.html) are published as standalone pages and linked from the app under Menu → About. The Privacy Policy documents on-device-only storage, the absence of accounts/analytics/cookies/payments, the sole third party (GitHub Pages, which sees standard web request logs when the app is loaded), and the user's own export/deletion controls. The Terms restate the no-affiliation disclaimer, the Apache-2.0 warranty and liability terms, and the user's responsibility to verify OCR output and to back up before browser storage is evicted.
 * **Brand or External-Sharing Risk**: Low.
   * *Mitigation*: Explicit disclaimers in the README and PILOT.md note that the project has no affiliation with or endorsement from FedEx.
 * **Stop Condition**: If any data exfiltration path is identified, or if browser CSP rules are bypassed, or if a browser vulnerability exposes IndexedDB storage to unauthorized apps.

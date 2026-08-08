@@ -15,6 +15,7 @@ If you are a co-worker looking to help pilot Receipts Express, check out the fol
 * **[Interactive Slide Deck (docs/pilot-deck.html)](./docs/pilot-deck.html)**: Interactive presentation slideshow for team meetings.
 * **[Slide Deck Content (docs/PILOT_DECK.md)](./docs/PILOT_DECK.md)**: Markdown version of the presentation deck.
 * **[Project Governance Review (docs/governance/REVIEW.md)](./docs/governance/REVIEW.md)**: Compliance checklist based on corporate templates.
+* **[Privacy Policy (docs/privacy.html)](./docs/privacy.html)** and **[Terms of Use (docs/terms.html)](./docs/terms.html)**: The user-facing legal pages, linked from the app under Menu → About.
 
 ---
 
@@ -169,6 +170,13 @@ Open the dev server URL on your phone (same network) or deploy `dist/` to any st
 This is a personal project, built and maintained independently. It has no affiliation with, endorsement from, or approval by FedEx, and it is not a production system operated by or for any organization.
 
 By design, all receipt data — images, extracted text, and report contents — stays on your device (see [SECURITY.md](./SECURITY.md) for exactly how). Exported PDFs, once you save or share them, are your responsibility to handle according to your own organization's data-handling rules — this app has no visibility into, or control over, what happens to a file after it leaves the app.
+
+The user-facing versions of these commitments are published as two standalone pages, linked from the app under Menu → About:
+
+* **[Privacy Policy (docs/privacy.html)](./docs/privacy.html)** — what is stored on your device, what is never collected, and the one network interaction that exists.
+* **[Terms of Use (docs/terms.html)](./docs/terms.html)** — no affiliation, Apache-2.0 licensing, as-is with no warranty, and what you're responsible for.
+
+Every claim in the Privacy Policy is traceable to code in this repository; both pages are deliberately self-contained and load no external fonts, scripts, or styles, which [`src/legalPages.test.ts`](./src/legalPages.test.ts) enforces.
 
 ## Versioning
 

@@ -323,16 +323,31 @@ export default function ReportList({ onOpenReport, onEditExpense }: Props) {
                 </p>
                 <p style={{ marginTop: '0.75rem' }}>
                   <a
+                    className="drawer-link"
                     href="./docs/pilot-deck.html"
                     target="_blank"
                     rel="noopener noreferrer"
-                    style={{
-                      color: '#2dd4bf',
-                      textDecoration: 'underline',
-                      fontWeight: 600,
-                    }}
                   >
                     View Pilot Slide Deck
+                  </a>
+                </p>
+                <p>
+                  <a
+                    className="drawer-link"
+                    href="./docs/privacy.html"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Privacy Policy
+                  </a>
+                  <span aria-hidden="true"> · </span>
+                  <a
+                    className="drawer-link"
+                    href="./docs/terms.html"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Terms of Use
                   </a>
                 </p>
                 <p className="muted">

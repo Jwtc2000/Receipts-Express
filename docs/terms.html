@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Receipts Express — Terms of Use</title>
+  <meta name="description" content="The terms under which Receipts Express is offered: an independent personal project, provided as is under Apache-2.0.">
+  <link rel="icon" type="image/svg+xml" href="../icons/icon.svg">
+  <meta name="theme-color" content="#0f766e">
+
+  <!--
+    Self-contained by design — system fonts, inline styles, no external
+    subresources. Kept in step with docs/privacy.html; see the note there.
+  -->
+  <style>
+    :root {
+      /* Mirrors the palette in src/styles.css */
+      --teal: #0f766e;
+      --purple: #7c3aed;
+      --orange: #ea580c;
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --text: #0f172a;
+      --muted: #64748b;
+      --border: #e2e8f0;
+      --header-gradient-a: #660099;
+      --header-gradient-b: #ff6600;
+      --radius: 14px;
+      --shadow: 0 1px 3px rgba(15, 23, 42, 0.08), 0 4px 12px rgba(15, 23, 42, 0.05);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    header.page-header {
+      background: linear-gradient(135deg, var(--header-gradient-a) 0%, var(--header-gradient-b) 100%);
+      color: #fff;
+      padding: calc(env(safe-area-inset-top, 0px) + 32px) 20px 32px;
+      text-align: center;
+    }
+
+    header.page-header h1 {
+      font-size: 1.75rem;
+      letter-spacing: -0.02em;
+    }
+
+    header.page-header .eyebrow {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      opacity: 0.85;
+      margin-bottom: 6px;
+    }
+
+    header.page-header .dates {
+      margin-top: 10px;
+      font-size: 0.85rem;
+      opacity: 0.9;
+    }
+
+    main {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 28px 20px calc(env(safe-area-inset-bottom, 0px) + 56px);
+    }
+
+    .callout {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--orange);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 18px 20px;
+      margin-bottom: 32px;
+    }
+
+    .callout p + p { margin-top: 10px; }
+
+    section { margin-bottom: 34px; }
+
+    h2 {
+      font-size: 1.15rem;
+      letter-spacing: -0.01em;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--border);
+    }
+
+    h2 .num {
+      color: var(--purple);
+      font-variant-numeric: tabular-nums;
+      margin-right: 8px;
+    }
+
+    h3 {
+      font-size: 0.95rem;
+      margin: 18px 0 6px;
+      color: var(--teal);
+    }
+
+    p + p, p + ul, ul + p { margin-top: 12px; }
+
+    ul { padding-left: 22px; }
+    li + li { margin-top: 6px; }
+
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.85em;
+      background: #f1f5f9;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: 1px 5px;
+    }
+
+    a { color: var(--teal); }
+    a:hover { color: var(--orange); }
+
+    .muted { color: var(--muted); font-size: 0.9rem; }
+
+    footer.page-footer {
+      border-top: 1px solid var(--border);
+      margin-top: 8px;
+      padding-top: 20px;
+      font-size: 0.85rem;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    footer.page-footer p + p { margin-top: 8px; }
+
+    @media (max-width: 480px) {
+      header.page-header h1 { font-size: 1.4rem; }
+      main { padding-left: 16px; padding-right: 16px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="page-header">
+    <p class="eyebrow">Receipts Express</p>
+    <h1>Terms of Use</h1>
+    <p class="dates">Effective 8 August 2026 · Last updated 8 August 2026</p>
+  </header>
+
+  <main>
+    <div class="callout">
+      <p>
+        <strong>Receipts Express is an independent personal project, offered free and as is.</strong>
+        It is a tool for capturing receipts and producing an expense report PDF — not a system
+        of record, not an archive, and not a service anyone operates on your behalf.
+      </p>
+      <p class="muted">
+        Using it means accepting the points below. They are short, and none of them are
+        surprising.
+      </p>
+    </div>
+
+    <section>
+      <h2><span class="num">1.</span>What this app is</h2>
+      <p>
+        Receipts Express is a Progressive Web App that scans receipts using on-device text
+        recognition, organises them into expense reports, and exports a polished PDF (or CSV)
+        for you to submit to whatever expense system your organisation uses. It runs entirely
+        in your browser, with no account and no server component.
+      </p>
+      <p>
+        By using the app you agree to these terms. If you do not agree with them, please do
+        not use the app.
+      </p>
+    </section>
+
+    <section>
+      <h2><span class="num">2.</span>No affiliation</h2>
+      <p>
+        This is a personal project, built and maintained independently. It has
+        <strong>no affiliation with, endorsement from, or approval by FedEx or any
+        employer</strong>, and it is not a production system operated by or for any
+        organisation.
+      </p>
+      <p>
+        If you are trialling it at work, whether it is acceptable to use for real expense data
+        is a decision for your own organisation — its IT, security, and records policies
+        apply, and nothing here overrides them.
+      </p>
+    </section>
+
+    <section>
+      <h2><span class="num">3.</span>Licence</h2>
+      <p>
+        The source code is released under the
+        <a href="https://github.com/Jwtc2000/Receipts-Express/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">Apache License 2.0</a>.
+        You are free to use, modify, and redistribute it on that licence's terms, which
+        include preserving the copyright and licence notices and stating any significant
+        changes you make.
+      </p>
+      <p>
+        Sections 4 and 5 below restate that licence's warranty and liability terms in plain
+        language. Where the wording differs, the licence text itself governs.
+      </p>
+      <p class="muted">
+        The app also bundles third-party open-source components — including Tesseract.js,
+        PDF.js, jsPDF, and React — each under its own licence.
+      </p>
+    </section>
+
+    <section>
+      <h2><span class="num">4.</span>Your responsibilities</h2>
+
+      <h3>Check what the scanner read</h3>
+      <p>
+        Text recognition is automated and it makes mistakes — misread totals, wrong dates,
+        garbled merchant names. Extracted values are presented as an editable draft precisely
+        because you are expected to check them. <strong>You are responsible for confirming
+        every value before saving, and for the accuracy of any report you submit.</strong>
+      </p>
+
+      <h3>Back up your work</h3>
+      <p>
+        Browser storage is not permanent. Clearing site data, switching devices or browsers,
+        or an operating-system cleanup can erase everything, and there is no server copy to
+        restore from. Treat the app as a capture-and-export tool, not an archive: export each
+        report when it is complete, and use the Backup card to keep an off-device copy.
+        <strong>Data loss from browser storage being cleared or evicted is an expected
+        limitation, not a defect.</strong>
+      </p>
+
+      <h3>Handle exported files under your own rules</h3>
+      <p>
+        Exported PDFs, CSVs, and backups contain real personal and financial information. Once
+        you save or share one, it is yours to handle according to your organisation's
+        data-handling policies. The app has no visibility into, or control over, what happens
+        to a file after it leaves the app.
+      </p>
+
+      <h3>Do not use development builds with real receipts</h3>
+      <p>
+        If you run the project yourself, note that in development mode (<code>npm run dev</code>)
+        the Content-Security-Policy is not applied, so the browser-level protections that block
+        network exfiltration in production are inactive. Use synthetic receipts for local
+        development; test with real files only against a production build
+        (<code>npm run build</code> and <code>npm run preview</code>).
+      </p>
+
+      <h3>Use it lawfully</h3>
+      <p>
+        Use the app only for receipts and expense records you are entitled to handle, and in
+        line with applicable law and your organisation's policies.
+      </p>
+    </section>
+
+    <section>
+      <h2><span class="num">5.</span>No warranty</h2>
+      <p>
+        The app is provided <strong>"as is", without warranties or conditions of any kind</strong>,
+        express or implied — including any warranty of merchantability, fitness for a
+        particular purpose, non-infringement, accuracy, or uninterrupted availability.
+      </p>
+      <p>
+        In particular, nothing here promises that text recognition will be correct, that
+        exported reports will satisfy any given expense or tax requirement, that the app will
+        work on every device or browser, or that data stored in your browser will survive.
+        You are solely responsible for determining whether the app is appropriate for your
+        use and for accepting the risks of using it.
+      </p>
+    </section>
+
+    <section>
+      <h2><span class="num">6.</span>Limitation of liability</h2>
+      <p>
+        To the fullest extent permitted by law, the project's author and contributors are
+        <strong>not liable for any damages arising from your use of the app</strong> — direct
+        or indirect, incidental, special, or consequential. That includes, without limitation,
+        lost or corrupted receipt data, an incorrect or rejected expense report, missed
+        reimbursement or filing deadlines, or loss of goodwill, even if the possibility of
+        such damage was known.
+      </p>
+      <p class="muted">
+        Some jurisdictions do not allow the exclusion of certain warranties or liabilities, in
+        which case the exclusions above apply only as far as that jurisdiction permits.
+      </p>
+    </section>
+
+    <section>
+      <h2><span class="num">7.</span>Availability and changes to the app</h2>
+      <p>
+        The app is published on GitHub Pages as a personal project. There is no service-level
+        commitment, no support obligation, and no guarantee of continued availability:
+        features may change, and the hosted app may be modified or withdrawn at any time,
+        without notice.
+      </p>
+      <p>
+        Because the app works offline once installed and the source is public under
+        Apache-2.0, you are never locked out of your own data — your reports remain on your
+        device, and you can export them or run the app yourself.
+      </p>
+    </section>
+
+    <section>
+      <h2><span class="num">8.</span>Privacy</h2>
+      <p>
+        Your receipts and reports stay on your device. The
+        <a href="./privacy.html">Privacy Policy</a> sets out exactly what is stored, what is
+        never collected, and the one network interaction that exists.
+      </p>
+    </section>
+
+    <section>
+      <h2><span class="num">9.</span>Changes to these terms</h2>
+      <p>
+        These terms may be updated; the "last updated" date at the top will change when they
+        are, and every revision is visible in the project's public history. Continuing to use
+        the app after a change means accepting the updated terms.
+      </p>
+    </section>
+
+    <section>
+      <h2><span class="num">10.</span>Contact</h2>
+      <p>
+        Questions about these terms are best raised as an issue on the project's repository:
+        <a href="https://github.com/Jwtc2000/Receipts-Express/issues" target="_blank" rel="noopener noreferrer">github.com/Jwtc2000/Receipts-Express/issues</a>.
+        Security vulnerabilities should be reported privately through
+        <a href="https://github.com/Jwtc2000/Receipts-Express/security/advisories/new" target="_blank" rel="noopener noreferrer">GitHub Security Advisories</a>.
+      </p>
+    </section>
+
+    <footer class="page-footer">
+      <p>
+        See also the <a href="./privacy.html">Privacy Policy</a>.
+      </p>
+      <p>
+        Independent personal project — no affiliation with, endorsement from, or approval by
+        FedEx or any employer.
+      </p>
+    </footer>
+  </main>
+</body>
+</html>

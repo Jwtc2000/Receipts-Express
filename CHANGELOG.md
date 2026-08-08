@@ -8,6 +8,34 @@ user-facing features, and `PATCH` for fixes with no visible feature change. The
 version lives in `package.json` and is shown in the app under Menu → About. Every
 merge to `main` that changes app behavior gets a version bump and a tag.
 
+## [1.13.0] - 2026-08-08
+
+### Added
+- Privacy Policy and Terms of Use, published as standalone pages
+  (`docs/privacy.html`, `docs/terms.html`) and linked from the app under
+  Menu → About. The Privacy Policy states only what the code actually
+  does — the IndexedDB stores and the four `br.*` localStorage keys by
+  name, on-device OCR and PDF rasterization, no accounts/analytics/
+  cookies/ads/payments, that the full OCR transcript is discarded rather
+  than saved, and that GitHub Pages is the sole third party (seeing
+  standard web request logs when the app is loaded). It also states the
+  limits plainly: storage is not separately encrypted, and there is no
+  single "delete all data" button, so full erasure is via the browser's
+  clear-site-data. The Terms carry the no-affiliation disclaimer, the
+  Apache-2.0 warranty and liability terms in plain language, and the
+  user's responsibility to verify OCR output and export before browser
+  storage is evicted.
+
+### Changed
+- `copyPilotDeckPlugin` is now `copyStaticDocsPlugin`, driven by a list
+  of pages, so every standalone page under `docs/` reaches `dist/`. The
+  existing `docs/**` entries in `globIgnores` and
+  `navigateFallbackDenylist` already cover the new pages.
+- Drawer links to those pages share a `.drawer-link` class instead of the
+  inline style the pilot-deck link carried. The class also moves them off
+  teal-400, which sat at roughly 1.8:1 against the white drawer panel and
+  failed WCAG AA, onto the brand `--teal` at 5.4:1.
+
 ## [1.12.0] - 2026-08-06
 
 ### Added
