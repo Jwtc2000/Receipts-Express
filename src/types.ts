@@ -9,6 +9,11 @@ export interface Report {
   /** Per-day cap on reimbursable Meals spending; unset/0 disables the food-balance feature. */
   dailyMealAllowance?: number
   /**
+   * Project number this report is charged to, picked from the saved list in
+   * the profile. Unset falls back to the profile's default project number.
+   */
+  projectNumber?: string
+  /**
    * Manually-entered FOREIGN→USD rate per non-USD currency used in this
    * report — 1 unit of that currency in US dollars (e.g. `{ EUR: 1.08 }`).
    * Entered by the user, never fetched: this app makes no network calls

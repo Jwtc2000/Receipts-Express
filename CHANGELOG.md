@@ -8,6 +8,27 @@ user-facing features, and `PATCH` for fixes with no visible feature change. The
 version lives in `package.json` and is shown in the app under Menu → About. Every
 merge to `main` that changes app behavior gets a version bump and a tag.
 
+## [1.12.0] - 2026-08-06
+
+### Added
+- Multiple project numbers: save a list of the projects you charge to
+  (Menu → Project Numbers, with one marked as the default) and charge
+  each report to its own — picked when creating the report or later from
+  the report's menu. The report's project number is what prints on its
+  PDF summary page; reports without one fall back to the default. Saved
+  project numbers are per-device (localStorage) like the rest of the
+  profile; a report's project number travels with it in backups.
+
+### Security
+- Cleared the six advisories `osv-scanner` flags on the dependency tree
+  (all pre-existing, none introduced by the project-numbers work):
+  `pdfjs-dist` 6.1.200 → 6.2.108 (GHSA-hq66-cqwq-w95j), and pinned
+  `dompurify` ≥3.4.13, `nanoid` ≥3.3.17 and `postcss` ≥8.5.23 via
+  `overrides`, alongside refreshed `brace-expansion` (≥5.0.9) and
+  `fast-uri` (≥3.1.5) pins. Each package resolves to a single copy in
+  the tree, so the overrides don't fork any dependency onto an
+  incompatible major.
+
 ## [1.11.1] - 2026-07-27
 
 ### Changed

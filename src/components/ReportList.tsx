@@ -10,10 +10,11 @@ import {
   dismissBackupWarning,
   shouldShowBackupWarning,
 } from '../backup'
-import { getProfile, saveProfile, type Profile } from '../profile'
+import { addProject, getProfile, removeProject, saveProfile, type Profile } from '../profile'
 import { expenseMatches } from '../search'
 import Icon from './icons'
 import DrawerSection from './DrawerSection'
+import ProjectSelect from './ProjectSelect'
 import { ArrowDivider, HeaderPlanes } from './decorative'
 import { LogoTitle } from './LogoTitle'
 
@@ -44,10 +45,18 @@ export default function ReportList({ onOpenReport, onEditExpense }: Props) {
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [profile, setProfile] = useState<Profile>(() => getProfile())
+  const [newProject, setNewProject] = useState('')
+  const [newReportProject, setNewReportProject] = useState('')
   const restoreInput = useRef<HTMLInputElement>(null)
 
   const setProfileField = (patch: Partial<Profile>) => setProfile((p) => ({ ...p, ...patch }))
   const persistProfile = () => saveProfile(profile)
+  // The project list is edited by button, not by typing, so it's saved
+  // immediately rather than on blur like the free-text fields above.
+  const updateProfile = (next: Profile) => {
+    setProfile(next)
+    saveProfile(next)
+  }
 
   const refresh = async () => {
     const reports = await listReports()
@@ -87,12 +96,21 @@ export default function ReportList({ onOpenReport, onEditExpense }: Props) {
     const startDate = newStartDate
     const endDate = newEndDate < startDate ? startDate : newEndDate
     const dailyMealAllowance = Math.max(0, parseFloat(newMealAllowance)) || 0
-    const report: Report = { id: newId(), name, createdAt: Date.now(), startDate, endDate, dailyMealAllowance }
+    const report: Report = {
+      id: newId(),
+      name,
+      createdAt: Date.now(),
+      startDate,
+      endDate,
+      dailyMealAllowance,
+      ...(newReportProject ? { projectNumber: newReportProject } : {}),
+    }
     await saveReport(report)
     setNewName('')
     setNewStartDate(todayIso())
     setNewEndDate(todayIso())
     setNewMealAllowance('')
+    setNewReportProject('')
     setCreating(false)
     onOpenReport(report.id)
   }
@@ -225,16 +243,65 @@ export default function ReportList({ onOpenReport, onEditExpense }: Props) {
                       onBlur={persistProfile}
                     />
                   </label>
-                  <label className="field span-2">
-                    <span>Project Number</span>
-                    <input
-                      placeholder="PRJ-42"
-                      value={profile.projectNumber}
-                      onChange={(e) => setProfileField({ projectNumber: e.target.value })}
-                      onBlur={persistProfile}
-                    />
-                  </label>
                 </div>
+              </DrawerSection>
+
+              <ArrowDivider />
+
+              <DrawerSection title="Project Numbers">
+                <p className="muted">
+                  Save the projects you charge to, then pick one per report — each report's PDF
+                  prints its own project number.
+                </p>
+                {profile.projects.length > 0 && (
+                  <ul className="project-list">
+                    {profile.projects.map((code) => (
+                      <li key={code} className={code === profile.projectNumber ? 'is-default' : ''}>
+                        <span className="project-code">{code}</span>
+                        {code === profile.projectNumber ? (
+                          <span className="project-default-tag">Default</span>
+                        ) : (
+                          <button
+                            className="btn ghost small"
+                            onClick={() => updateProfile({ ...profile, projectNumber: code })}
+                          >
+                            Make default
+                          </button>
+                        )}
+                        <button
+                          className="icon-btn danger"
+                          aria-label={`Remove project ${code}`}
+                          onClick={() => updateProfile(removeProject(profile, code))}
+                        >
+                          <Icon name="trash" size={16} />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <form
+                  className="project-add"
+                  onSubmit={(e) => {
+                    e.preventDefault()
+                    if (!newProject.trim()) return
+                    updateProfile(addProject(profile, newProject))
+                    setNewProject('')
+                  }}
+                >
+                  <input
+                    placeholder="PRJ-42"
+                    value={newProject}
+                    onChange={(e) => setNewProject(e.target.value)}
+                  />
+                  <button type="submit" className="btn primary small" disabled={!newProject.trim()}>
+                    Add
+                  </button>
+                </form>
+                {profile.projects.length > 0 && (
+                  <p className="muted">
+                    New reports start on the default and can be switched from the report's own menu.
+                  </p>
+                )}
               </DrawerSection>
 
               <ArrowDivider />
@@ -335,6 +402,7 @@ export default function ReportList({ onOpenReport, onEditExpense }: Props) {
                   <h3>{report.name}</h3>
                   <p className="muted">
                     {count} expense{count === 1 ? '' : 's'}
+                    {report.projectNumber ? ` · ${report.projectNumber}` : ''}
                   </p>
                 </div>
                 <div className="report-card-side">
@@ -459,6 +527,14 @@ export default function ReportList({ onOpenReport, onEditExpense }: Props) {
                     onChange={(e) => setNewMealAllowance(e.target.value)}
                   />
                 </label>
+                {profile.projects.length > 0 && (
+                  <ProjectSelect
+                    value={newReportProject}
+                    projects={profile.projects}
+                    defaultProject={profile.projectNumber}
+                    onChange={setNewReportProject}
+                  />
+                )}
               </div>
               <div className="form-actions">
                 <button type="button" className="btn ghost" onClick={() => setCreating(false)}>
@@ -470,7 +546,13 @@ export default function ReportList({ onOpenReport, onEditExpense }: Props) {
               </div>
             </form>
           ) : (
-            <button className="fab" onClick={() => setCreating(true)}>
+            <button
+              className="fab"
+              onClick={() => {
+                setNewReportProject(profile.projectNumber)
+                setCreating(true)
+              }}
+            >
               + New Report
             </button>
           ))}

@@ -620,6 +620,68 @@ body {
   gap: 12px;
 }
 
+/* ---- Saved project numbers ---- */
+
+.project-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.project-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+}
+
+.project-list li.is-default {
+  border-color: var(--teal);
+}
+
+.project-code {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.project-default-tag {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--teal);
+}
+
+.project-add {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.project-add input {
+  flex: 1;
+  min-width: 0;
+  font-size: 1rem;
+  font-family: inherit;
+  padding: 11px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--text);
+}
+
+.project-add input:focus {
+  outline: 2px solid var(--teal);
+  outline-offset: -1px;
+}
+
 .usd-total-display {
   display: flex;
   flex-wrap: wrap;

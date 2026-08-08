@@ -17,8 +17,10 @@ import { exportReportCsv } from '../csv'
 import { expenseMatches } from '../search'
 import { dayColor, contrastText, rgbToCss } from '../colors'
 import { foodBalanceForDate, formatFoodBalance, formatPersonalTotal } from '../mealAllowance'
+import { getProfile, type Profile } from '../profile'
 import Icon from './icons'
 import DrawerSection from './DrawerSection'
+import ProjectSelect from './ProjectSelect'
 import { HeaderPlanes } from './decorative'
 
 interface Props {
@@ -46,6 +48,7 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
   const [tripStartDraft, setTripStartDraft] = useState('')
   const [tripEndDraft, setTripEndDraft] = useState('')
   const [mealAllowanceDraft, setMealAllowanceDraft] = useState('')
+  const [profile, setProfile] = useState<Profile>(() => getProfile())
   const [exchangeRateDrafts, setExchangeRateDrafts] = useState<Record<string, string>>({})
   const dragIndex = useRef<number | null>(null)
   const thumbsRef = useRef<Map<string, string>>(new Map())
@@ -232,6 +235,8 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
     setTripStartDraft(report.startDate || todayIso())
     setTripEndDraft(report.endDate || todayIso())
     setMealAllowanceDraft(report.dailyMealAllowance ? String(report.dailyMealAllowance) : '')
+    // Re-read in case the saved project list was edited since this screen opened.
+    setProfile(getProfile())
     const drafts: Record<string, string> = {}
     for (const currency of foreignCurrencies) {
       const rate = report.exchangeRates?.[currency]
@@ -253,6 +258,13 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
       delete current[currency]
     }
     const updated = { ...report, exchangeRates: current }
+    await saveReport(updated)
+    setReport(updated)
+  }
+
+  const saveProjectNumber = async (projectNumber: string) => {
+    if (!report) return
+    const updated = { ...report, projectNumber }
     await saveReport(updated)
     setReport(updated)
   }
@@ -431,6 +443,25 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
                   </label>
                 </div>
               </DrawerSection>
+
+              <DrawerSection title="Project Number">
+                <p className="muted">
+                  {profile.projects.length > 0
+                    ? "Which project this report is charged to — it's printed on the PDF summary page."
+                    : 'Save project numbers in the home screen menu to charge reports to different projects.'}
+                </p>
+                {profile.projects.length > 0 && (
+                  <div className="field-grid">
+                    <ProjectSelect
+                      value={report.projectNumber ?? ''}
+                      projects={profile.projects}
+                      defaultProject={profile.projectNumber}
+                      onChange={(value) => void saveProjectNumber(value)}
+                      label="Charge to"
+                    />
+                  </div>
+                )}
+              </DrawerSection>
             </div>
           </aside>
         </div>
@@ -460,6 +491,7 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
           {searching
             ? `${visibleIndices.length} of ${expenses.length} match${expenses.length === 1 ? '' : 'es'}`
             : `${expenses.length} expense${expenses.length === 1 ? '' : 's'}`}
+          {!searching && report.projectNumber ? ` · ${report.projectNumber}` : ''}
         </span>
         <strong>{totalDisplay}</strong>
       </div>

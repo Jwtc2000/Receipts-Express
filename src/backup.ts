@@ -41,6 +41,7 @@ function isValidReport(v: unknown): v is Report {
     (v.endDate === undefined || typeof v.endDate === 'string') &&
     (v.dailyMealAllowance === undefined ||
       (typeof v.dailyMealAllowance === 'number' && Number.isFinite(v.dailyMealAllowance))) &&
+    (v.projectNumber === undefined || typeof v.projectNumber === 'string') &&
     (v.exchangeRates === undefined ||
       (isPlainObject(v.exchangeRates) &&
         Object.values(v.exchangeRates).every((r) => typeof r === 'number' && Number.isFinite(r) && r > 0)))

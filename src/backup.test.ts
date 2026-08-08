@@ -91,6 +91,24 @@ describe('validateBackup', () => {
     expect(() => validateBackup(bad)).toThrow(/malformed/i)
   })
 
+  it('accepts a report with a project number', async () => {
+    const { validateBackup } = await import('./backup')
+    const backup = validBackup({
+      reports: [{ id: 'r1', name: 'Trip', createdAt: 1, projectNumber: 'PRJ-42' }],
+    })
+    const { reports } = validateBackup(backup)
+    expect(reports[0].projectNumber).toBe('PRJ-42')
+  })
+
+  it('rejects a report with a non-string projectNumber', async () => {
+    const { validateBackup } = await import('./backup')
+    const bad = validBackup({
+      // @ts-expect-error intentionally malformed for the test
+      reports: [{ id: 'r1', name: 'Trip', createdAt: 1, projectNumber: 42 }],
+    })
+    expect(() => validateBackup(bad)).toThrow(/malformed/i)
+  })
+
   it('rejects an expense with a non-numeric personalAmount (regression)', async () => {
     // A malformed personalAmount would otherwise crash businessAmount's
     // subtraction the first time totals are computed.

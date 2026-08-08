@@ -6,3 +6,21 @@ updates:
       interval: "weekly"
     cooldown:
       default-days: 7
+
+  # Without this, npm advisories only surfaced when the Jenkins Supply
+  # chain stage (osv-scanner) went red on an unrelated PR — as six of
+  # them did on #51.
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+    # Batch routine version bumps into two PRs a week instead of a dozen.
+    # Security updates are ungrouped and ignore the cooldown, so an
+    # advisory still gets its own PR the day it lands.
+    groups:
+      production-dependencies:
+        dependency-type: "production"
+      development-dependencies:
+        dependency-type: "development"

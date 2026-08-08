@@ -80,9 +80,10 @@ export async function exportReportPdf(report: Report, expenses: Expense[]): Prom
   )
 
   // Optional profile attributes (name, employee ID, cost center, project
-  // number) — only takes up space on the page when at least one is set.
+  // number) — only takes up space on the page when at least one is set. The
+  // report's own project number wins over the profile default when set.
   let y = 150
-  const profileLine = profileSummaryLines(getProfile()).join('   ·   ')
+  const profileLine = profileSummaryLines(getProfile(), report.projectNumber).join('   ·   ')
   if (profileLine) {
     doc.setTextColor(...SLATE)
     doc.setFont('helvetica', 'normal')
