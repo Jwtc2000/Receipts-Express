@@ -19,6 +19,16 @@ merge to `main` that changes app behavior gets a version bump and a tag.
   project numbers are per-device (localStorage) like the rest of the
   profile; a report's project number travels with it in backups.
 
+### Security
+- Cleared the six advisories `osv-scanner` flags on the dependency tree
+  (all pre-existing, none introduced by the project-numbers work):
+  `pdfjs-dist` 6.1.200 → 6.2.108 (GHSA-hq66-cqwq-w95j), and pinned
+  `dompurify` ≥3.4.13, `nanoid` ≥3.3.17 and `postcss` ≥8.5.23 via
+  `overrides`, alongside refreshed `brace-expansion` (≥5.0.9) and
+  `fast-uri` (≥3.1.5) pins. Each package resolves to a single copy in
+  the tree, so the overrides don't fork any dependency onto an
+  incompatible major.
+
 ## [1.11.1] - 2026-07-27
 
 ### Changed
