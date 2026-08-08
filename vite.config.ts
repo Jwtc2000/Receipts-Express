@@ -60,7 +60,12 @@ function cspPlugin(): Plugin {
 // same in production as they do from the repo. Anything added here is already
 // covered by the docs/ entries in globIgnores and navigateFallbackDenylist
 // below.
-const STATIC_DOC_PAGES = ['pilot-deck.html', 'privacy.html', 'terms.html']
+const STATIC_DOC_PAGES = [
+  'pilot-deck.html',
+  'privacy.html',
+  'terms.html',
+  'consumer-health-data.html',
+]
 
 function copyStaticDocsPlugin(): Plugin {
   const root = fileURLToPath(new URL('.', import.meta.url))
@@ -84,6 +89,13 @@ function copyStaticDocsPlugin(): Plugin {
           copyFileSync(resolve(root, 'assets', file), resolve(outDir, 'assets', file))
         }
       }
+      // Ship the license with the deployment, not just in the repo. Apache-2.0
+      // §7 and §8 disclaim warranty and liability for anyone who receives the
+      // Work — and a browser running this app has received it. Those
+      // disclaimers attach by license, without depending on the user having
+      // accepted the Terms, so they are the fallback if assent is ever
+      // disputed. Costs one file.
+      copyFileSync(resolve(root, 'LICENSE'), resolve(outDir, 'LICENSE.txt'))
     },
   }
 }
@@ -148,7 +160,12 @@ export default defineConfig({
         // sit in the mandatory install-time precache with no code path that
         // can ever execute them. Distinguished from the real `index-*.js`
         // entry chunk by the `.es` suffix, which only these carry.
-        globIgnores: ['tesseract/**', 'pdfjs/**', 'docs/**', 'assets/index.es-*.js', 'assets/html2canvas.esm-*.js', 'assets/purify.es-*.js'],
+        // fonts/ is here for the same reason as docs/: globPatterns above
+        // matches woff2, but the webfonts exist only for the standalone
+        // pages under docs/ — the app's own UI uses the system stack. Left
+        // in, they would sit in every user's mandatory install-time
+        // precache to style pages most users never open.
+        globIgnores: ['tesseract/**', 'pdfjs/**', 'docs/**', 'fonts/**', 'assets/index.es-*.js', 'assets/html2canvas.esm-*.js', 'assets/purify.es-*.js'],
         // vite-plugin-pwa's generateSW registers an SPA navigation route that
         // serves index.html (the app shell) for every navigation request. The
         // pilot deck and the privacy/terms pages are real, standalone pages
@@ -177,6 +194,17 @@ export default defineConfig({
             options: {
               cacheName: 'pdfjs-engine',
               expiration: { maxEntries: 40, maxAgeSeconds: 30 * 24 * 60 * 60 }
+            }
+          },
+          {
+            // Excluded from the precache above, so cache them the first time
+            // someone actually opens a docs/ page — after which the privacy
+            // policy and terms read identically offline.
+            urlPattern: /\/fonts\//,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'webfonts',
+              expiration: { maxEntries: 8, maxAgeSeconds: 365 * 24 * 60 * 60 }
             }
           }
         ]

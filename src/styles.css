@@ -700,6 +700,61 @@ body {
   color: var(--orange);
 }
 
+/* ---- First-run terms acknowledgment ---- */
+
+.first-run-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(15, 23, 42, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.first-run {
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: 0 12px 40px rgba(15, 23, 42, 0.3);
+  padding: 22px 20px calc(env(safe-area-inset-bottom, 0px) + 20px);
+  max-width: 420px;
+  width: 100%;
+  max-height: 90dvh;
+  overflow-y: auto;
+}
+
+.first-run h2 {
+  font-size: 1.15rem;
+  margin-bottom: 10px;
+}
+
+.first-run p {
+  font-size: 0.92rem;
+  line-height: 1.5;
+  margin-bottom: 12px;
+}
+
+/* Berman v. Freedom Financial faulted notice set in small grey type away
+   from the button. This stays at body size and full contrast, sits directly
+   above the button, and underlines its links so they read as links. */
+.first-run-assent {
+  color: var(--text);
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.first-run-assent a {
+  color: var(--teal);
+  text-decoration: underline;
+  font-weight: 600;
+}
+
+.first-run .btn {
+  width: 100%;
+  justify-content: center;
+}
+
 /* Links out of the drawer to the standalone pages under docs/ (pilot deck,
    privacy policy, terms of use). Uses the brand --teal rather than the
    teal-400 (#2dd4bf) the pilot-deck link previously hardcoded inline: the

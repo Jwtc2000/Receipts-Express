@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Receipts Express — Consumer Health Data Privacy Policy</title>
+  <meta name="description" content="Consumer Health Data Privacy Policy under the Washington My Health My Data Act.">
+  <link rel="icon" type="image/svg+xml" href="../icons/icon.svg">
+  <meta name="theme-color" content="#0f766e">
+
+  <!--
+    A SEPARATE page, deliberately.
+
+    RCW 19.373.020(1)(b) requires a regulated entity to prominently publish a
+    link to its consumer health data privacy policy, and the Washington
+    Attorney General's guidance goes further: the link must be "separate and
+    distinct", and the policy "may not contain additional information not
+    required under the My Health My Data Act." So this page carries only the
+    MHMD-required disclosures — no terms, no cookie talk, no general privacy
+    content. Everything else lives in privacy.html.
+
+    Publishing this is not a concession that the author is a regulated
+    entity; see the closing note. It costs one static page, and MHMD routes
+    violations into the Consumer Protection Act with fee-shifting.
+
+    Self-contained: self-hosted fonts, inline styles, no external
+    subresources. Enforced by src/legalPages.test.ts.
+  -->
+  <style>
+    @font-face {
+      font-family: 'Inter Variable';
+      font-style: normal;
+      font-display: swap;
+      font-weight: 100 900;
+      src: url('../fonts/inter-latin-wght-normal.woff2') format('woff2-variations');
+    }
+    @font-face {
+      font-family: 'Outfit Variable';
+      font-style: normal;
+      font-display: swap;
+      font-weight: 100 900;
+      src: url('../fonts/outfit-latin-wght-normal.woff2') format('woff2-variations');
+    }
+
+    :root {
+      --font-display: 'Outfit Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --font-sans: 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      --teal: #0f766e;
+      --purple: #7c3aed;
+      --orange: #ea580c;
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --text: #0f172a;
+      --muted: #64748b;
+      --border: #e2e8f0;
+      --header-gradient-a: #660099;
+      --header-gradient-b: #ff6600;
+      --radius: 14px;
+      --shadow: 0 1px 3px rgba(15, 23, 42, 0.08), 0 4px 12px rgba(15, 23, 42, 0.05);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--font-sans);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    header.page-header {
+      background: linear-gradient(135deg, var(--header-gradient-a) 0%, var(--header-gradient-b) 100%);
+      color: #fff;
+      padding: calc(env(safe-area-inset-top, 0px) + 32px) 20px 32px;
+      text-align: center;
+    }
+
+    header.page-header h1 {
+      font-family: var(--font-display);
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    header.page-header .eyebrow {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      opacity: 0.85;
+      margin-bottom: 6px;
+    }
+
+    header.page-header .dates {
+      margin-top: 10px;
+      font-size: 0.85rem;
+      opacity: 0.9;
+    }
+
+    main {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 28px 20px calc(env(safe-area-inset-bottom, 0px) + 56px);
+    }
+
+    .callout {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--teal);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 18px 20px;
+      margin-bottom: 32px;
+    }
+
+    section { margin-bottom: 30px; }
+
+    h2 {
+      font-family: var(--font-display);
+      font-size: 1.05rem;
+      font-weight: 600;
+      margin-bottom: 10px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--border);
+    }
+
+    p + p, p + ul, ul + p { margin-top: 12px; }
+    ul { padding-left: 22px; }
+    li + li { margin-top: 6px; }
+
+    .none {
+      font-weight: 700;
+      color: var(--teal);
+    }
+
+    a { color: var(--teal); }
+    a:hover { color: var(--orange); }
+
+    .muted { color: var(--muted); font-size: 0.9rem; }
+
+    footer.page-footer {
+      border-top: 1px solid var(--border);
+      margin-top: 8px;
+      padding-top: 20px;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    @media (max-width: 480px) {
+      header.page-header h1 { font-size: 1.25rem; }
+      main { padding-left: 16px; padding-right: 16px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="page-header">
+    <p class="eyebrow">Receipts Express</p>
+    <h1>Consumer Health Data Privacy Policy</h1>
+    <p class="dates">Washington My Health My Data Act · Effective 8 August 2026</p>
+  </header>
+
+  <main>
+    <div class="callout">
+      <p>
+        Receipts Express runs entirely in your web browser. It has no server, no accounts, and
+        no analytics. Everything you scan or enter is processed and stored only on your own
+        device and is never transmitted to the author or to anyone else.
+      </p>
+    </div>
+
+    <section>
+      <h2>Categories of consumer health data collected, and the purpose of collection</h2>
+      <p class="none">None.</p>
+      <p>
+        The author does not buy, rent, access, retain, receive, acquire, infer, derive, or
+        otherwise process any consumer health data. The app performs no health inference and
+        derives no health status: it stores an image of a receipt and the merchant, date, and
+        amount you confirm. If you scan a receipt from a pharmacy or a medical provider, it
+        stays on your device exactly like every other receipt.
+      </p>
+    </section>
+
+    <section>
+      <h2>Categories of sources of consumer health data</h2>
+      <p class="none">None.</p>
+    </section>
+
+    <section>
+      <h2>Categories of consumer health data shared</h2>
+      <p class="none">None.</p>
+    </section>
+
+    <section>
+      <h2>Third parties and affiliates with whom consumer health data is shared</h2>
+      <p class="none">None.</p>
+      <p>
+        There are no affiliates, no service providers, no processors, and no contractors. The
+        author has no access to your data and therefore nothing to share.
+      </p>
+    </section>
+
+    <section>
+      <h2>Sale of consumer health data</h2>
+      <p class="none">The author does not sell consumer health data, has never sold it, and does not offer it for sale.</p>
+    </section>
+
+    <section>
+      <h2>Geofencing</h2>
+      <p class="none">The author does not operate any geofence.</p>
+      <p>
+        The app never requests your location, and no geofence is or has been placed around any
+        facility providing in-person health care services.
+      </p>
+    </section>
+
+    <section>
+      <h2>How to exercise your rights</h2>
+      <p>
+        The Act gives you the right to confirm whether your consumer health data is being
+        collected, to access it, to withdraw consent, and to have it deleted.
+        <strong>Because the author holds no data about you, there is nothing for the author to
+        confirm, access, or delete.</strong> You hold the only copy, and you can act on it
+        directly and immediately:
+      </p>
+      <ul>
+        <li>Delete an individual expense, or delete a report — which also deletes its expenses and their receipt images.</li>
+        <li>Erase everything at once using your browser's "clear site data" or website-data controls for this site.</li>
+      </ul>
+      <p>
+        To submit a request or an appeal anyway, or to tell the author that something on this
+        page is inaccurate, open an issue at
+        <a href="https://github.com/Jwtc2000/Receipts-Express/issues" target="_blank" rel="noopener noreferrer">github.com/Jwtc2000/Receipts-Express/issues</a>.
+        You will receive a response within 45 days. If a request is denied, you may contact the
+        Washington State Attorney General at
+        <a href="https://www.atg.wa.gov/file-complaint" target="_blank" rel="noopener noreferrer">atg.wa.gov/file-complaint</a>.
+      </p>
+    </section>
+
+    <footer class="page-footer">
+      <p>
+        This notice is published for transparency. It is not an admission that the author is a
+        "regulated entity" or a "small business" as those terms are defined in RCW 19.373.010.
+      </p>
+    </footer>
+  </main>
+</body>
+</html>

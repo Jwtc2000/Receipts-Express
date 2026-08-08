@@ -350,6 +350,21 @@ export default function ReportList({ onOpenReport, onEditExpense }: Props) {
                     Terms of Use
                   </a>
                 </p>
+                {/* Its own link, not folded into the line above: RCW
+                    19.373.020(1)(b) and the Washington AG's guidance call for
+                    a separate and distinct link to the consumer health data
+                    policy, and for an app the "homepage" for that purpose
+                    includes the About screen. */}
+                <p>
+                  <a
+                    className="drawer-link"
+                    href="./docs/consumer-health-data.html"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Consumer Health Data Privacy Policy
+                  </a>
+                </p>
                 <p className="muted">
                   Version {__APP_VERSION__}{' '}
                   <span style={{ fontSize: '0.8em', opacity: 0.7 }}>({__COMMIT_HASH__})</span>

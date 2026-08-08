@@ -15,7 +15,7 @@ If you are a co-worker looking to help pilot Receipts Express, check out the fol
 * **[Interactive Slide Deck (docs/pilot-deck.html)](./docs/pilot-deck.html)**: Interactive presentation slideshow for team meetings.
 * **[Slide Deck Content (docs/PILOT_DECK.md)](./docs/PILOT_DECK.md)**: Markdown version of the presentation deck.
 * **[Project Governance Review (docs/governance/REVIEW.md)](./docs/governance/REVIEW.md)**: Compliance checklist based on corporate templates.
-* **[Privacy Policy (docs/privacy.html)](./docs/privacy.html)** and **[Terms of Use (docs/terms.html)](./docs/terms.html)**: The user-facing legal pages, linked from the app under Menu → About.
+* **[Privacy Policy (docs/privacy.html)](./docs/privacy.html)**, **[Terms of Use (docs/terms.html)](./docs/terms.html)**, and **[Consumer Health Data Privacy Policy (docs/consumer-health-data.html)](./docs/consumer-health-data.html)**: The user-facing legal pages, linked from the app under Menu → About and acknowledged once on first launch.
 
 ---
 
@@ -171,12 +171,15 @@ This is a personal project, built and maintained independently. It has no affili
 
 By design, all receipt data — images, extracted text, and report contents — stays on your device (see [SECURITY.md](./SECURITY.md) for exactly how). Exported PDFs, once you save or share them, are your responsibility to handle according to your own organization's data-handling rules — this app has no visibility into, or control over, what happens to a file after it leaves the app.
 
-The user-facing versions of these commitments are published as two standalone pages, linked from the app under Menu → About:
+The user-facing versions of these commitments are published as three standalone pages, linked from the app under Menu → About. New users acknowledge the first two once, on first launch, before using the app:
 
 * **[Privacy Policy (docs/privacy.html)](./docs/privacy.html)** — what is stored on your device, what is never collected, and the one network interaction that exists.
-* **[Terms of Use (docs/terms.html)](./docs/terms.html)** — no affiliation, Apache-2.0 licensing, as-is with no warranty, and what you're responsible for.
+* **[Terms of Use (docs/terms.html)](./docs/terms.html)** — no affiliation, Apache-2.0 licensing, as-is with no warranty, Washington governing law, and what you're responsible for.
+* **[Consumer Health Data Privacy Policy (docs/consumer-health-data.html)](./docs/consumer-health-data.html)** — a separate, distinctly-linked page, because Washington's My Health My Data Act treats that link as its own requirement and a scanned pharmacy receipt is the kind of thing it contemplates.
 
-Every claim in the Privacy Policy is traceable to code in this repository; both pages are deliberately self-contained and load no external fonts, scripts, or styles, which [`src/legalPages.test.ts`](./src/legalPages.test.ts) enforces.
+Every claim in the Privacy Policy is traceable to code in this repository. All three pages are deliberately self-contained — no external fonts, scripts, or styles — and so is the pilot deck, which used to load its fonts from Google's CDN. [`src/legalPages.test.ts`](./src/legalPages.test.ts) enforces that for all four, and also checks that the localStorage keys the policy enumerates are still the ones the app writes.
+
+These pages are not a substitute for legal advice, and they have not been reviewed by an attorney.
 
 ## Versioning
 

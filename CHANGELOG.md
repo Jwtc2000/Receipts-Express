@@ -14,19 +14,55 @@ merge to `main` that changes app behavior gets a version bump and a tag.
 - Privacy Policy and Terms of Use, published as standalone pages
   (`docs/privacy.html`, `docs/terms.html`) and linked from the app under
   Menu → About. The Privacy Policy states only what the code actually
-  does — the IndexedDB stores and the four `br.*` localStorage keys by
+  does — the IndexedDB stores and the five `br.*` localStorage keys by
   name, on-device OCR and PDF rasterization, no accounts/analytics/
   cookies/ads/payments, that the full OCR transcript is discarded rather
   than saved, and that GitHub Pages is the sole third party (seeing
   standard web request logs when the app is loaded). It also states the
   limits plainly: storage is not separately encrypted, and there is no
   single "delete all data" button, so full erasure is via the browser's
-  clear-site-data. The Terms carry the no-affiliation disclaimer, the
-  Apache-2.0 warranty and liability terms in plain language, and the
-  user's responsibility to verify OCR output and export before browser
-  storage is evicted.
+  clear-site-data.
+- A one-time acknowledgment on first launch. Terms reachable only from a
+  menu are browsewrap, which generally fails — the Ninth Circuit wants
+  conspicuous notice *and* an unambiguous act of assent, so a warranty
+  disclaimer nobody agreed to protects nobody. The notice sits directly
+  above the button at full contrast, both policies are linked so they can
+  be read first, and the button says "I Agree". The acknowledgment is
+  recorded in `br.termsAccepted` with the terms version, and reappears
+  only when `TERMS_VERSION` is bumped for a material change
+  (`src/terms.ts`, `src/components/FirstRunNotice.tsx`).
+- A Consumer Health Data Privacy Policy (`docs/consumer-health-data.html`)
+  as a separate, distinctly-linked page. Washington's My Health My Data
+  Act treats that link as its own requirement, and a scanned pharmacy
+  receipt is the kind of thing it contemplates — even though nothing here
+  ever leaves the device.
+- Protective clauses the Terms previously lacked: governing law and venue
+  (Washington), a liability cap that survives if the blanket exclusion is
+  struck, indemnification, eligibility, acceptable use, a disclaimer that
+  exports are not warranted to satisfy Internal Revenue Service
+  substantiation or any employer's reimbursement policy, and the standard
+  machinery (severability, entire agreement, survival, assignment,
+  notices, trademark reservation). The warranty and liability sections are
+  now set off in bordered boxes with uppercase leads, since
+  RCW 62A.1-201(b)(10) turns on whether a reasonable person ought to have
+  noticed the term.
+- Affirmative "does not sell, share, rent, or trade" and Global Privacy
+  Control statements in the Privacy Policy. Both were true before and
+  implied throughout, but the statutory words appeared nowhere.
 
 ### Changed
+- Inter and Outfit are now self-hosted from the app's own origin, and the
+  pilot deck no longer loads them from Google's font CDN. That deck is
+  linked from inside the app, so opening it sent every reader's IP to
+  Google — quietly contradicting the "no third-party requests of any
+  kind" claim in `SECURITY.md` and in the new privacy policy. Vendored by
+  `scripts/copy-font-assets.mjs` into `public/fonts/` alongside each
+  family's OFL notice, following the existing Tesseract/PDF.js pattern.
+  Variable fonts, so two files cover the whole weight axis and the deck's
+  `font-weight: 900` is real rather than synthesized.
+- The fonts are excluded from the install-time precache (`globIgnores`)
+  and cached at runtime instead, so the service worker doesn't grow for
+  the majority of users who never open a docs page.
 - `copyPilotDeckPlugin` is now `copyStaticDocsPlugin`, driven by a list
   of pages, so every standalone page under `docs/` reaches `dist/`. The
   existing `docs/**` entries in `globIgnores` and
@@ -35,6 +71,12 @@ merge to `main` that changes app behavior gets a version bump and a tag.
   inline style the pilot-deck link carried. The class also moves them off
   teal-400, which sat at roughly 1.8:1 against the white drawer panel and
   failed WCAG AA, onto the brand `--teal` at 5.4:1.
+
+### Fixed
+- The Terms' licence section pointed at the wrong two section numbers for
+  its own warranty and liability clauses, and subordinated them to
+  Apache-2.0. The licence covers the *code*; these terms cover use of the
+  *hosted app* — now stated as such.
 
 ## [1.12.0] - 2026-08-06
 
