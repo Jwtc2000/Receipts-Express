@@ -4,14 +4,17 @@ import { formatMoney, formatTotal, newId, todayIso } from '../types'
 import { listReports, listExpenses, saveReport, deleteReport } from '../db'
 import {
   exportBackup,
-  importBackup,
+  validateBackup,
+  commitBackup,
   lastBackupAt,
   backupIsStale,
   dismissBackupWarning,
   shouldShowBackupWarning,
+  MAX_STRING_LENGTH,
 } from '../backup'
 import { addProject, getProfile, removeProject, saveProfile, type Profile } from '../profile'
 import { expenseMatches } from '../search'
+import { useModal } from '../hooks/useModal'
 import Icon from './icons'
 import DrawerSection from './DrawerSection'
 import ProjectSelect from './ProjectSelect'
@@ -48,6 +51,7 @@ export default function ReportList({ onOpenReport, onEditExpense }: Props) {
   const [newProject, setNewProject] = useState('')
   const [newReportProject, setNewReportProject] = useState('')
   const restoreInput = useRef<HTMLInputElement>(null)
+  const menuRef = useModal<HTMLElement>(menuOpen, () => setMenuOpen(false))
 
   const setProfileField = (patch: Partial<Profile>) => setProfile((p) => ({ ...p, ...patch }))
   const persistProfile = () => saveProfile(profile)
@@ -120,7 +124,11 @@ export default function ReportList({ onOpenReport, onEditExpense }: Props) {
     setBackupNote(null)
     try {
       const done = await exportBackup()
-      if (done) setBackupNote('Backup saved')
+      // Not "Backup saved": the download path can only confirm the browser
+      // accepted the file, not that it was kept (see the caveat on
+      // shareOrDownloadFile in share.ts). Saying "saved" would tell the user
+      // they have a copy that may not exist.
+      if (done) setBackupNote('Backup file created — check it saved')
     } catch {
       setBackupNote('Backup failed — try again')
     } finally {
@@ -129,16 +137,61 @@ export default function ReportList({ onOpenReport, onEditExpense }: Props) {
     }
   }
 
+  // A restore writes with `put`, so a record in the backup replaces the record
+  // on this device that shares its id — including one edited since the backup
+  // was taken — and nothing can undo that. So the file is validated first,
+  // which touches nothing, and the user is shown what the restore would do
+  // before any of it happens.
   const doRestore = async (file: File | undefined) => {
     if (!file) return
     setBackupBusy(true)
     setBackupNote(null)
     try {
-      const { reports, expenses } = await importBackup(file)
-      setBackupNote(`Restored ${reports} report${reports === 1 ? '' : 's'}, ${expenses} expense${expenses === 1 ? '' : 's'}`)
+      const plan = await validateBackup(file)
+      const { reports, expenses, overwrites } = plan.counts
+      const exported = plan.exportedAt ? new Date(plan.exportedAt) : null
+      const taken =
+        exported && !Number.isNaN(exported.getTime())
+          ? `taken ${exported.toLocaleString()}`
+          : 'with no export date recorded'
+      const message = [
+        `Restore this backup, ${taken}?`,
+        '',
+        `It holds ${reports} report${reports === 1 ? '' : 's'} and ${expenses} expense${expenses === 1 ? '' : 's'}.`,
+        overwrites > 0
+          ? `${overwrites} record${overwrites === 1 ? '' : 's'} already on this device will be replaced by the copy in the backup, even where this device's copy is newer. That can't be undone.`
+          : 'Nothing already on this device will be replaced.',
+      ].join('\n')
+      if (!window.confirm(message)) {
+        setBackupNote('Restore cancelled — nothing was changed')
+        return
+      }
+      const committed = await commitBackup(plan)
+      // A backup can carry a profile, and commitBackup writes it straight to
+      // localStorage — so `profile` in this component is now the pre-restore
+      // copy. Left alone, the next blur on any profile field would save that
+      // stale copy back over the one the restore just wrote, losing it with no
+      // sign anything happened. Re-read from storage rather than trusting
+      // plan.profile, so this matches what actually landed in every case: the
+      // file carried none, it was written, or the write failed.
+      setProfile(getProfile())
+      const restored = `Restored ${reports} report${reports === 1 ? '' : 's'}, ${expenses} expense${expenses === 1 ? '' : 's'}`
+      setBackupNote(
+        committed.profile === 'failed'
+          ? `${restored} — but the profile in the backup couldn't be saved, so this device's own is unchanged`
+          : restored,
+      )
       await refresh()
-    } catch {
-      setBackupNote("Couldn't read that file — is it a Receipts Express backup?")
+    } catch (err) {
+      // validateBackup names what it rejected — which record, or which limit.
+      // Showing that beats collapsing every failure into one guess about the
+      // file, which left a user with a genuine backup no way to tell whether
+      // they picked the wrong file or hit a size limit.
+      setBackupNote(
+        err instanceof Error && err.message
+          ? `Couldn't restore: ${err.message}`
+          : "Couldn't read that file — is it a Receipts Express backup?",
+      )
     } finally {
       setBackupBusy(false)
       if (restoreInput.current) restoreInput.current.value = ''
@@ -187,6 +240,7 @@ export default function ReportList({ onOpenReport, onEditExpense }: Props) {
             autoFocus
             type="text"
             inputMode="search"
+            aria-label="Search all expenses"
             placeholder="Search all expenses by title, merchant, or amount…"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -201,9 +255,16 @@ export default function ReportList({ onOpenReport, onEditExpense }: Props) {
 
       {menuOpen && (
         <div className="drawer-backdrop" onClick={() => setMenuOpen(false)}>
-          <aside className="drawer" onClick={(e) => e.stopPropagation()}>
+          <aside
+            ref={menuRef}
+            className="drawer"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="home-menu-title"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="drawer-header">
-              <h2>Menu</h2>
+              <h2 id="home-menu-title">Menu</h2>
               <button className="icon-btn" aria-label="Close menu" onClick={() => setMenuOpen(false)}>
                 <Icon name="close" />
               </button>
@@ -218,7 +279,12 @@ export default function ReportList({ onOpenReport, onEditExpense }: Props) {
                 <div className="field-grid">
                   <label className="field span-2">
                     <span>Name</span>
+                    {/* maxLength on every free-text field here, and on the
+                        report name below: MAX_STRING_LENGTH is the ceiling the
+                        backup importer enforces, so anything longer would
+                        produce a backup file this app refuses to read back. */}
                     <input
+                      maxLength={MAX_STRING_LENGTH}
                       placeholder="Jane Doe"
                       value={profile.name}
                       onChange={(e) => setProfileField({ name: e.target.value })}
@@ -228,6 +294,7 @@ export default function ReportList({ onOpenReport, onEditExpense }: Props) {
                   <label className="field">
                     <span>Employee ID</span>
                     <input
+                      maxLength={MAX_STRING_LENGTH}
                       placeholder="E12345"
                       value={profile.employeeId}
                       onChange={(e) => setProfileField({ employeeId: e.target.value })}
@@ -237,6 +304,7 @@ export default function ReportList({ onOpenReport, onEditExpense }: Props) {
                   <label className="field">
                     <span>Cost Center</span>
                     <input
+                      maxLength={MAX_STRING_LENGTH}
                       placeholder="CC-100"
                       value={profile.costCenter}
                       onChange={(e) => setProfileField({ costCenter: e.target.value })}
@@ -289,6 +357,8 @@ export default function ReportList({ onOpenReport, onEditExpense }: Props) {
                   }}
                 >
                   <input
+                    aria-label="Project number to add"
+                    maxLength={MAX_STRING_LENGTH}
                     placeholder="PRJ-42"
                     value={newProject}
                     onChange={(e) => setNewProject(e.target.value)}
@@ -396,17 +466,17 @@ export default function ReportList({ onOpenReport, onEditExpense }: Props) {
           ) : (
             <ul className="report-list">
               {searchResults.map((expense) => (
-                <li
-                  key={expense.id}
-                  className="report-card"
-                  onClick={() => onEditExpense(expense.reportId, expense.id)}
-                >
-                  <div className="report-card-main">
+                <li key={expense.id} className="report-card">
+                  <button
+                    type="button"
+                    className="report-card-main"
+                    onClick={() => onEditExpense(expense.reportId, expense.id)}
+                  >
                     <h3>{expense.title || expense.merchant || 'Untitled expense'}</h3>
                     <p className="muted">
                       {reportNames.get(expense.reportId) ?? 'Unknown report'} · {expense.date || 'No date'}
                     </p>
-                  </div>
+                  </button>
                   <div className="report-card-side">
                     <span className="report-total">{formatMoney(expense.amount, expense.currency)}</span>
                   </div>
@@ -427,23 +497,30 @@ export default function ReportList({ onOpenReport, onEditExpense }: Props) {
         ) : (
           <ul className="report-list">
             {summaries.map(({ report, count, totalDisplay }) => (
-              <li key={report.id} className="report-card" onClick={() => onOpenReport(report.id)}>
-                <div className="report-card-main">
+              // Only the main area is the button, not the whole card: the card
+              // also holds the delete button, and a <button> may not contain
+              // another one — browsers resolve that nesting unpredictably.
+              // Keeping them siblings is also what lets the delete handler drop
+              // its stopPropagation, since there is no longer an outer click to
+              // stop.
+              <li key={report.id} className="report-card">
+                <button
+                  type="button"
+                  className="report-card-main"
+                  onClick={() => onOpenReport(report.id)}
+                >
                   <h3>{report.name}</h3>
                   <p className="muted">
                     {count} expense{count === 1 ? '' : 's'}
                     {report.projectNumber ? ` · ${report.projectNumber}` : ''}
                   </p>
-                </div>
+                </button>
                 <div className="report-card-side">
                   <span className="report-total">{totalDisplay}</span>
                   <button
                     className="icon-btn danger"
                     aria-label={`Delete ${report.name}`}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      void removeReport(report.id, report.name)
-                    }}
+                    onClick={() => void removeReport(report.id, report.name)}
                   >
                     <Icon name="trash" size={18} />
                   </button>
@@ -470,7 +547,14 @@ export default function ReportList({ onOpenReport, onEditExpense }: Props) {
                   {showWarning && <Icon name="warning" size={16} />}
                   {showWarning ? 'Back up your receipts' : 'Backup'}
                 </h3>
-                <p className="muted">
+                {/* A live region rather than plain text: the result of a
+                    backup or a restore is otherwise only ever reported by the
+                    text quietly changing here. It sits on the paragraph rather
+                    than on a wrapper added alongside the note, because a live
+                    region that appears at the same moment as its message is
+                    usually not announced at all — this one is already on
+                    screen, next to the buttons that produce the message. */}
+                <p className="muted" role="status">
                   {backupNote ??
                     (last
                       ? `Last backup ${new Date(last).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`
@@ -520,6 +604,8 @@ export default function ReportList({ onOpenReport, onEditExpense }: Props) {
             >
               <input
                 autoFocus
+                aria-label="Report name"
+                maxLength={MAX_STRING_LENGTH}
                 placeholder="Report name — e.g. NYC Trip July"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}

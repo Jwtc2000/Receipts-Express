@@ -1,5 +1,6 @@
-import { readFileSync, mkdirSync, copyFileSync, readdirSync } from 'node:fs'
+import { readFileSync, writeFileSync, mkdirSync, copyFileSync, readdirSync } from 'node:fs'
 import { execSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { defineConfig, type Plugin, type ResolvedConfig } from 'vite'
@@ -31,6 +32,37 @@ const commitHash = (() => {
 // external forms; see SECURITY.md for the frame-ancestors gap itself.
 const CSP =
   "default-src 'self'; connect-src 'self'; img-src 'self' blob: data:; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; worker-src 'self' blob:; base-uri 'self'; form-action 'self'"
+
+// The same policy, adjusted for the standalone pages under docs/ — derived from
+// CSP above rather than written out again, so the two cannot drift apart.
+//
+// Two adjustments, both forced by what those pages actually are:
+//
+// style-src gains 'unsafe-inline'. Every page under docs/ carries its CSS in a
+// <style> block and the deck additionally uses inline style attributes, so
+// style-src 'self' alone would serve the privacy policy and terms as unstyled
+// text. Style attributes cannot be covered by a hash, so there is no stricter
+// option that leaves the pages readable. What this gives up is small here:
+// default-src, connect-src, img-src and form-action all stay at 'self', so the
+// usual CSS exfiltration route — a url() pointing off-origin — is still shut,
+// and none of these pages takes input worth stealing in the first place.
+//
+// script-src gains a hash per inline <script> the page actually contains,
+// which is stricter than 'unsafe-inline' and does not need maintaining: the
+// hash is recomputed from the file on every build, so editing the deck's
+// scaling script keeps working, while a script that appears in the served page
+// by any other route has no matching hash. Only pilot-deck.html has one; the
+// three legal pages have none and so keep inline script blocked outright,
+// which src/legalPages.test.ts independently holds them to.
+function docsCsp(html: string): string {
+  const hashes = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)].map(
+    ([, body]) => `'sha256-${createHash('sha256').update(body, 'utf-8').digest('base64')}'`,
+  )
+  return CSP.replace("style-src 'self'", () => "style-src 'self' 'unsafe-inline'").replace(
+    "script-src 'self'",
+    () => ["script-src 'self'", ...hashes].join(' '),
+  )
+}
 
 // Build-only: Vite's dev server injects CSS via inline <style> tags for
 // HMR, which style-src without 'unsafe-inline' blocks. The deployed app —
@@ -81,7 +113,26 @@ function copyStaticDocsPlugin(): Plugin {
     closeBundle() {
       mkdirSync(resolve(outDir, 'docs'), { recursive: true })
       for (const page of STATIC_DOC_PAGES) {
-        copyFileSync(resolve(root, 'docs', page), resolve(outDir, 'docs', page))
+        // cspPlugin's transformIndexHtml only ever reaches index.html, so
+        // these pages used to ship with no CSP at all — leaving the privacy
+        // policy and the terms, the two documents a reader has the most reason
+        // to trust, as the only unprotected pages in the deployment. Inject
+        // the policy as each page is copied; see docsCsp for what it adjusts
+        // and why, and note that it is derived from the same CSP constant the
+        // app itself uses rather than being a second copy of the string.
+        const html = readFileSync(resolve(root, 'docs', page), 'utf-8')
+        const withCsp = html.replace(
+          /<head>/i,
+          (head) =>
+            `${head}\n    <meta http-equiv="Content-Security-Policy" content="${docsCsp(html)}">`,
+        )
+        if (withCsp === html) {
+          // If a page's <head> is ever reformatted past this pattern, the copy
+          // would silently go back to shipping unprotected — which is the exact
+          // state being fixed here, and is invisible in a green build.
+          throw new Error(`docs/${page}: no <head> tag to inject the CSP into.`)
+        }
+        writeFileSync(resolve(outDir, 'docs', page), withCsp)
       }
       mkdirSync(resolve(outDir, 'assets'), { recursive: true })
       for (const file of readdirSync(resolve(root, 'assets'))) {
@@ -96,6 +147,15 @@ function copyStaticDocsPlugin(): Plugin {
       // accepted the Terms, so they are the fallback if assent is ever
       // disputed. Costs one file.
       copyFileSync(resolve(root, 'LICENSE'), resolve(outDir, 'LICENSE.txt'))
+      // Same reasoning, other direction: the third-party notices cover code
+      // that is served to the browser, and MIT, ISC and Apache-2.0 all
+      // condition the grant on the notice travelling with the copy. Keeping
+      // the file only in the repository discharges nothing for someone who
+      // received the app from the deployed site.
+      copyFileSync(
+        resolve(root, 'THIRD_PARTY_NOTICES.md'),
+        resolve(outDir, 'THIRD_PARTY_NOTICES.md'),
+      )
     },
   }
 }
@@ -119,6 +179,18 @@ export default defineConfig({
         name: 'Receipts Express',
         short_name: 'Receipts Express',
         description: 'Scan receipts, organize expense reports, export polished PDFs.',
+        // The install identity, and the one field here that must never change.
+        // A browser uses `id` to decide whether an install it is looking at is
+        // the app it already has; edit it and every existing installation stops
+        // matching, so an update lands as a second, separate app sitting beside
+        // the first — with the original's IndexedDB data stranded in it, since
+        // this app stores everything on the device and has no server copy to
+        // restore from. It is resolved against the manifest's own URL, so this
+        // is written as the GitHub Pages project path the app actually deploys
+        // to. Renaming the repository would change that path; if that ever
+        // happens, the right move is to accept the mismatch, not to "fix" this.
+        id: '/Receipts-Express/',
+        categories: ['finance', 'productivity', 'utilities'],
         theme_color: '#0f766e',
         background_color: '#f8fafc',
         display: 'standalone',
@@ -197,9 +269,28 @@ export default defineConfig({
             }
           },
           {
+            // The pages under docs/ are kept out of the precache above on
+            // purpose: precaching them would make every unrelated policy or
+            // slide-deck edit re-download the whole install for every user.
+            // But with no runtime rule either they were never cached at all,
+            // so the Terms and Privacy links in the first-run gate simply
+            // failed offline — in the one mode this app tells people it works
+            // in. StaleWhileRevalidate is the fit: a reader gets the stored
+            // copy immediately, and the background refresh means an amended
+            // policy reaches them on the next visit without the page ever
+            // being unavailable in between.
+            urlPattern: /\/docs\//,
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'docs-pages',
+              expiration: { maxEntries: 8, maxAgeSeconds: 30 * 24 * 60 * 60 }
+            }
+          },
+          {
             // Excluded from the precache above, so cache them the first time
-            // someone actually opens a docs/ page — after which the privacy
-            // policy and terms read identically offline.
+            // someone actually opens a docs/ page. This rule covers the font
+            // files only — the pages that use them are handled by the docs/
+            // rule above.
             urlPattern: /\/fonts\//,
             handler: 'CacheFirst',
             options: {

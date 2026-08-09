@@ -72,11 +72,80 @@ merge to `main` that changes app behavior gets a version bump and a tag.
   teal-400, which sat at roughly 1.8:1 against the white drawer panel and
   failed WCAG AA, onto the brand `--teal` at 5.4:1.
 
+- The repository's Content-Security-Policy claims were rewritten to say
+  what the policy does: it restricts fetch, XMLHttpRequest, WebSocket,
+  EventSource and beacon requests to the app's own origin, and blocks
+  form submissions to other origins. It is delivered in a `<meta>` tag
+  because GitHub Pages cannot send custom response headers, so it does
+  not govern top-level navigation. A strong control, not an absolute
+  one. `README.md`, `SECURITY.md`, both pilot decks, `docs/privacy.html`
+  and `docs/governance/REVIEW.md` had variously described it as stopping
+  everything outgoing, asserted that a compromised dependency could not
+  get receipts off the device, and called the live site secure without
+  qualification. The sweep was not complete: the HTML pilot deck kept
+  absolute claims its Markdown twin had already lost, which a re-audit
+  caught.
+- A denylist test (`src/legalPages.test.ts`) now fails the build if any
+  of seven specific overstatements reappears. Its scope is narrower than
+  "the repository" — the six files in `CLAIM_CHECKED_FILES`:
+  `docs/privacy.html`, `docs/terms.html`, `docs/consumer-health-data.html`,
+  `docs/pilot-deck.html`, `README.md` and `SECURITY.md`.
+  `docs/PILOT_DECK.md`, `docs/PILOT.md` and `docs/governance/REVIEW.md`
+  are not guarded. It also matches fixed phrasings rather than judging
+  whether a claim is supportable, so an overstatement the audit did not
+  already name passes it even in a file it covers.
+- The pilot decks no longer publish an employer's internal filing
+  deadline or record-retention target, no longer rank named consumer
+  cloud services as a destination for confidential receipts, and now
+  open by saying to use synthetic or personal receipts unless the
+  organization has approved the tool. "Governance Snapshot" is now
+  "Governance Self-Assessment", because nothing in it has been reviewed
+  by anyone — which the repo's own `docs/PILOT.md` already said.
+- The brand gradient moves from `#660099 → #ff6600` to
+  `#0f766e → #6d28d9`. White on the old orange end computed 2.94:1 and
+  failed WCAG AA; the new sweep clears it end to end — 5.47:1 at the
+  teal end, its worst point, rising to 7.1:1 at the violet end — and the
+  endpoints are colours already in the design system (the app icon's
+  teal and the existing `--purple-dark`). Day banners interpolate
+  between them, so they and the PDF export change too.
+- Third-party attribution now ships: `THIRD_PARTY_NOTICES.md` at the
+  repository root and in the build, and the two Tesseract licence
+  sidecars the shipped worker already referenced but which the copy
+  script never copied — a live 404.
+
 ### Fixed
 - The Terms' licence section pointed at the wrong two section numbers for
   its own warranty and liability clauses, and subordinated them to
   Apache-2.0. The licence covers the *code*; these terms cover use of the
   *hosted app* — now stated as such.
+- The Terms' small-claims clause preserved access to small claims
+  "instead of the courts named in section 13". Section 13 is Privacy;
+  the courts are named in section 14.
+- A non-numeric `br.lastBackupAt` made `backupIsStale()` return false
+  forever, silently disabling the stale-backup warning — `Number(raw)`
+  yields `NaN`, and `Date.now() - NaN > STALE_AFTER_MS` is false. Both
+  timestamp parses are now guarded with `Number.isFinite`.
+- Restoring a backup overwrote same-ID records with no confirmation,
+  including newer local data replaced by older backup data. Restore now
+  validates first and asks, showing the report and expense counts, how
+  many records would be replaced, and when the backup was taken.
+- The first-run gate could be tabbed straight out of into the app
+  behind, so a keyboard user could use the whole product without ever
+  accepting the Terms — which is the entire point of the gate. Focus is
+  now trapped, and everything behind it is `inert`.
+- Keyboard users could not open a report or an expense at all: the only
+  reachable control on a card was Delete. Cards are real buttons now,
+  with Delete kept separate rather than nested inside them.
+- The exported PDF — the only thing this app puts in front of someone
+  who never accepted the Terms — now carries a line saying the amounts
+  and dates are user-entered or machine-extracted and are not
+  independently verified.
+- The standalone pages under `docs/` shipped with no Content-Security-
+  Policy at all; the build only injected it into `index.html`. They also
+  weren't cached by the service worker, so the Terms and Privacy links
+  in the first-run gate were dead offline.
+- The CSV formula-injection guard covered some columns but not the date
+  or category columns.
 
 ## [1.12.0] - 2026-08-06
 

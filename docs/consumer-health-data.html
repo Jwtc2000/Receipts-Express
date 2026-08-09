@@ -53,8 +53,8 @@
       --text: #0f172a;
       --muted: #64748b;
       --border: #e2e8f0;
-      --header-gradient-a: #660099;
-      --header-gradient-b: #ff6600;
+      --header-gradient-a: #0f766e;
+      --header-gradient-b: #6d28d9;
       --radius: 14px;
       --shadow: 0 1px 3px rgba(15, 23, 42, 0.08), 0 4px 12px rgba(15, 23, 42, 0.05);
     }
@@ -72,6 +72,10 @@
     header.page-header {
       background: linear-gradient(135deg, var(--header-gradient-a) 0%, var(--header-gradient-b) 100%);
       color: #fff;
+      /* The teal end of the gradient contrasts white text more weakly than
+         the violet end — the shadow keeps the heading readable across the
+         whole band. Same value as .topbar in src/styles.css. */
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
       padding: calc(env(safe-area-inset-top, 0px) + 32px) 20px 32px;
       text-align: center;
     }
@@ -134,7 +138,9 @@
     }
 
     a { color: var(--teal); }
-    a:hover { color: var(--orange); }
+    /* Darker than var(--orange), which reaches only 3.4:1 on this background
+       — below the 4.5:1 body-text minimum. */
+    a:hover { color: #9a3412; }
 
     .muted { color: var(--muted); font-size: 0.9rem; }
 
@@ -166,6 +172,11 @@
         no analytics. Everything you scan or enter is processed and stored only on your own
         device and is never transmitted to the author or to anyone else.
       </p>
+      <p>
+        This policy is published by <strong>Jordan Campbell</strong> ("the author"), an
+        individual resident in the State of Washington, United States; the project's GitHub
+        repository, linked below, is the contact channel for it.
+      </p>
     </div>
 
     <section>
@@ -183,11 +194,19 @@
     <section>
       <h2>Categories of sources of consumer health data</h2>
       <p class="none">None.</p>
+      <p>
+        There is no source to describe, because the author receives no data of any kind from
+        the app: it has no server to receive it and makes no request that carries it.
+      </p>
     </section>
 
     <section>
       <h2>Categories of consumer health data shared</h2>
       <p class="none">None.</p>
+      <p>
+        Nothing is shared because nothing is held: the author receives no data of any kind from
+        the app, so there is no category of it to pass on.
+      </p>
     </section>
 
     <section>
@@ -230,7 +249,8 @@
         To submit a request or an appeal anyway, or to tell the author that something on this
         page is inaccurate, open an issue at
         <a href="https://github.com/Jwtc2000/Receipts-Express/issues" target="_blank" rel="noopener noreferrer">github.com/Jwtc2000/Receipts-Express/issues</a>.
-        You will receive a response within 45 days. If a request is denied, you may contact the
+        The author will respond as promptly as reasonably possible, and in any event will aim
+        to respond within 45 days. If a request is denied, you may contact the
         Washington State Attorney General at
         <a href="https://www.atg.wa.gov/file-complaint" target="_blank" rel="noopener noreferrer">atg.wa.gov/file-complaint</a>.
       </p>

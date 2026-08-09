@@ -60,6 +60,51 @@ describe('buildExpenseCsv', () => {
     expect(cols[7]).toBe("'+1 212 555 0199")
   })
 
+  // Date and Category look like fixed vocabularies picked from a date input
+  // and a <select>, which is why they went unguarded at first. They are plain
+  // strings on Expense, and a restored backup can carry anything in them, so
+  // they are as reachable by an attacker-supplied value as Title or Notes.
+  it('neutralizes a leading formula character in the date and category columns (CSV injection regression)', () => {
+    const csv = buildExpenseCsv([makeExpense({ date: '=1+1', category: '-Meals' })])
+    const cols = csv.split('\r\n')[1].split(',')
+    expect(cols[0]).toBe("'=1+1")
+    expect(cols[3]).toBe("'-Meals")
+  })
+
+  it('leaves an ordinary date and category untouched', () => {
+    // No real ISO date or category name starts with = + - or @, so the guard
+    // above changes nothing a user will ever actually see.
+    const csv = buildExpenseCsv([makeExpense({ date: '2026-07-18', category: 'Meals' })])
+    const cols = csv.split('\r\n')[1].split(',')
+    expect(cols[0]).toBe('2026-07-18')
+    expect(cols[3]).toBe('Meals')
+  })
+
+  it('guards every column the app does not generate itself', () => {
+    // Currency too — it is free text with a 3-character cap in the editor, not
+    // a closed list. Amount and Personal Amount are deliberately excluded; the
+    // next case pins why.
+    const csv = buildExpenseCsv([
+      makeExpense({
+        date: '@now',
+        title: '=1',
+        merchant: '+1',
+        category: '-x',
+        currency: '=US',
+        notes: '@cmd',
+      }),
+    ])
+    const cols = csv.split('\r\n')[1].split(',')
+    expect([cols[0], cols[1], cols[2], cols[3], cols[6], cols[7]]).toEqual([
+      "'@now",
+      "'=1",
+      "'+1",
+      "'-x",
+      "'=US",
+      "'@cmd",
+    ])
+  })
+
   it('does not mangle a genuinely negative amount with the formula guard', () => {
     const csv = buildExpenseCsv([makeExpense({ amount: -5, personalAmount: -2 })])
     const cols = csv.split('\r\n')[1].split(',')

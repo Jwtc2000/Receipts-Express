@@ -50,7 +50,7 @@
       --orange-light: #ffedd5;
       
       /* Gradients */
-      --brand-gradient: linear-gradient(135deg, #660099 0%, #ff6600 100%);
+      --brand-gradient: linear-gradient(135deg, #0f766e 0%, #6d28d9 100%);
       --teal-gradient: linear-gradient(135deg, #0f766e 0%, #115e59 100%);
       --dark-gradient: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
       --glass-bg: rgba(255, 255, 255, 0.08);
@@ -327,9 +327,16 @@
       gap: 8px;
     }
 
+    /* Real button elements, so they are reachable by keyboard and announced
+       by a screen reader. The reset below keeps them looking like the plain
+       dots they replaced. */
     .dot {
       width: 8px;
       height: 8px;
+      padding: 0;
+      border: none;
+      -webkit-appearance: none;
+      appearance: none;
       border-radius: 50%;
       background: rgba(255, 255, 255, 0.2);
       cursor: pointer;
@@ -353,7 +360,17 @@
       justify-content: center;
       align-items: center;
       transition: background 0.3s, transform 0.2s, border-color 0.3s;
-      outline: none;
+    }
+
+    /* The deck is driven by arrow keys as much as by clicks, so the buttons
+       and dots have to show where the keyboard is. The nav buttons used to
+       suppress their outline, which removed the only such indicator. */
+    .nav-btn:focus-visible,
+    .dot:focus-visible,
+    .info-tip:focus-visible,
+    a:focus-visible {
+      outline: 2px solid #5eead4;
+      outline-offset: 3px;
     }
 
     .nav-btn:hover {
@@ -840,6 +857,45 @@
         display: none;
       }
     }
+
+    /* Readers who have asked their system for reduced motion get the deck
+       without the slide fly-in, the floating screenshot, or the drifting
+       network background. Nothing is hidden — only the movement stops. The
+       canvas loop is stopped in script for the same reason; CSS cannot
+       reach inside it. Last in the sheet so these rules win on source
+       order over the responsive block above. */
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+
+      .slide,
+      .slide.active {
+        transform: none;
+      }
+
+      .slide-image-container {
+        opacity: 1;
+        transform: none;
+      }
+
+      .screenshot-preview,
+      .screenshot-preview:hover {
+        animation: none;
+        transform: rotate(2deg);
+      }
+
+      .glass-card:hover,
+      .nav-btn:hover,
+      .nav-btn:active,
+      .dot.active {
+        transform: none;
+      }
+    }
   </style>
 </head>
 <body>
@@ -874,14 +930,17 @@
       
       <!-- Slide 1: Cover -->
       <div class="slide active" id="slide-1">
-        <canvas id="networkCanvas" class="network-canvas"></canvas>
+        <canvas id="networkCanvas" class="network-canvas" aria-hidden="true"></canvas>
         <div style="z-index: 1; text-align: center;">
           <h1 class="slide-title slide-title-large">Receipts Express</h1>
           <h2 class="slide-subtitle" style="color: #cbd5e1; font-weight: 400;">Standardized Receipt-to-PDF Capture</h2>
           <div style="display: inline-flex; gap: 10px; margin-top: 1rem;">
-            <span class="table-badge badge-teal" style="font-size: 0.85rem; padding: 0.4rem 0.8rem;">Progressive Web App (Offline-First)</span>
+            <span class="table-badge badge-teal" style="font-size: 0.85rem; padding: 0.4rem 0.8rem;">Progressive Web App (Offline-First Shell)</span>
             <span class="table-badge badge-orange" style="font-size: 0.85rem; padding: 0.4rem 0.8rem;">Private by Design</span>
           </div>
+          <p style="margin: 1rem auto 0; max-width: 640px; font-size: 0.9rem; line-height: 1.5; color: #94a3b8;">
+            Runs locally on your device. The app shell is cached when you install it and works offline from then on; the OCR and PDF engines are fetched from the app's own origin the first time you use them, and are cached from then on. No servers, no accounts, zero data sharing.
+          </p>
         </div>
       </div>
 
@@ -903,8 +962,8 @@
           <div class="glass-card">
             <h3 style="font-family: var(--font-display); font-size: 1.4rem; margin-bottom: 1rem; color: #7c3aed;">The Privacy Trap</h3>
             <ul class="fancy-list" style="--bullet-color: var(--purple)">
-              <li style="color: #e2e8f0;">Common free scanner apps contain third-party ad-tracking toolkits.</li>
-              <li>Sensitive financial data (merchant locations, items, card fractions) gets uploaded to unvetted cloud systems.</li>
+              <li style="color: #e2e8f0;">Free scanner apps commonly bundle third-party analytics or ad-tracking SDKs — an app's privacy label is usually the only evidence a user ever sees of it.</li>
+              <li>Sensitive financial data (merchant locations, items, card fractions) can end up uploaded to cloud systems nobody in the organization has vetted.</li>
               <li>Lack of structural boundaries leaves personal/corporate data vulnerable to exfiltration.</li>
             </ul>
           </div>
@@ -929,8 +988,12 @@
                 <span style="font-size: 0.9rem; color: #cbd5e1;">Create, name, and drag-and-drop receipts to reorder. Group expenses easily.</span>
               </div>
               <div>
-                <strong style="color: #ffffff; display: block; margin-bottom: 0.4rem;"><svg class="slide-icon" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Secure Storage</strong>
-                <span style="font-size: 0.9rem; color: #cbd5e1;">Data stays safely in your local browser sandbox (IndexedDB). Zero servers.</span>
+                <!-- Was a padlock beside the words "Secure Storage". The app
+                     writes IndexedDB unencrypted, so both the icon and the
+                     word implied a control that does not exist. A database
+                     cylinder says what this actually is. -->
+                <strong style="color: #ffffff; display: block; margin-bottom: 0.4rem;"><svg class="slide-icon" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 5v14c0 1.66-4 3-9 3s-9-1.34-9-3V5"/><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/></svg>On-Device Storage<span class="info-tip" tabindex="0" aria-label="What protects on-device storage">?<span class="tip-bubble"><strong>What actually protects it:</strong> the browser's storage sandbox keeps this app's data separate from other websites and other apps, and zero servers are involved. The app does not separately encrypt what it stores — what protects it is your device: your screen lock, your account password, and your device's disk encryption. Anyone with your unlocked device and browser profile can open the app and read what is in it, so use it only on a device you control.</span></span></strong>
+                <span style="font-size: 0.9rem; color: #cbd5e1;">Data stays in your browser's storage sandbox (IndexedDB), separate from other sites and apps. Zero servers. The app does not encrypt it on top of that.</span>
               </div>
               <div>
                 <strong style="color: #ffffff; display: block; margin-bottom: 0.4rem;"><svg class="slide-icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Local PDF Export</strong>
@@ -948,43 +1011,50 @@
       <!-- Slide 4: Governance & AI-Efficiency -->
       <div class="slide" id="slide-4">
         <h1 class="slide-title">Governance & Guidelines</h1>
-        <h2 class="slide-subtitle">Inspiration and alignment with corporate frameworks</h2>
-        
+        <h2 class="slide-subtitle">Where the review format came from, and what has and has not been reviewed</h2>
+
         <div class="slide-content-grid">
           <div>
             <p class="lead" style="margin-bottom: 1rem;">
-              Receipts Express is structured after the <strong>AI Pilot Program Template</strong> from the FedEx AI Efficiency Hub:
+              Receipts Express's pilot governance structure is formatted after the <strong>AI Pilot Program Template</strong> published in the public GitHub repository arigatoexpress/AI-Efficiency:
             </p>
-            <p style="color: #94a3b8; font-size: 0.95rem; line-height: 1.5; margin-bottom: 1.5rem;">
-              Credit to the open-source repository <a href="https://github.com/arigatoexpress/AI-Efficiency" target="_blank" style="color: #ea580c; text-decoration: none; font-weight: 500;">arigatoexpress/AI-Efficiency</a> for establishing the risk-review format we apply to this pilot proposal.
+            <p style="color: #94a3b8; font-size: 0.95rem; line-height: 1.5; margin-bottom: 1rem;">
+              Credit to that repository — <a href="https://github.com/arigatoexpress/AI-Efficiency" target="_blank" rel="noopener noreferrer" style="color: #ea580c; text-decoration: none; font-weight: 500;">arigatoexpress/AI-Efficiency</a> — for establishing the risk-review format we apply to this pilot proposal.
             </p>
-            
+            <p style="color: #94a3b8; font-size: 0.9rem; line-height: 1.5; margin-bottom: 1.5rem;">
+              Independent personal project — no affiliation with, endorsement from, or approval by FedEx or any employer.
+            </p>
+
             <div class="glass-card" style="padding: 1.25rem;">
               <h4 style="color: #ffffff; margin-bottom: 0.5rem; font-size: 1.05rem;">Why this matters:</h4>
               <p style="font-size: 0.9rem; color: #cbd5e1; line-height: 1.4;">
-                Applying a standardized governance checklist upfront ensures privacy compliance, legal clarity, and clear risk mitigation strategies before introducing utility tools to departmental workflows.
+                Working through a standardized governance checklist upfront is how the developer examined this tool's own privacy posture, legal footing, and risks before proposing it to anyone. The answers are a self-assessment. No organization has reviewed or approved them.
               </p>
             </div>
           </div>
-          
+
           <div class="glass-card">
-            <h3 style="font-family: var(--font-display); font-size: 1.25rem; margin-bottom: 1rem; color: #ffffff;">Governance Snapshot</h3>
+            <h3 style="font-family: var(--font-display); font-size: 1.25rem; margin-bottom: 1rem; color: #ffffff;">Governance Self-Assessment</h3>
             <table class="slide-table" style="margin-top: 0;">
               <tr>
-                <td><strong>Data Classification</strong> <span class="info-tip" tabindex="0" aria-label="Governance application: Data Classification">?<span class="tip-bubble"><strong>Data Classification:</strong> receipts contain names, merchant locations, purchase itemizations, and partial card numbers. Since this is Confidential employee financial data, it is governed under strict corporate privacy requirements. Receipts Express complies by keeping all data local inside your browser profile's sandboxed storage.</span></span></td>
+                <td><strong>Data Classification</strong> <span class="info-tip" tabindex="0" aria-label="Governance application: Data Classification">?<span class="tip-bubble"><strong>Data Classification:</strong> receipts contain names, merchant locations, purchase itemizations, and partial card numbers. Data like this is normally treated as Confidential. The app's approach is to keep all of it local, inside your browser profile's sandboxed storage; whether that satisfies a particular organization's requirements is for that organization to decide.</span></span></td>
                 <td><span class="table-badge badge-orange">Confidential</span></td>
               </tr>
               <tr>
-                <td><strong>AI Engine Location</strong> <span class="info-tip" tabindex="0" aria-label="Governance application: AI Engine Location">?<span class="tip-bubble"><strong>AI Engine Location:</strong> corporate policies restrict transmitting private data to unapproved cloud AI endpoints. Receipts Express mitigates this by self-hosting the Tesseract.js OCR engine locally, and self-hosting PDF.js for PDF-receipt rasterization the same way. All text recognition and PDF processing runs on your device inside your browser sandbox, requiring no internet connection.</span></span></td>
+                <td><strong>AI Engine Location</strong> <span class="info-tip" tabindex="0" aria-label="Governance application: AI Engine Location">?<span class="tip-bubble"><strong>AI Engine Location:</strong> organizations commonly restrict transmitting private data to unapproved cloud AI endpoints. Receipts Express avoids the question by self-hosting the Tesseract.js OCR engine, and self-hosting PDF.js for PDF-receipt rasterization the same way. All text recognition and PDF processing runs on your device inside your browser sandbox, and nothing is sent to an external service. The engine files themselves are not part of the install-time precache: they are downloaded from the app's own origin the first time you scan a receipt or open a PDF, then cached for reuse.</span></span></td>
                 <td><span class="table-badge badge-teal">On-Device Only</span></td>
               </tr>
               <tr>
-                <td><strong>Data Egress Control</strong> <span class="info-tip" tabindex="0" aria-label="Governance application: Data Egress Control">?<span class="tip-bubble"><strong>Data Egress Control:</strong> policy compliance is enforced at the browser level via a Content-Security-Policy (CSP). The header <code>connect-src 'self'</code> programmatically blocks the browser from sending data to any external server or API, meaning even a compromised dependency cannot exfiltrate your receipts.</span></span></td>
-                <td><span class="table-badge badge-teal">Enforced CSP</span></td>
+                <td><strong>Data Egress Control</strong> <span class="info-tip" tabindex="0" aria-label="Governance application: Data Egress Control">?<span class="tip-bubble"><strong>Data Egress Control:</strong> the deployed app carries a Content-Security-Policy that restricts fetch, XMLHttpRequest, WebSocket, EventSource and beacon requests to the app's own origin, and blocks form submissions to other origins. It is delivered in a <code>&lt;meta&gt;</code> tag, because GitHub Pages cannot send custom response headers, so it does not govern top-level navigation — a compromised dependency could still navigate the page elsewhere. It is a strong control, not an absolute one.</span></span></td>
+                <td><span class="table-badge badge-teal">Origin-scoped CSP</span></td>
               </tr>
               <tr>
-                <td><strong>Human-in-the-Loop</strong> <span class="info-tip" tabindex="0" aria-label="Governance application: Human-in-the-Loop">?<span class="tip-bubble"><strong>Human-in-the-Loop:</strong> AI algorithms can misread numbers or dates. To ensure financial audit readiness, the OCR engine only populates editable draft inputs. The user is the responsible human owner who must review and manually verify all dates and amounts before exporting the PDF.</span></span></td>
+                <td><strong>Human-in-the-Loop</strong> <span class="info-tip" tabindex="0" aria-label="Governance application: Human-in-the-Loop">?<span class="tip-bubble"><strong>Human-in-the-Loop:</strong> OCR misreads numbers and dates. The engine therefore only fills editable draft inputs: the user is the responsible human owner and has to review and correct every date and amount before exporting the PDF. Nothing in the app checks the figures for you, and none of this has been assessed against an audit standard.</span></span></td>
                 <td><span class="table-badge badge-teal">User must verify OCR</span></td>
+              </tr>
+              <tr>
+                <td><strong>Tool approval status</strong> <span class="info-tip" tabindex="0" aria-label="Governance application: Tool approval status">?<span class="tip-bubble"><strong>Tool approval status:</strong> no organization has reviewed, endorsed, or approved Receipts Express for use with its data. PILOT.md is the proposal asking for that review to start; until it happens, everything in this table is the author's own assessment.</span></span></td>
+                <td><span class="table-badge badge-orange">Not yet reviewed</span></td>
               </tr>
             </table>
           </div>
@@ -1054,8 +1124,9 @@
             </p>
             <ul class="fancy-list" style="font-size: 0.9rem;">
               <li>The device runs critically low on disk space.</li>
-              <li>The user manually clears cookies and website data.</li>
-              <li>The OS automatically purges browser caches.</li>
+              <li>The user manually clears browser cache, cookies, and website data.</li>
+              <li>The OS automatically purges browser caches to free up system space.</li>
+              <li>On iPhone and iPad, Safari clears a site's data after about a week without a visit, unless the browser has granted the app durable storage. Installing the app to the Home Screen makes that grant likelier but does not assure it.</li>
             </ul>
           </div>
 
@@ -1088,9 +1159,9 @@
         <div class="slide-content-grid" style="grid-template-columns: 1.25fr 0.75fr; align-items: center; margin-top: 1rem;">
           <div class="slide-content-stack" style="margin-top: 0; gap: 0.5rem;">
             <div class="glass-card" style="padding: 0.75rem 1rem;">
-              <strong style="color: #0f766e; display: block; font-size: 1.05rem; margin-bottom: 0.25rem;"><svg class="slide-icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>Save JSON Backups — Local First, Then Cloud</strong>
+              <strong style="color: #0f766e; display: block; font-size: 1.05rem; margin-bottom: 0.25rem;"><svg class="slide-icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>Save JSON Backups — Local First, Then Approved Storage</strong>
               <p style="font-size: 0.82rem; color: #cbd5e1; line-height: 1.35;">
-                When clicking "Back up now", the app generates a single <code>.json</code> file. <strong>Easiest:</strong> save it straight to your device's local storage (Downloads or Files app) first — no login, no upload wait. <strong>Then</strong>, for redundancy, copy that same file into corporate/secured cloud storage under an "Expenses-Backup" folder, in this order: OneDrive, then Google Drive, then iCloud or SharePoint — whichever your organization provides.
+                When clicking "Back up now", the app generates a single <code>.json</code> file. <strong>Easiest:</strong> save it straight to your device's local storage (Downloads or Files app) first — no login, no upload wait. <strong>Then</strong>, for redundancy, copy that same file into whatever storage your organization approves for data at this classification, under an "Expenses-Backup" folder.
               </p>
             </div>
             
@@ -1104,7 +1175,7 @@
             <div class="glass-card" style="padding: 0.75rem 1rem;">
               <strong style="color: #7c3aed; display: block; font-size: 1.05rem; margin-bottom: 0.25rem;"><svg class="slide-icon" viewBox="0 0 24 24"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>Cross-Device Restore</strong>
               <p style="font-size: 0.82rem; color: #cbd5e1; line-height: 1.35;">
-                If you upgrade your phone or switch browsers, export a backup JSON from your old device and click "Restore" on your new device to seamlessly merge all your reports, receipts, and images.
+                If you upgrade your phone or switch browsers, export a backup JSON from your old device and click "Restore" on your new device to bring your reports, receipts, and images across. Restore is not a merge: records already on the device that share an ID with a record in the backup are overwritten by the backup's version, and the app asks you to confirm — naming how many will be replaced — before it writes anything<span class="info-tip" tabindex="0" aria-label="Which device to restore onto">?<span class="tip-bubble"><strong>Which way round:</strong> restoring an older backup on top of newer edits replaces those edits, and that cannot be undone. Restore onto the device that has the less recent data, not the more recent.</span></span>.
               </p>
             </div>
           </div>
@@ -1120,15 +1191,20 @@
         <h1 class="slide-title">Pilot Next Steps</h1>
         <h2 class="slide-subtitle">How to get started and contribute to the pilot</h2>
         
-        <div class="slide-content-stack" style="max-width: 850px; margin: 0.35rem auto 0;">
+        <div class="slide-content-stack" style="max-width: 850px; margin: 0.35rem auto 0; gap: 0.5rem;">
+          <div class="glass-card accent-card" style="padding: 0.7rem 1.5rem;">
+            <p style="font-size: 0.85rem; color: #e2e8f0; line-height: 1.4;">
+              <strong>Start with receipts you are free to use.</strong> Try the app on synthetic receipts you make up, or on your own personal ones. Do not put an employer's receipts into it unless that organization has reviewed the tool and approved it for data of this kind.
+            </p>
+          </div>
+
           <div class="glass-card" style="padding: 0.8rem 1.5rem;">
             <h3 style="font-family: var(--font-display); font-size: 1.1rem; margin-bottom: 0.35rem; color: #0f766e;">Safe Real-Trip Demo Guidelines</h3>
             <ul class="fancy-list teal-bullet" style="gap: 0.3rem; font-size: 0.8rem;">
-              <li><strong>Use the Live HTTPS Link</strong>: Run the app via the production URL: <a href="https://jwtc2000.github.io/Receipts-Express/" target="_blank" style="color: #ea580c; text-decoration: none; font-weight: 500;">https://jwtc2000.github.io/Receipts-Express/</a> (also linked at the top of the repository). This live site enforces a browser-level Content-Security-Policy (CSP) that blocks all outgoing data.</li>
-              <li><strong>What is "Dev Mode"?</strong>: Regular pilot participants will not use dev mode — that's only for developers running raw source code locally (<code>npm run dev</code>), where browser blocks are bypassed for styling hot-reloads. The live website is completely secure.</li>
-              <li><strong>Policy Compliance Window</strong>: Since reports must be filed by the Wednesday following a trip, scan receipts as they happen, export the complete PDF/CSV on the final day of travel, upload it, and then clear the data from the PWA<span class="info-tip" tabindex="0" aria-label="How and why to clear PWA data">?<span class="tip-bubble"><strong>How:</strong> open the Menu on the home screen and tap the trash icon on the report to delete it (and all its receipt images) — you'll be asked to confirm. To wipe everything in one step instead, use your browser's site settings → "Clear site data" for this origin.<br><br><strong>Why:</strong> once a report is exported and safely backed up, there's no reason for corporate receipt images or OCR'd text to keep sitting on your device. Deleting it shortens the window during which that data could be exposed if the device is lost, shared, or compromised — keeping you inside the &lt;10-day retention target.</span></span>.</li>
-              <li><strong>Minimize Storage Duration</strong>: Adhering to the Wednesday deadline ensures corporate financial data lives in the local browser database (IndexedDB) for less than 10 days, minimizing security exposure.</li>
-              <li><strong>Daily Backups — Local First, Then Cloud</strong>: Export a JSON backup daily during travel. Easiest: save it to your device's local storage first (Downloads/Files) — no login needed. Then copy it to corporate cloud storage for redundancy: OneDrive, then Google Drive, then iCloud/SharePoint.</li>
+              <li><strong>Use the Live HTTPS Link</strong>: Run the app via the production URL: <a href="https://jwtc2000.github.io/Receipts-Express/" target="_blank" rel="noopener noreferrer" style="color: #fb923c; text-decoration: none; font-weight: 500; overflow-wrap: anywhere;">jwtc2000.github.io/Receipts-Express</a> (also linked at the top of the repository). The deployed site carries a Content-Security-Policy that restricts where the page can send data<span class="info-tip" tabindex="0" aria-label="What the Content-Security-Policy does and does not cover">?<span class="tip-bubble"><strong>Covered:</strong> fetch, XMLHttpRequest, WebSocket, EventSource and beacon requests are restricted to the app's own origin, and form submissions to other origins are blocked.<br><br><strong>Not covered:</strong> the policy is delivered in a <code>&lt;meta&gt;</code> tag, because GitHub Pages cannot send custom response headers. A <code>&lt;meta&gt;</code> policy does not govern top-level navigation, so a compromised dependency could still navigate the page elsewhere.</span></span> — a strong control, not an absolute one.</li>
+              <li><strong>What is "Dev Mode"?</strong>: Regular pilot participants will not use dev mode — that's only for developers running raw source code locally (<code>npm run dev</code>). The Content-Security-Policy is added by the production build, so it isn't present at all in dev mode, where Vite injects styles inline for hot-reloading.</li>
+              <li><strong>Export, Then Clear</strong>: Scan receipts as they happen, export the complete PDF/CSV on the final day of travel, file it by whatever deadline your organization's expense policy sets, and then clear the data from the PWA<span class="info-tip" tabindex="0" aria-label="How and why to clear PWA data">?<span class="tip-bubble"><strong>How:</strong> open the Menu on the home screen and tap the trash icon on the report to delete it (and all its receipt images) — you'll be asked to confirm. To wipe everything in one step instead, use your browser's site settings → "Clear site data" for this origin.<br><br><strong>Why:</strong> once a report is exported and safely backed up, there's no reason for receipt images or OCR'd text to keep sitting on your device. Deleting it shortens the window during which that data could be exposed if the device is lost, shared, or compromised.<br><br><strong>Note:</strong> "Clear site data" also erases the record that you accepted the Terms, since that record is kept in the same browser storage. The app will ask you to accept them again the next time you open it.</span></span>.</li>
+              <li><strong>Daily Backups — Local First, Then Approved Storage</strong>: Export a JSON backup daily during travel. Easiest: save it to your device's local storage first (Downloads/Files) — no login needed. Then copy it to whatever storage your organization approves for data at this classification, for redundancy.</li>
               <li><strong>Verify and Report</strong>: Cross-check OCR data values against the physical receipts and log formatting suggestions.</li>
             </ul>
           </div>
@@ -1141,15 +1217,20 @@
     <!-- Footer Controls -->
     <footer class="deck-footer">
       <div class="footer-meta">
-        Introduction to Receipts Express | Github: <a href="https://github.com/Jwtc2000" target="_blank">Jwtc2000</a> | <a href="mailto:Jwtc2000@users.noreply.github.com" style="color: var(--teal); text-decoration: none; font-weight: 500;">Report Bug</a> | Inspired by <a href="https://github.com/arigatoexpress/AI-Efficiency" target="_blank">AI-Efficiency</a>
+        <div>
+          Introduction to Receipts Express | Github: <a href="https://github.com/Jwtc2000" target="_blank" rel="noopener noreferrer">Jwtc2000</a> | <a href="https://github.com/Jwtc2000/Receipts-Express/issues" target="_blank" rel="noopener noreferrer" style="color: var(--teal); text-decoration: none; font-weight: 500;">Report Bug</a> | Inspired by <a href="https://github.com/arigatoexpress/AI-Efficiency" target="_blank" rel="noopener noreferrer">AI-Efficiency</a>
+        </div>
+        <div style="margin-top: 0.25rem;">
+          Independent personal project — no affiliation with, endorsement from, or approval by FedEx or any employer.
+        </div>
       </div>
-      
+
       <div class="controls-wrapper">
         <button class="nav-btn" id="prevBtn" aria-label="Previous slide" disabled>
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
         </button>
-        
-        <div class="dots-nav" id="dotsContainer"></div>
+
+        <div class="dots-nav" id="dotsContainer" role="group" aria-label="Slide navigation"></div>
         
         <button class="nav-btn" id="nextBtn" aria-label="Next slide">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
@@ -1180,8 +1261,11 @@
       const scaleX = wrapperWidth / targetWidth;
       const scaleY = wrapperHeight / targetHeight;
 
-      // Always fit completely within the wrapper bounds
-      const scale = Math.min(scaleX, scaleY);
+      // Always fit completely within the wrapper bounds, and never enlarge
+      // past the design size: on a tall or very wide monitor the slide used
+      // to be scaled up, which blurs the screenshots and pushes the type
+      // past a comfortable reading measure.
+      const scale = Math.min(scaleX, scaleY, 1);
 
       inner.style.transform = `scale(${scale})`;
     }
@@ -1199,11 +1283,18 @@
     
     let currentSlideIndex = 0;
 
-    // Initialize dots
+    // Initialize dots. These are real buttons rather than styled divs: as
+    // divs they were unreachable by keyboard and announced as nothing, even
+    // though they are the only direct way to jump to a slide.
     slides.forEach((_, index) => {
-      const dot = document.createElement('div');
+      const dot = document.createElement('button');
+      dot.type = 'button';
       dot.classList.add('dot');
-      if (index === 0) dot.classList.add('active');
+      dot.setAttribute('aria-label', `Go to slide ${index + 1} of ${slides.length}`);
+      if (index === 0) {
+        dot.classList.add('active');
+        dot.setAttribute('aria-current', 'true');
+      }
       dot.addEventListener('click', () => goToSlide(index));
       dotsContainer.appendChild(dot);
     });
@@ -1215,7 +1306,13 @@
       nextBtn.disabled = currentSlideIndex === slides.length - 1;
       
       dots.forEach((dot, idx) => {
-        dot.classList.toggle('active', idx === currentSlideIndex);
+        const isCurrent = idx === currentSlideIndex;
+        dot.classList.toggle('active', isCurrent);
+        if (isCurrent) {
+          dot.setAttribute('aria-current', 'true');
+        } else {
+          dot.removeAttribute('aria-current');
+        }
       });
       
       // Update progress bar
@@ -1254,8 +1351,23 @@
       }
     }
 
-    // Keyboard controls
+    // Keyboard controls.
+    //
+    // A keystroke the focused control handles itself must not also drive the
+    // deck: Space on a focused button is a click, so pressing it on "Next"
+    // used to advance two slides, and every key inside a text field belongs
+    // to the field. Arrow and Page keys keep working everywhere else, since
+    // that is how the deck is meant to be driven.
+    function targetHandlesKey(e) {
+      const el = e.target;
+      if (!(el instanceof Element)) return false;
+      if (el.closest('input, textarea, select')) return true;
+      return e.key === ' ' && el.closest('a, button') !== null;
+    }
+
     document.addEventListener('keydown', (e) => {
+      if (targetHandlesKey(e)) return;
+
       if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') {
         nextSlide();
       } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
@@ -1361,6 +1473,9 @@
       const canvas = document.getElementById('networkCanvas');
       if (!canvas) return;
       const ctx = canvas.getContext('2d');
+      // Declared here, before resize() can reach it, so the reduced-motion
+      // redraw below never runs into the temporal dead zone.
+      const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
       let width = canvas.width = canvas.offsetWidth;
       let height = canvas.height = canvas.offsetHeight;
 
@@ -1530,6 +1645,9 @@
         // Rebuild (not just reposition) so the node count re-scales to the
         // new canvas area too — e.g. an orientation change on a phone.
         init();
+        // With motion off there is no animation loop to pick the new size
+        // up, so paint the single static frame here instead.
+        if (reduceMotion.matches) drawFrame(false);
       }
 
       window.addEventListener('resize', resize);
@@ -1562,7 +1680,10 @@
         });
       }
 
-      function animate() {
+      // One frame of the graph. `step` advances the physics; passing false
+      // paints the nodes where they already are, which is what the
+      // reduced-motion path wants.
+      function drawFrame(step) {
         ctx.clearRect(0, 0, width, height);
 
         // Connections line render
@@ -1588,11 +1709,16 @@
 
         // Draw active nodes
         nodes.forEach(node => {
-          node.update();
+          if (step) node.update();
           node.draw();
         });
+      }
 
-        requestAnimationFrame(animate);
+      function animate() {
+        drawFrame(true);
+        // A reader who has asked for reduced motion gets the graph as a
+        // still image: drawn once, never re-scheduled.
+        if (!reduceMotion.matches) requestAnimationFrame(animate);
       }
 
       animate();

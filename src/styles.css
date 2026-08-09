@@ -7,6 +7,11 @@
   --purple-light: #ede9fe;
   --orange: #ea580c;
   --orange-light: #ffedd5;
+  /* --orange is a fill and border color only: it reaches 3.6:1 on white and
+     3.1:1 on --orange-light, so it fails WCAG AA for body text on either.
+     --orange-text is the same hue darkened to 7.3:1 on white and 6.4:1 on
+     --orange-light — use it anywhere the color lands on glyphs. */
+  --orange-text: #9a3412;
   --bg: #f8fafc;
   --card: #ffffff;
   --text: #0f172a;
@@ -15,8 +20,8 @@
   --danger: #dc2626;
   /* Header gradient — see src/colors.ts (HEADER_GRADIENT_A/B), shared with
      the day-banner color sequence and the PDF export. */
-  --header-gradient-a: #660099;
-  --header-gradient-b: #ff6600;
+  --header-gradient-a: #0f766e;
+  --header-gradient-b: #6d28d9;
   --radius: 14px;
   --shadow: 0 1px 3px rgba(15, 23, 42, 0.08), 0 4px 12px rgba(15, 23, 42, 0.05);
 }
@@ -55,12 +60,17 @@ body {
   z-index: 10;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 12px;
   padding: calc(env(safe-area-inset-top, 0px) + 14px) 16px 14px;
   background: linear-gradient(135deg, var(--header-gradient-a) 0%, var(--header-gradient-b) 100%);
   color: #fff;
-  /* The orange end of the gradient contrasts white text more weakly than
-     the purple end — the shadow keeps text readable across the whole bar. */
+  /* White text clears AA against the gradient itself at both ends now that
+     the sweep runs teal-700 to violet-700. The shadow stays for the
+     .topbar-plane glyphs, which drift behind the text as white at 0.32
+     opacity and lighten whatever they pass over — over the teal end that
+     composite lands near 3:1, so the shadow is what keeps the title
+     readable as a plane passes under it. */
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
 }
 
@@ -268,6 +278,13 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  /* Headings in this bar have to grow, or the controls after them bunch up
+     against the title instead of sitting at the far edge — which is what the
+     expense editor's heading did, being the one that matched no rule granting
+     it flex. min-width:0 because flex items default to min-width:auto and
+     would otherwise refuse to ellipsize. */
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .topbar-title {
@@ -301,8 +318,22 @@ body {
   display: block;
 }
 
-.report-title {
+/* Selector deliberately more specific than `.topbar h1` above, which would
+   otherwise win on specificity (0,1,1 beats 0,1,0) and replace this floor
+   with `flex-basis: auto` — putting the title straight back to 0px wide. */
+.topbar h1.report-title {
   cursor: pointer;
+  /* Every other item in the bar has flex-shrink: 0, so the title is the only
+     thing that can give — and without a floor it gives all the way to 0px,
+     hiding the report name and pushing the menu button off-screen on a narrow
+     phone. A basis rather than a width, so it still grows to fill a wide bar;
+     paired with flex-wrap on .topbar, the controls drop to a second line
+     instead of squeezing it out. */
+  flex: 1 1 6rem;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .rename-form {
@@ -453,6 +484,34 @@ body {
   box-shadow: var(--shadow);
   padding: 16px;
   cursor: pointer;
+}
+
+/* The card's tappable region is a real <button> so keyboard users can open a
+   report — the delete button sits outside it, since a button may not contain
+   another one. That means undoing the UA button chrome: without this the
+   browser paints its own grey face and outset border over the card. */
+.report-card-main {
+  flex: 1;
+  min-width: 0;
+  display: block;
+  text-align: left;
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+/* Checked against the expense row's problem: this one is not clipped.
+   .report-card sets no overflow and pads 16px, so a ring drawn outward stays
+   inside the card and is fully visible. It is spelled out anyway so both cards
+   show the same teal ring rather than one of them falling back to the
+   browser's. */
+.report-card-main:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 2px;
 }
 
 .report-card h3 {
@@ -697,7 +756,7 @@ body {
 
 .usd-total-note {
   font-size: 0.78rem;
-  color: var(--orange);
+  color: var(--orange-text);
 }
 
 /* ---- First-run terms acknowledgment ---- */
@@ -807,7 +866,7 @@ body {
 }
 
 .backup-card.stale h3 {
-  color: var(--orange);
+  color: var(--orange-text);
 }
 
 .backup-actions {
@@ -871,11 +930,18 @@ body {
 }
 
 .search-bar input:focus {
-  outline: none;
+  /* Same visible focus ring as the other text inputs. The input has no border
+     of its own, so without a ring a keyboard user has nothing to look at. */
+  outline: 2px solid var(--teal);
+  outline-offset: -1px;
 }
 
 .search-bar .icon-btn {
+  /* The clear-search glyph is 14px; the min-* pair keeps the button itself at
+     the 24px minimum target size regardless of what the icon inside measures. */
   padding: 4px;
+  min-width: 24px;
+  min-height: 24px;
 }
 
 /* ---- Report summary bar ---- */
@@ -900,7 +966,7 @@ body {
   gap: 8px;
   padding: 10px 16px;
   background: var(--orange-light);
-  color: #9a3412;
+  color: var(--orange-text);
   font-size: 0.85rem;
 }
 
@@ -939,7 +1005,10 @@ body {
 
 .day-divider-date {
   font-size: 0.82rem;
-  opacity: 0.85;
+  /* The day colors are picked to clear 4.5:1 at full strength, so any opacity
+     here spends contrast that was only just budgeted for. 0.95 is enough to
+     read as secondary next to the label without eating into that margin. */
+  opacity: 0.95;
 }
 
 .day-divider-food {
@@ -994,7 +1063,13 @@ body {
   cursor: grab;
 }
 
+/* Back to a plain container. It was briefly a <button> wrapping the whole
+   row, which fixed keyboard access at the cost of the card's <h3>: a heading
+   inside a button is not exposed as a heading. The control is now the title
+   button below, whose ::after is stretched over this box — hence the
+   positioning context here. */
 .expense-card-body {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -1026,9 +1101,58 @@ body {
 
 .expense-info h3 {
   font-size: 0.98rem;
+}
+
+/* The row's control: a button holding the title, sitting inside the <h3>
+   rather than around it. Its ::after covers the whole card body, so tapping
+   anywhere on the row still opens the expense — the pointer target is
+   unchanged from when the row itself was the button, and the heading survives.
+   The row's own icon buttons are siblings of .expense-card-body, not children,
+   so nothing interactive ends up inside this one. */
+.expense-open {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+/* Truncation lives on a leaf span rather than on the button or the <h3>. An
+   absolutely positioned box does escape an ancestor's `overflow: hidden` when
+   its containing block sits outside that ancestor, so the stretched ::after
+   would survive either — but only by that rule, and it would collapse to the
+   title's own box the day someone gives .expense-info or the <h3> a position.
+   Clipping nothing on the way down is one less thing to know. */
+.expense-open-label {
+  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.expense-open::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius);
+}
+
+/* The focus ring goes on the stretched overlay, which is the shape the user
+   actually clicks; a ring around the title alone would point at a third of
+   the control. It has to be drawn inward: .expense-card sets overflow hidden
+   and the row is flush with the card's top, left and right edges, so an
+   outline drawn outward is clipped on three sides. -2px for a 2px stroke puts
+   the whole ring inside the box. */
+.expense-open:focus-visible {
+  outline: none;
+}
+
+.expense-open:focus-visible::after {
+  outline: 2px solid var(--teal);
+  outline-offset: -2px;
 }
 
 .expense-amount {
@@ -1299,7 +1423,7 @@ body {
 
 .storage-warning-body strong {
   display: block;
-  color: var(--orange);
+  color: var(--orange-text);
   font-size: 0.95rem;
   margin-bottom: 2px;
 }
@@ -1322,7 +1446,7 @@ body {
   gap: 8px;
   padding: 10px 16px;
   background: var(--orange-light);
-  color: var(--orange);
+  color: var(--orange-text);
   font-size: 0.85rem;
 }
 
@@ -1349,4 +1473,37 @@ body {
   box-shadow: var(--shadow);
   border: 1px solid var(--orange);
   animation: update-banner-in 0.2s ease-out;
+}
+
+/* ---- Reduced motion ---- */
+
+/* One blanket rule rather than a list of the animations that exist today, so
+   anything added later is covered without someone having to remember this
+   block. The entry animations it collapses (.drawer, .update-banner,
+   .error-toast) and the .btn opacity transition are all decoration — the
+   element still arrives, it just stops sliding in.
+
+   .spinner is the deliberate exception. It is the one animation that carries
+   information: it says work is still running. Freezing it would leave a
+   static ring that reads as a stalled app, so it is slowed instead. Both
+   places it appears also state the status in text next to it ("Processing
+   file…", and "Reading receipt…" with a live percentage), so nothing
+   depends on the motion alone.
+
+   The .topbar-plane glyphs are handled separately further up: they are pure
+   decoration and are hidden outright, and .drawer-arrow-icon only animates
+   under a `no-preference` query, so neither needs anything here. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .spinner {
+    animation-duration: 2.4s !important;
+    animation-iteration-count: infinite !important;
+  }
 }

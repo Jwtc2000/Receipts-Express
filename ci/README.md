@@ -11,7 +11,9 @@ Neither pipeline duplicates the other's stages.
 
 ## Pipeline stages
 
-Every stage below runs on every push and every PR unless marked **main-only**.
+Every stage below runs on every Jenkins build of a branch unless marked **main-only** — the `Jenkinsfile` gates those two with `when { branch 'main' }`.
+
+A build is not triggered by the push. The controller is reachable only over the tailnet, so GitHub cannot deliver a webhook to it; a build starts when the multibranch job scans the repository, which is why **Scan Repository Now** is a step in the working rhythm below.
 
 | Stage | Tool | Version | What it checks |
 |---|---|---|---|

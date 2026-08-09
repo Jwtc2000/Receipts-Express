@@ -16,7 +16,31 @@ export type IconName =
   | 'search'
   | 'backup'
   | 'file'
+  | 'edit'
 
+/*
+ * Several of these glyphs are Feather Icons — MIT, Copyright (c) 2013-2023 Cole Bemis,
+ * https://github.com/feathericons/feather. Each was compared against upstream `icons/*.svg`:
+ *
+ *   camera, trash, swap (Feather `repeat`), search  path data identical
+ *   image      Feather `image`, identical but for a dropped `ry` on the rect
+ *   warning    Feather `alert-triangle`, identical (the `L` after the moveto is implicit here)
+ *   backup     Feather `download`: the arrow is identical, the tray is redrawn
+ *   file       Feather `file-text`: frame and fold identical, the two body lines run in the
+ *              opposite direction and the short `10 9 9 9 8 9` polyline is dropped
+ *   edit       Feather `edit`: identical, with the closing `9.5-9.5` segment replaced by `z`
+ *
+ * The wrapper <svg> below follows Feather's convention too: 24x24 viewBox, no fill,
+ * currentColor stroke at width 2, round caps and joins.
+ *
+ * Nothing else here is claimed as Feather's. `receipt` and `express-arrow` are original.
+ * `menu`, `close` and the three chevrons do share coordinates with Feather's `menu`, `x` and
+ * chevrons, but two or three straight strokes on a 24-unit grid is geometry rather than
+ * expression — there is no meaningfully different way to draw them at this size, so there is
+ * nothing there for anyone to own and no attribution is claimed for them.
+ *
+ * The MIT licence text and the notice this satisfies are in THIRD_PARTY_NOTICES.md.
+ */
 const PATHS: Record<IconName, ReactNode> = {
   receipt: (
     <>
@@ -103,6 +127,12 @@ const PATHS: Record<IconName, ReactNode> = {
       <polyline points="14 2 14 8 20 8" />
       <line x1="8" y1="13" x2="16" y2="13" />
       <line x1="8" y1="17" x2="16" y2="17" />
+    </>
+  ),
+  edit: (
+    <>
+      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4z" />
     </>
   ),
 }

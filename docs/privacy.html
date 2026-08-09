@@ -47,8 +47,8 @@
       --text: #0f172a;
       --muted: #64748b;
       --border: #e2e8f0;
-      --header-gradient-a: #660099;
-      --header-gradient-b: #ff6600;
+      --header-gradient-a: #0f766e;
+      --header-gradient-b: #6d28d9;
       --radius: 14px;
       --shadow: 0 1px 3px rgba(15, 23, 42, 0.08), 0 4px 12px rgba(15, 23, 42, 0.05);
     }
@@ -66,6 +66,10 @@
     header.page-header {
       background: linear-gradient(135deg, var(--header-gradient-a) 0%, var(--header-gradient-b) 100%);
       color: #fff;
+      /* The teal end of the gradient contrasts white text more weakly than
+         the violet end — the shadow keeps the heading readable across the
+         whole band. Same value as .topbar in src/styles.css. */
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
       padding: calc(env(safe-area-inset-top, 0px) + 32px) 20px 32px;
       text-align: center;
     }
@@ -148,7 +152,9 @@
     }
 
     a { color: var(--teal); }
-    a:hover { color: var(--orange); }
+    /* Darker than var(--orange), which reaches only 3.4:1 on this background
+       — below the 4.5:1 body-text minimum. */
+    a:hover { color: #9a3412; }
 
     .muted { color: var(--muted); font-size: 0.9rem; }
 
@@ -203,12 +209,12 @@
       <p>
         <strong>Receipts Express has no accounts and no servers.</strong> Your receipt images,
         the details read from them, and your expense reports are created and stored entirely
-        on your own device, and are never sent to us or to anyone else.
+        on your own device, and are never sent to the author or to anyone else.
       </p>
       <p class="muted">
-        Nobody operating this project can see your data, because it never reaches us. The
-        rest of this page explains exactly what is stored, where, and what the few remaining
-        edges are.
+        Nobody working on this project can see your data, because it never reaches the author.
+        The rest of this page explains exactly what is stored, where, and what the few
+        remaining edges are.
       </p>
     </div>
 
@@ -239,6 +245,11 @@
         All of it stays in your browser's own storage for this site. Nothing here is
         transmitted anywhere.
       </p>
+      <p class="muted">
+        The app creates three IndexedDB databases and five local storage values, and every one
+        of them is described below. Only the first database holds anything of yours; the other
+        two hold the app's own cache bookkeeping and the text recognition model.
+      </p>
 
       <h3>Browser database (IndexedDB)</h3>
       <p>
@@ -260,7 +271,7 @@
             </tr>
             <tr>
               <td><code>images</code></td>
-              <td>The receipt photo itself, stored as a JPEG. Images are resized to a maximum of 1800&nbsp;px and re-encoded before saving, which also drops any EXIF metadata the original photo carried.</td>
+              <td>The receipt photo itself, stored as a JPEG. Images are resized to a maximum of 1800&nbsp;px and re-encoded before saving; for receipts you photograph or upload, that re-encoding also drops any EXIF metadata the original file carried, including a location tag.</td>
             </tr>
           </tbody>
         </table>
@@ -277,8 +288,36 @@
 
       <h3>Offline cache</h3>
       <p>
-        The app's service worker caches the app's own files — code, icons, and the text
-        recognition and PDF engines — so it works offline. No receipt data is stored there.
+        The app's service worker keeps a copy of the app's own files so it can run without a
+        connection. The code and icons are stored when you install the app. The text
+        recognition and PDF engines are too large to store at install, so each is stored the
+        first time you use it; these policy pages are stored the first time you open them. No
+        receipt data is stored there.
+      </p>
+
+      <h3>Cache bookkeeping database</h3>
+      <p>
+        The caching library that manages that offline copy keeps a second, small IndexedDB
+        database of its own, named <code>workbox-expiration</code>, with one collection,
+        <code>cache-entries</code>. It records which of the app's own files were cached and
+        when, so stale copies can be replaced on schedule. It holds file addresses and
+        timestamps only — no receipt data, no expense data, and nothing about you. It is listed
+        here because you will see it if you inspect your browser's storage, and an undocumented
+        database is exactly the kind of thing this page should not leave unexplained.
+      </p>
+
+      <h3>Text recognition language database</h3>
+      <p>
+        The first time you scan a receipt, the text recognition engine fetches its English
+        language data from this app's own address, unpacks it, and stores it in a third
+        IndexedDB database so that later scans do not have to fetch it again. The stored copy
+        is large — roughly 22&nbsp;MB — and sits under a single entry keyed
+        <code>./eng.traineddata</code>. The engine caches through the <code>idb-keyval</code>
+        library and takes that library's default names rather than anything this app chose, so
+        the database is called <code>keyval-store</code> and its one collection
+        <code>keyval</code>. It holds the recognition model and nothing else: no receipt data,
+        no transcribed text, and nothing about you. It does not exist until your first scan,
+        which is why a fresh install shows only the other two.
       </p>
     </section>
 
@@ -344,15 +383,33 @@
       </p>
       <p>
         <strong>This is the only third party involved, and it only ever sees a request for the
-        app itself — never your receipts.</strong> Once the app has loaded, it can work fully
-        offline.
+        app itself — never your receipts.</strong> Most of the app works offline once it is
+        installed: the screens, your stored reports, and exporting them. The text recognition and
+        PDF engines are the exception. They are too large to store at install, so your first
+        scan and your first PDF receipt each need a connection to fetch the engine — again from
+        GitHub Pages, and again a request for the app's own files, not for your data. After
+        each has run once, it works offline too.
       </p>
       <p>
-        That boundary is enforced by your browser, not merely promised: every production build
-        carries a Content-Security-Policy of <code>connect-src 'self'</code>, which blocks any
-        script on the page — including one smuggled in through a compromised dependency —
-        from sending data anywhere other than the app's own address. An automated test asserts
-        the policy is present on every build.
+        Your browser helps hold that boundary rather than leaving it to a promise. The deployed
+        app carries a Content-Security-Policy — <code>connect-src 'self'</code> is the directive
+        that matters here — which restricts fetch, XMLHttpRequest, WebSocket, EventSource and
+        beacon requests to the app's own origin, and blocks form submissions to other origins.
+        That closes the routes a script would ordinarily use to send data off your device,
+        including a script smuggled in through a compromised dependency.
+      </p>
+      <p>
+        <strong>What it does not do.</strong> The policy is delivered in a <code>&lt;meta&gt;</code>
+        tag, because GitHub Pages cannot send custom response headers, so it does not govern
+        top-level navigation — a compromised dependency could still navigate the page
+        elsewhere. A <code>&lt;meta&gt;</code> policy also reaches only the document that carries
+        it, so each document needs its own. The app's document has one, and the standalone pages
+        under <code>docs/</code>, including this one, now carry one too: the build derives a
+        policy per page from the same source as the app's and injects it as the page is copied,
+        relaxed only as far as that page's own inline stylesheet and any inline script it
+        contains require. The restriction on where a page may send network requests is not
+        relaxed on any of them. It is a strong control, not an absolute one. An automated test
+        asserts that the app and each of these pages ships with a policy on every build.
       </p>
     </section>
 
@@ -399,11 +456,11 @@
         <li><strong>Take it with you.</strong> The Backup card on the home screen exports everything — every report, expense, and receipt image — as a single JSON file you can restore later or keep elsewhere. Individual reports also export as PDF or CSV.</li>
         <li><strong>Delete a report.</strong> Deleting a report also deletes all of its expenses and their receipt images.</li>
         <li><strong>Delete an expense.</strong> Deleting an expense also deletes its receipt images. Replacing a receipt image deletes the one it replaced.</li>
-        <li><strong>Erase everything.</strong> There is currently <em>no</em> single "delete all data" button in the app. To remove everything at once, use your browser's own "clear site data" or website-data controls for this site. That erases the database and the stored settings together.</li>
+        <li><strong>Erase everything.</strong> There is currently <em>no</em> single "delete all data" button in the app. To remove everything at once, use your browser's own "clear site data" or website-data controls for this site. That erases all three databases, the stored settings, and the offline cache together.</li>
       </ul>
       <p class="muted">
-        Deletion is immediate and local. There is no server copy, no backup held by us, and no
-        retention period — once it is gone from your device, it is gone.
+        Deletion is immediate and local. There is no server copy, no backup held by the author,
+        and no retention period — once it is gone from your device, it is gone.
       </p>
     </section>
 
@@ -417,6 +474,13 @@
         paper receipts in your bag.
       </p>
       <p>
+        That sandbox is scoped to a web address, not to an app: anything else served from the
+        same address shares this storage and can read it. GitHub Pages puts every project of an
+        account at one address, each under its own path, so another page published there is a
+        neighbour of this app's data rather than a stranger to it. The path does not separate
+        them — only a different address would.
+      </p>
+      <p>
         Anyone with access to your unlocked device and browser profile can open the app and
         read what is in it. There is no separate app passcode. Because receipts can carry
         merchant names, dates, amounts, and partial payment card numbers, use the app only on
@@ -424,12 +488,14 @@
         not on a shared or public computer.
       </p>
       <p>
-        <strong>Breach notification.</strong> Washington's data breach notification law
-        (RCW 19.255) applies to those who own, license, maintain, or possess personal
-        information. The author does none of those, so there is no store of your data that
-        could be breached. If the author ever learns that the hosted app has been modified to
-        transmit your data, a prominent notice will be posted on this page and in the project's
-        public repository as promptly as possible.
+        <strong>Breach notification.</strong> Washington's data breach notification law,
+        chapter 19.255 RCW, places its duties on whoever owns or licenses data containing
+        personal information, with a narrower duty on whoever maintains data owned by someone
+        else. The author holds no such data — there is no server, no log, and no backup — so
+        there is no store of your data that could be breached. What the author can commit to
+        instead: if he ever learns that the hosted app has been modified to transmit your data,
+        a prominent notice will go on this page and in the project's public repository as
+        promptly as reasonably possible.
       </p>
       <h3>Your data can also disappear on its own</h3>
       <p>
@@ -454,11 +520,30 @@
         section 9 — you exercise them directly, without asking anyone.
       </p>
       <p>
-        That answer is the same wherever you live. State privacy laws — California's CCPA and
-        CPRA, and the equivalents in Virginia, Colorado, Connecticut, and Utah — place duties
-        on organizations that collect personal information and meet their size thresholds. The
-        author collects none and meets none. Washington's My Health My Data Act gets a fuller,
-        separate answer on the
+        That answer is the same wherever you live. State consumer privacy laws place their
+        duties on businesses and controllers that <em>collect</em> personal information; around
+        twenty states now have one, and they are not uniform — some key applicability to
+        revenue or volume thresholds, others to small-business status. Which test a given state
+        uses does not change the answer here, because the answer does not rest on a threshold:
+        the author collects none and receives none, and so is neither a business nor a
+        controller under any of them.
+      </p>
+      <p>
+        <strong>If you are in the EEA or the United Kingdom.</strong> The General Data
+        Protection Regulation and the UK GDPR place their duties on a <em>controller</em> — the
+        party that decides why and how personal data is processed — and on a <em>processor</em>
+        acting on a controller's instructions. The author is neither. Your receipts, the text
+        read from them, and everything you type never leave your device and never reach him, so
+        there is no personal data of yours for him to control or process. The one exception is
+        the ordinary web-server record described in section 6: GitHub, which hosts the app,
+        sees your IP address, your browser, and the time when your browser downloads it. That
+        handling is governed by GitHub's Privacy Statement rather than by this policy, and the
+        author cannot see, configure, or retrieve any of it. This is a description of what
+        happens, not a claim of certification — no regulator has reviewed this app, and if you
+        think this description is wrong, the contact route below is the fastest way to say so.
+      </p>
+      <p>
+        Washington's My Health My Data Act gets a fuller, separate answer on the
         <a href="./consumer-health-data.html">Consumer Health Data Privacy Policy</a> page.
       </p>
       <p class="muted">
@@ -491,8 +576,11 @@
     <section>
       <h2><span class="num">14.</span>Contact</h2>
       <p>
-        Receipts Express is an independent personal project maintained by Jwtc2000. Questions
-        about this policy are best raised as an issue on the project's repository:
+        Receipts Express is published by <strong>Jordan Campbell</strong>, an individual
+        resident in the State of Washington, United States, as an independent personal project.
+        The project's GitHub repository is the contact channel for this policy; there is no
+        mailing address and no inbox, because the project collects no contact details of its
+        own and holds none of yours. Questions are best raised as an issue:
       </p>
       <p>
         <a href="https://github.com/Jwtc2000/Receipts-Express/issues" target="_blank" rel="noopener noreferrer">github.com/Jwtc2000/Receipts-Express/issues</a>

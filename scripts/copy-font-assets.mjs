@@ -40,12 +40,19 @@ for (const { pkg, file } of families) {
   fs.copyFileSync(from, path.join(dest, file))
   copied++
 
-  // OFL-1.1 requires the licence travel with the fonts it covers.
+  // OFL-1.1 requires the licence travel with the fonts it covers. This throws
+  // for the same reason the font-binary check above does, but the asymmetry
+  // used to run the wrong way: an existsSync guard here failed *open*, so a
+  // fontsource restructure that moved or renamed LICENSE would skip the copy
+  // silently and ship the font binaries with no licence text and a green
+  // build. A missing font degrades visibly and someone notices; a missing OFL
+  // notice is an invisible breach of the only condition the licence imposes.
   const licence = path.join(root, 'node_modules', pkg, 'LICENSE')
-  if (fs.existsSync(licence)) {
-    fs.copyFileSync(licence, path.join(dest, `${file.split('-')[0]}-OFL.txt`))
-    copied++
+  if (!fs.existsSync(licence)) {
+    throw new Error(`Expected OFL licence missing: ${licence}. OFL-1.1 requires it ship beside ${file}.`)
   }
+  fs.copyFileSync(licence, path.join(dest, `${file.split('-')[0]}-OFL.txt`))
+  copied++
 }
 
 console.log(`Copied ${copied} font assets to public/fonts/`)

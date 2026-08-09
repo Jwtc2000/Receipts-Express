@@ -18,6 +18,8 @@ import { expenseMatches } from '../search'
 import { dayColor, contrastText, rgbToCss } from '../colors'
 import { foodBalanceForDate, formatFoodBalance, formatPersonalTotal } from '../mealAllowance'
 import { getProfile, type Profile } from '../profile'
+import { MAX_STRING_LENGTH } from '../backup'
+import { useModal } from '../hooks/useModal'
 import Icon from './icons'
 import DrawerSection from './DrawerSection'
 import ProjectSelect from './ProjectSelect'
@@ -52,6 +54,16 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
   const [exchangeRateDrafts, setExchangeRateDrafts] = useState<Record<string, string>>({})
   const dragIndex = useRef<number | null>(null)
   const thumbsRef = useRef<Map<string, string>>(new Map())
+  const menuRef = useModal<HTMLElement>(menuOpen, () => setMenuOpen(false))
+  // modal: false — the export menu is a two-item popover hanging off its own
+  // button, not a surface that covers the app. It keeps Escape and the focus
+  // move; trapping Tab inside it and freezing the page scroll behind it were
+  // both wrong for something this size.
+  const exportMenuRef = useModal<HTMLDivElement>(
+    exportMenuOpen,
+    () => setExportMenuOpen(false),
+    { modal: false },
+  )
 
   const refresh = async () => {
     const r = await getReport(reportId)
@@ -303,19 +315,48 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
               void saveRename()
             }}
           >
-            <input autoFocus value={nameDraft} onChange={(e) => setNameDraft(e.target.value)} onBlur={() => void saveRename()} />
+            {/* Capped like every other free-text field that reaches a stored
+                record: without it, a name longer than MAX_STRING_LENGTH
+                produces a backup file this app's own importer then refuses. */}
+            <input
+              autoFocus
+              aria-label="Report name"
+              maxLength={MAX_STRING_LENGTH}
+              value={nameDraft}
+              onChange={(e) => setNameDraft(e.target.value)}
+              onBlur={() => void saveRename()}
+            />
           </form>
         ) : (
-          <h1
-            className="report-title"
-            onClick={() => {
-              setNameDraft(report.name)
-              setRenaming(true)
-            }}
-            title="Tap to rename"
-          >
-            {report.name}
-          </h1>
+          <>
+            {/* The heading stays a heading. Tapping it still starts a rename,
+                since that gesture is what people already use, but the control
+                a keyboard or screen reader gets is the button beside it — a
+                heading with a click handler is reachable by neither. */}
+            <h1
+              className="report-title"
+              onClick={() => {
+                setNameDraft(report.name)
+                setRenaming(true)
+              }}
+              title="Tap to rename"
+            >
+              {report.name}
+            </h1>
+            {/* Icon-only, like every other control in this bar. A text label
+                here costs ~78px of fixed width, which at 320px crushed the
+                title to nothing and pushed the menu button off-screen. */}
+            <button
+              className="icon-btn"
+              aria-label={`Rename report "${report.name}"`}
+              onClick={() => {
+                setNameDraft(report.name)
+                setRenaming(true)
+              }}
+            >
+              <Icon name="edit" />
+            </button>
+          </>
         )}
         {expenses.length > 0 && (
           <button
@@ -327,8 +368,13 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
           </button>
         )}
         <div className="export-menu-wrap">
+          {/* The popover itself is an unnamed container, so what tells a
+              screen reader it exists and whether it is showing is the trigger,
+              not the box. */}
           <button
             className="btn primary small"
+            aria-haspopup="true"
+            aria-expanded={exportMenuOpen}
             onClick={() => setExportMenuOpen((v) => !v)}
             disabled={exporting !== null || expenses.length === 0}
           >
@@ -337,7 +383,7 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
           {exportMenuOpen && (
             <>
               <div className="export-menu-backdrop" onClick={() => setExportMenuOpen(false)} />
-              <div className="export-menu">
+              <div className="export-menu" ref={exportMenuRef}>
                 <button className="btn ghost small" onClick={() => void doExportPdf()}>
                   Export as PDF
                 </button>
@@ -355,9 +401,16 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
 
       {menuOpen && (
         <div className="drawer-backdrop" onClick={() => setMenuOpen(false)}>
-          <aside className="drawer" onClick={(e) => e.stopPropagation()}>
+          <aside
+            ref={menuRef}
+            className="drawer"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="report-menu-title"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="drawer-header">
-              <h2>Report Menu</h2>
+              <h2 id="report-menu-title">Report Menu</h2>
               <button className="icon-btn" aria-label="Close menu" onClick={() => setMenuOpen(false)}>
                 <Icon name="close" />
               </button>
@@ -474,6 +527,7 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
             autoFocus
             type="text"
             inputMode="search"
+            aria-label="Search expenses in this report"
             placeholder="Search title, merchant, or amount…"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -585,7 +639,16 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
                 </div>
 
                 <div className="expense-card">
-                  <div className="expense-card-body" onClick={() => onEditExpense(expense.id)}>
+                  {/* The title is a real button, so opening an expense no
+                      longer needs a pointer. The button sits inside the <h3>
+                      rather than around the whole row: a heading nested in a
+                      button is not exposed as a heading, and wrapping the row
+                      cost this screen every expense heading it had. Its
+                      ::after is stretched across .expense-card-body (see
+                      styles.css), so the tap target is still the whole row.
+                      The row's other controls are in .expense-actions below,
+                      outside the button — one may not contain another. */}
+                  <div className="expense-card-body">
                     {expense.imageId && thumbs.get(expense.imageId) ? (
                       <img className="expense-thumb" src={thumbs.get(expense.imageId)} alt="" />
                     ) : (
@@ -594,7 +657,17 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
                       </div>
                     )}
                     <div className="expense-info">
-                      <h3>{expense.title || expense.merchant || 'Untitled expense'}</h3>
+                      <h3>
+                        <button
+                          type="button"
+                          className="expense-open"
+                          onClick={() => onEditExpense(expense.id)}
+                        >
+                          <span className="expense-open-label">
+                            {expense.title || expense.merchant || 'Untitled expense'}
+                          </span>
+                        </button>
+                      </h3>
                       <p className="muted">
                         {expense.date || 'No date'} · {expense.category}
                       </p>

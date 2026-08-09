@@ -56,6 +56,31 @@ async function pdfText(file: File): Promise<string> {
   return file.text()
 }
 
+/**
+ * Just the text drawn on the summary page, in draw order, joined with single
+ * spaces.
+ *
+ * Each page gets its own uncompressed content stream, and the summary page is
+ * found by the title it draws rather than by stream index, since an embedded
+ * receipt image adds streams of its own. Within the page, a long line is
+ * wrapped by `doc.splitTextToSize()` before it is drawn, so it arrives as
+ * several separate PDF strings and no assertion on a whole sentence can match
+ * the raw output. Word wrapping drops the space it breaks on, so re-joining
+ * the strings with one space puts the sentence back together exactly. PDF
+ * string syntax escapes `(`, `)` and `\`; none of the text asserted below
+ * contains any of them.
+ */
+async function summaryPageProse(file: File): Promise<string> {
+  const raw = await file.text()
+  const streams = [...raw.matchAll(/stream\r?\n([\s\S]*?)endstream/g)].map((m) => m[1])
+  const summary = streams.find((s) => s.includes('(Expense Report)'))
+  if (summary === undefined) throw new Error('no summary page found in the exported PDF')
+  return [...summary.matchAll(/\(((?:\\.|[^()\\])*)\)/g)]
+    .map((m) => m[1])
+    .join(' ')
+    .replace(/\s+/g, ' ')
+}
+
 beforeEach(() => {
   // jsdom doesn't implement these, and jsPDF elsewhere calls `new URL(...)`
   // internally — replacing the whole URL global (rather than patching just
@@ -140,6 +165,39 @@ describe('exportReportPdf', () => {
 
     const file = (shareOrDownloadFile as ReturnType<typeof vi.fn>).mock.calls[0][0] as File
     expect(await countPdfPages(file)).toBe(3)
+  })
+
+  // The exported PDF is the only thing this product says to someone who never
+  // opened it: an approver, a bookkeeper, an auditor. They never saw the
+  // Terms, never saw the first-run gate, and never agreed to anything — so
+  // every disclaimer the app relies on reaches them through this one line or
+  // not at all, and a page of typed and OCR-read figures laid out like a
+  // record package otherwise reads as verified. Pinned word for word, and
+  // pinned to the summary page specifically, so it cannot be shortened,
+  // softened, or quietly moved somewhere the reader will not look.
+  const ACCURACY_NOTE =
+    'Amounts and dates are user-entered or machine-extracted from receipt images and are not independently verified. Check against the original receipts.'
+
+  it('puts the accuracy note on the summary page, in full', async () => {
+    const { exportReportPdf } = await import('./pdf')
+    const { shareOrDownloadFile } = await import('./share')
+
+    await exportReportPdf(makeReport(), [makeExpense({ imageId: undefined })])
+
+    const file = (shareOrDownloadFile as ReturnType<typeof vi.fn>).mock.calls[0][0] as File
+    expect(await summaryPageProse(file)).toContain(ACCURACY_NOTE)
+  })
+
+  it('keeps the accuracy note when the report has no expenses at all', async () => {
+    // An empty report still exports, and an empty page of figures is exactly
+    // the case where a reader has least reason to doubt what little is there.
+    const { exportReportPdf } = await import('./pdf')
+    const { shareOrDownloadFile } = await import('./share')
+
+    await exportReportPdf(makeReport(), [])
+
+    const file = (shareOrDownloadFile as ReturnType<typeof vi.fn>).mock.calls[0][0] as File
+    expect(await summaryPageProse(file)).toContain(ACCURACY_NOTE)
   })
 
   it('omits the TOTAL (USD) line entirely for an all-USD report', async () => {

@@ -44,8 +44,8 @@
       --text: #0f172a;
       --muted: #64748b;
       --border: #e2e8f0;
-      --header-gradient-a: #660099;
-      --header-gradient-b: #ff6600;
+      --header-gradient-a: #0f766e;
+      --header-gradient-b: #6d28d9;
       --radius: 14px;
       --shadow: 0 1px 3px rgba(15, 23, 42, 0.08), 0 4px 12px rgba(15, 23, 42, 0.05);
     }
@@ -63,6 +63,10 @@
     header.page-header {
       background: linear-gradient(135deg, var(--header-gradient-a) 0%, var(--header-gradient-b) 100%);
       color: #fff;
+      /* The teal end of the gradient contrasts white text more weakly than
+         the violet end — the shadow keeps the heading readable across the
+         whole band. Same value as .topbar in src/styles.css. */
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
       padding: calc(env(safe-area-inset-top, 0px) + 32px) 20px 32px;
       text-align: center;
     }
@@ -107,13 +111,16 @@
     .callout p + p { margin-top: 10px; }
 
     /* Warranty and liability sections. RCW 62A.1-201(b)(10) treats a term as
-       conspicuous when a reasonable person ought to have noticed it —
-       contrasting colour, larger type, or being set off from surrounding
-       text all qualify. This box does all three at once, and the lead
-       sentence inside it is additionally uppercased, so the disclaimer does
-       not rest on any single theory of conspicuousness. */
+       conspicuous when a reasonable person ought to have noticed it — being
+       set off from the surrounding text, and type that contrasts with it,
+       both qualify. Two legs carry that here: the 2px orange border sets the
+       box off from the page at about 3.5:1, and the lead sentence inside it
+       is uppercased. The background is deliberately not counted as a third —
+       it is perceptibly warmer than the page but computes to only about
+       1.2:1 against it, which is not a contrast anything should rest on. It
+       was #fffbeb, effectively invisible at 1.01:1, until this was measured. */
     .legal-box {
-      background: #fffbeb;
+      background: #fde68a;
       border: 2px solid var(--orange);
       border-radius: var(--radius);
       padding: 18px 20px;
@@ -129,6 +136,10 @@
       letter-spacing: 0.01em;
       margin-bottom: 10px;
     }
+
+    /* var(--muted) clears 4.5:1 on the page background but only reaches 3.8:1
+       on the darker box, so the plain-terms notes inside get a darker grey. */
+    .legal-box .muted { color: #475569; }
 
     section { margin-bottom: 34px; }
 
@@ -169,7 +180,9 @@
     }
 
     a { color: var(--teal); }
-    a:hover { color: var(--orange); }
+    /* Darker than var(--orange), which reaches only 3.4:1 on this background
+       — below the 4.5:1 body-text minimum. */
+    a:hover { color: #9a3412; }
 
     .muted { color: var(--muted); font-size: 0.9rem; }
 
@@ -300,6 +313,14 @@
         The app also bundles third-party open-source components — including Tesseract.js,
         PDF.js, jsPDF, and React — each under its own license, and two webfonts under the SIL
         Open Font License.
+        <a href="https://github.com/Jwtc2000/Receipts-Express/blob/main/THIRD_PARTY_NOTICES.md" target="_blank" rel="noopener noreferrer">THIRD_PARTY_NOTICES.md</a>,
+        at the root of the repository, records them with their versions and licenses. It is a
+        work in progress rather than a finished record: about ten components — several of them
+        the C libraries compiled into the text recognition engine's WebAssembly — are marked
+        there as undetermined, because the installed package carries no copyright line to quote
+        and the operative wording has to be read upstream first. The file names each one and
+        says what is missing, so read it as the current state of that work rather than as a
+        settled list.
       </p>
     </section>
 
@@ -335,8 +356,8 @@
       <h3>Do not use development builds with real receipts</h3>
       <p>
         If you run the project yourself, note that in development mode (<code>npm run dev</code>)
-        the Content-Security-Policy is not applied, so the browser-level protections that block
-        network exfiltration in production are inactive. Use synthetic receipts for local
+        the Content-Security-Policy is not applied, so the browser-level restrictions on where
+        the page may send network requests are inactive. Use synthetic receipts for local
         development; test with real files only against a production build
         (<code>npm run build</code> and <code>npm run preview</code>).
       </p>
@@ -466,7 +487,7 @@
     </section>
 
     <section>
-      <h2><span class="num">12.</span>Availability and changes to the app</h2>
+      <h2><span class="num">12.</span>Availability, changes to the app, and termination</h2>
       <p>
         The app is published on GitHub Pages as a personal project. There is no service-level
         commitment, no support obligation, and no guarantee of continued availability:
@@ -474,9 +495,22 @@
         without notice.
       </p>
       <p>
-        Because the app works offline once installed and the source is public under
-        Apache-2.0, you are never locked out of your own data — your reports remain on your
-        device, and you can export them or run the app yourself.
+        <strong>Termination.</strong> These terms run for as long as you use the app and end
+        when you stop using it. There is no account for the author to close and no server-side
+        access to withdraw, so the license granted in section 4 is revocable only in the sense
+        that the author may stop publishing the app under this section. That does not reach
+        data already on your device, does not reach any file you have already exported, and
+        does not affect the rights the Apache License grants you over the source code — those
+        are perpetual and irrevocable by that license's own terms. The sections listed under
+        <em>Survival</em> in section 17 continue to apply.
+      </p>
+      <p>
+        Because your reports sit on your own device and the source is public under Apache-2.0,
+        you are never locked out of your own data. Once the app is installed, opening it,
+        reading what is stored, and exporting a report all work without a connection. Scanning
+        a new receipt is the exception: the text recognition engine is too large to store at
+        install and is fetched the first time you use it, so that first scan needs a
+        connection. Either way you can export what you already have, or run the app yourself.
       </p>
     </section>
 
@@ -487,6 +521,11 @@
         <a href="./privacy.html">Privacy Policy</a> sets out exactly what is stored, what is
         never collected, and the one network interaction that exists. It forms part of these
         terms.
+      </p>
+      <p>
+        A separate <a href="./consumer-health-data.html">Consumer Health Data Privacy Policy</a>
+        addresses Washington's My Health My Data Act. It is published separately because that
+        Act requires it to stand on its own, and it does not form part of these terms.
       </p>
     </section>
 
@@ -520,7 +559,7 @@
       <p>
         <strong>Small claims stay available.</strong> Either of us may bring an individual
         claim in a small claims court with jurisdiction, instead of the courts named in
-        section 13.
+        section 14.
       </p>
       <p class="muted">
         There is no mandatory arbitration clause and no class-action waiver in these terms.
@@ -544,7 +583,7 @@
         <li><strong>Entire agreement.</strong> These terms and the Privacy Policy are the entire agreement between you and the author about the hosted app, and supersede any earlier understanding. The Apache License continues to govern the source code separately.</li>
         <li><strong>No waiver.</strong> A failure to enforce a provision is not a waiver of it.</li>
         <li><strong>Assignment.</strong> You may not assign these terms without the author's consent. The author may assign them to a successor maintainer of the project.</li>
-        <li><strong>Survival.</strong> Sections 7 through 11, 14, 15, and 17 survive any termination of these terms or your use of the app.</li>
+        <li><strong>Survival.</strong> Sections 7 through 11 and 14 through 19 survive any termination of these terms or your use of the app — the disclaimers, the liability cap, the indemnity, and everything needed to resolve a dispute about a use that has already happened.</li>
         <li><strong>Notices.</strong> Because the app collects no contact details, notices to you are given by posting them on this page or in the app. Notices to the author go to the project's issue tracker.</li>
         <li><strong>No agency.</strong> Nothing here creates a partnership, employment, or agency relationship.</li>
         <li><strong>Force majeure.</strong> The author is not responsible for any failure or delay caused by events beyond reasonable control.</li>
@@ -558,6 +597,12 @@
         name "Receipts Express" and the project's logo are reserved. If you fork or
         redistribute a modified copy, please give it a different name, so nobody mistakes your
         version for this one.
+      </p>
+      <p>
+        The logo files themselves are part of the source and may be copied and modified under
+        the Apache License like any other file in the repository. What is reserved is the use
+        of the name and the mark to <em>identify</em> software: you may copy the artwork, but
+        you may not use it to identify a fork or to suggest that this project endorses one.
       </p>
       <p>
         Any other names mentioned — including FedEx — belong to their respective owners and

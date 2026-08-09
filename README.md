@@ -4,6 +4,8 @@
 
 Scan receipts, organize expense reports, and export polished PDFs — all in your browser, all on your device.
 
+**Live app: <https://jwtc2000.github.io/Receipts-Express/>**
+
 Receipts Express is a **Progressive Web App (PWA)**: it runs on iOS, Android, and desktop from a single codebase, can be installed to your home screen like a native app, and keeps working offline. No accounts, no servers — every receipt stays on your device.
 
 ---
@@ -40,7 +42,7 @@ Expense reports get filed late because filing them is tedious: receipts pile up 
 
 ## The Problem with the Alternatives
 
-Most free receipt-scanner apps are ad-supported products. Their advertising toolkits (ad SDKs) are third-party code with their own data-sharing arrangements, they're known for showing intrusive or misleading ads, and the personal financial data flowing through them — receipts, which often carry partial card numbers and reveal exactly where and when you traveled — passes through servers (external cloud infrastructure) nobody outside the vendor has ever independently vetted. That's a bad trade for data this sensitive.
+Free receipt-scanner apps are commonly ad-supported, and commonly do their scanning on the vendor's servers (external cloud infrastructure) rather than on the phone. The point is not that any particular one of them mishandles your data — it's that from the outside you have no way to tell. An app store listing does not tell you which third-party advertising toolkits (ad SDKs) are embedded in the binary, what data-sharing arrangements come with them, where a receipt image travels once it leaves the phone, or who has looked at the server it lands on. Receipts often carry partial card numbers and a record of exactly where and when you were, and for data that sensitive, "take our word for it" is a bad trade. This project's answer is to leave nothing to take on faith: the work happens on your device, and the code that does it is here to read.
 
 ---
 
@@ -50,27 +52,27 @@ Most free receipt-scanner apps are ad-supported products. Their advertising tool
 * <img src="./assets/reports.svg" width="18" height="18" align="center" /> **Multiple expense reports**, each with its own timeline of expenses.
 * <img src="./assets/reorder.svg" width="18" height="18" align="center" /> **Reorganize freely** — drag expenses to reorder them on the timeline (or use the arrow buttons on mobile), and move expenses between reports.
 * <img src="./assets/pdf.svg" width="18" height="18" align="center" /> **One-tap PDF export** — a summary page listing every expense with the grand total, followed by a full page for each receipt image (one page per page, for multi-page PDF receipts), with the expense's title and details shown once, beneath the last page.
-* <img src="./assets/lock.svg" width="18" height="18" align="center" /> **Private by design** — everything is stored in your browser's secure sandbox database (IndexedDB). Nothing leaves your device.
+* <img src="./assets/lock.svg" width="18" height="18" align="center" /> **Private by design** — everything is stored in your browser's own storage sandbox (IndexedDB), which keeps it separate from other websites and other apps. Nothing leaves your device. The app does not encrypt it on top of that: what protects it at rest is your device's lock screen and disk encryption.
 
 ---
 
 ## Security Posture
 
-Every claim below is something you can verify by reading this repository, not something you have to take on faith:
+Every claim below is something you can verify by reading this repository, not something you have to take on faith — with one exception, flagged where it appears:
 
-* **On-device-only processing and storage.** See [SECURITY.md](./SECURITY.md) for the full data classification.
-* **No exfiltration, enforced by a Content-Security-Policy (CSP)** — not just promised. `connect-src 'self'` means the browser itself blocks any script from reaching any network destination other than this app's own origin, regardless of what a compromised dependency might try. [`src/csp.test.ts`](./src/csp.test.ts) asserts every production build carries the policy.
-* **Self-hosted text recognition (OCR).** Tesseract.js's engine, WebAssembly (WASM) core, and language data are bundled and served from this app's own origin — it never calls an external content delivery network (CDN).
+* **On-device-only processing and storage.** See [SECURITY.md](./SECURITY.md) for the full data classification, including the limits of the controls described here.
+* **A Content-Security-Policy (CSP) that constrains where the app can talk.** The deployed app carries a Content-Security-Policy that restricts fetch, XMLHttpRequest, WebSocket, EventSource and beacon requests to the app's own origin, and blocks form submissions to other origins. It is delivered in a `<meta>` tag, because GitHub Pages cannot send custom response headers, so it does not govern top-level navigation — a compromised dependency could still navigate the page elsewhere. It is a strong control, not an absolute one. [`src/csp.test.ts`](./src/csp.test.ts) runs a real production build and asserts the policy is in the output, so it cannot go missing without the test suite failing.
+* **Self-hosted text recognition (OCR).** Tesseract.js's engine, WebAssembly (WASM) core, and language data are bundled and served from this app's own origin — it never calls an external content delivery network (CDN). Tesseract.js's own default CDN URLs are still present as unused strings in the shipped files; [SECURITY.md](./SECURITY.md) says where, and why they are never requested.
 * **Dual Continuous Integration (CI).** GitHub Actions runs typecheck, tests, and a blocking security vulnerability audit (`npm audit`); a separate Jenkins pipeline runs secrets scanning (gitleaks) and static application security testing (SAST via semgrep) on its own agent infrastructure. See [ci/README.md](./ci/README.md).
 * **SHA-pinned supply chain.** Every GitHub Action is pinned to a full commit cryptographic hash (SHA) rather than a mutable tag, with Dependabot on a 7-day cooldown before it proposes an update.
-* **Branch protection on `main`**, requiring both CI systems to pass before anything merges.
+* **Branch protection on `main`**, requiring both CI systems to pass before anything merges. This is the exception to the sentence above: branch protection is a setting on the GitHub repository, not a file inside it, so nothing here demonstrates that it is switched on. You have my description of it ([ci/README.md](./ci/README.md) records the exact required checks) and the merge history, not the setting itself.
 * **[Apache-2.0](./LICENSE)** license.
 
 ---
 
 ## Continuous Integration & Deployment (CI/CD)
 
-**In plain terms:** every time code is pushed or a pull request is opened, two independent automated systems inspect it before it's allowed anywhere near the live app. One lives on GitHub's own servers and handles "does it work" (does it compile, do the tests pass, is the deploy safe to run). The other lives on a private machine and handles "is it safe" (no leaked secrets, no risky code patterns, no vulnerable dependencies). Both have to say yes before a change can merge into `main`; if either says no, the merge is blocked.
+**In plain terms:** two independent automated systems inspect a change before it's allowed anywhere near the live app. One lives on GitHub's own servers and handles "does it work" (does it compile, do the tests pass, is the deploy safe to run); it starts by itself on every push and every pull request. The other lives on a private machine and handles "is it safe" (no leaked secrets, no risky code patterns, no vulnerable dependencies); because that machine isn't reachable from the internet, GitHub can't notify it, so its runs are kicked off from the Jenkins side rather than by the push. Both have to say yes before a change can merge into `main`; if either says no — or hasn't reported yet — the merge is blocked.
 
 **In technical terms:** the two pipelines are deliberately non-overlapping — neither repeats a check the other already owns. Full reasoning and configuration notes live in [ci/README.md](./ci/README.md); the summary below is what each one runs.
 
@@ -80,15 +82,15 @@ Hosted on GitHub's own runners. Every Action is pinned to a full 40-character co
 
 | Job | Runs on | What it does |
 | --- | --- | --- |
-| **`test`** | Every push to `main` and every pull request | Checks out the code, installs dependencies (`npm ci`), then runs `npm run typecheck` (TypeScript type checking), `npm test` (the Vitest test suite), and `npm audit --audit-level=high` (fails the build if any dependency has a known high-or-worse severity vulnerability). |
-| **`build`** | Only a push to `main`, or a manual run (`workflow_dispatch`) | Runs `npm run build` to compile the production bundle, then hands it to GitHub Pages' `configure-pages`/`upload-pages-artifact` actions. Never runs on PRs or feature branches, so in-progress work can never reach the live site. |
+| **`test`** | Every push to `main`, every pull request, and every manual run (`workflow_dispatch`), on whatever ref it was started from | Checks out the code, installs dependencies (`npm ci`), then runs `npm run typecheck` (TypeScript type checking), `npm test` (the Vitest test suite), and `npm audit --audit-level=high` (fails the build if any dependency has a known high-or-worse severity vulnerability). |
+| **`build`** | Only a push to `main`, or a manual run (`workflow_dispatch`) whose ref is `main` — the job's `if` requires `refs/heads/main` either way | Runs `npm run build` to compile the production bundle, then hands it to GitHub Pages' `configure-pages`/`upload-pages-artifact` actions. Never runs on PRs or feature branches, so in-progress work can never reach the live site. |
 | **`deploy`** | Same restriction as `build`, and only after `build` succeeds | Publishes the built artifact to GitHub Pages using GitHub's official `deploy-pages` action, with `id-token: write` permission scoped to just this job. |
 
-Permissions are minimal by default (`contents: read` at the workflow level), each job only gains the extra permission it needs, and `persist-credentials: false` on checkout means the GitHub token never lingers after the checkout step. Concurrency groups cancel superseded runs of the same job on the same ref, and Pages deploys are serialized so two deploys can never race each other.
+Permissions are minimal by default (`contents: read` at the workflow level), each job only gains the extra permission it needs, and `persist-credentials: false` on checkout means the GitHub token never lingers after the checkout step. Two jobs carry concurrency groups: `test` cancels a superseded run of itself on the same ref, and `deploy` shares a single repository-wide `pages` group, so a newer deploy cancels an in-flight one instead of racing it.
 
 ### Jenkins — [`Jenkinsfile`](./Jenkinsfile)
 
-Hosted on a separate, self-hosted machine (reachable only over a private Tailscale network, not the public internet), running the same checks on every push and PR unless noted as main-only:
+Hosted on a separate, self-hosted machine, reachable only over a private Tailscale network rather than the public internet. That has a consequence worth stating plainly: GitHub cannot deliver a push or pull-request webhook to a machine it cannot reach, so a Jenkins build is not triggered by the push itself. It starts when the multibranch job scans the repository — in practice a **Scan Repository Now** once the containers are up, which is why that step is in the working rhythm in [ci/README.md](./ci/README.md). Every stage below then runs against the branch being built, except the two marked main-only, which the `Jenkinsfile` gates with `when { branch 'main' }`:
 
 | Stage | Tool | What it checks |
 | --- | --- | --- |
@@ -111,11 +113,13 @@ Branch protection on `main` requires **both** systems to report success before a
 | **User Interface (UI)** | React 18 + TypeScript + Vite | **React** handles rendering the screens and components; **TypeScript** is a programming language that catches bugs early by checking code types; **Vite** is a packager (build tool) that compiles files for the web. |
 | **Receipt OCR** | Tesseract.js (runs fully in-browser) | An offline engine that runs in-browser to transcribe text out of pictures using **WebAssembly (WASM)**, which lets native binary code run fast in the browser. |
 | **PDF Receipt Rasterization** | PDF.js (runs fully in-browser) | Converts an uploaded PDF receipt into one image per page on-device, so it flows through the same OCR/storage/export path as a photographed receipt. |
-| **Storage** | IndexedDB via `idb` | A secure local database inside your browser that holds reports, expenses, and receipt images. |
+| **Storage** | IndexedDB via `idb` | A local database inside your browser that holds reports, expenses, and receipt images. The browser keeps it sandboxed away from other sites; the app writes it unencrypted, so what guards it is the device's own lock screen and disk encryption. |
 | **PDF Export** | jsPDF | A library that packages receipt details and images into a PDF file entirely on your machine. |
 | **Offline Support** | `vite-plugin-pwa` service worker + manifest | Technology that allows the app to be installed onto your home screen and run offline without an internet connection (**Progressive Web App**). |
 
-The text recognition engine (worker, WASM core, English language data) is **self-hosted**: the build process copies it from the program's library folder (`node_modules`) into the public distribution folder (`public/tesseract/`) automatically, so the app never calls a CDN and scanning works fully offline once the app has loaded. The PDF rasterization engine (PDF.js's worker, WASM codecs, standard fonts, and color profiles) is self-hosted the same way, into `public/pdfjs/` — see [`scripts/copy-pdfjs-assets.mjs`](./scripts/copy-pdfjs-assets.mjs).
+The text recognition engine (worker, WASM core, English language data) is **self-hosted**: the build process copies it from the program's library folder (`node_modules`) into the public distribution folder (`public/tesseract/`) automatically, so the app fetches it from its own origin and never calls a CDN. The PDF rasterization engine (PDF.js's worker, WASM codecs, standard fonts, and color profiles) is self-hosted the same way, into `public/pdfjs/` — see [`scripts/copy-pdfjs-assets.mjs`](./scripts/copy-pdfjs-assets.mjs).
+
+Neither engine is part of the install-time precache. Both are excluded by `globIgnores` in [`vite.config.ts`](./vite.config.ts) because the files are large, and each is instead cached by the service worker on first use (`runtimeCaching`, cache-first, 30-day expiry). The practical consequence: installing the app does not by itself make scanning work offline. Your first OCR scan needs a connection to fetch the engine, WASM core, and language data, and your first PDF upload needs one to fetch the PDF worker; after each has been used once, that path works offline too. The rest of the app — the shell, the UI, your stored reports — is precached at install and available offline immediately.
 
 ---
 

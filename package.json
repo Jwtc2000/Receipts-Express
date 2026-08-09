@@ -3,6 +3,7 @@
   "private": true,
   "version": "1.13.0",
   "description": "Scan receipts, organize expense reports, export polished PDFs.",
+  "license": "Apache-2.0",
   "type": "module",
   "engines": {
     "node": ">=26"

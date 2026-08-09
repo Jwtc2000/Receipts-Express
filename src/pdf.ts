@@ -79,18 +79,36 @@ export async function exportReportPdf(report: Report, expenses: Expense[]): Prom
     94,
   )
 
+  // The exported PDF is read by someone the app never meets — an expense
+  // approver, a bookkeeper, an auditor — who never opened Receipts Express
+  // and never accepted its terms. Every figure on this page was either typed
+  // by the user or read off a photograph by OCR, and nothing checks either
+  // against the receipt. This line is the only place that reaches that
+  // reader, which is why it sits on the summary page and not in a settings
+  // screen. Kept directly under the generated-date line so it is read with
+  // the header rather than found later.
+  const ACCURACY_NOTE =
+    'Amounts and dates are user-entered or machine-extracted from receipt images and are not independently verified. Check against the original receipts.'
+  doc.setTextColor(...MUTED_GRAY)
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(8)
+  const accuracyLines = doc.splitTextToSize(ACCURACY_NOTE, PAGE_W - 2 * MARGIN) as string[]
+  doc.text(accuracyLines, MARGIN, 126)
+  const accuracyBottom = 126 + (accuracyLines.length - 1) * 10
+
   // Optional profile attributes (name, employee ID, cost center, project
   // number) — only takes up space on the page when at least one is set. The
   // report's own project number wins over the profile default when set.
-  let y = 150
+  let y = accuracyBottom + 26
   const profileLine = profileSummaryLines(getProfile(), report.projectNumber).join('   ·   ')
   if (profileLine) {
     doc.setTextColor(...SLATE)
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(9)
     const profileLines = doc.splitTextToSize(profileLine, PAGE_W - 2 * MARGIN) as string[]
-    doc.text(profileLines, MARGIN, 128)
-    y = 128 + profileLines.length * 11 + 22
+    const profileTop = accuracyBottom + 20
+    doc.text(profileLines, MARGIN, profileTop)
+    y = profileTop + profileLines.length * 11 + 22
   }
 
   // Table header
