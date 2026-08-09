@@ -101,6 +101,56 @@
       opacity: 0.9;
     }
 
+    /* The way back to the product, in the header and again at the very
+       end. Kept identical across the three legal pages; the contrast
+       reasoning is noted in docs/privacy.html. */
+    a.back-to-app {
+      display: inline-flex;
+      align-items: center;
+      min-height: 40px;
+      padding: 8px 18px;
+      border: 1.5px solid rgba(255, 255, 255, 0.7);
+      border-radius: 9999px;
+      background: rgba(255, 255, 255, 0.12);
+      color: #fff;
+      font-size: 0.9rem;
+      font-weight: 600;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    a.back-to-app:hover {
+      background: rgba(255, 255, 255, 0.22);
+      color: #fff;
+    }
+
+    a.back-to-app:focus-visible {
+      outline: 2px solid #fff;
+      outline-offset: 3px;
+    }
+
+    header.page-header .header-return { margin-top: 18px; }
+
+    .footer-return {
+      text-align: center;
+      margin-top: 24px;
+    }
+
+    a.back-to-app.at-end {
+      border-color: transparent;
+      background: linear-gradient(135deg, var(--header-gradient-a) 0%, var(--header-gradient-b) 100%);
+      box-shadow: var(--shadow);
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+    }
+
+    a.back-to-app.at-end:hover {
+      background: linear-gradient(135deg, #115e59 0%, #5b21b6 100%);
+    }
+
+    a.back-to-app.at-end:focus-visible {
+      outline-color: var(--purple);
+    }
+
     main {
       max-width: 720px;
       margin: 0 auto;
@@ -163,6 +213,7 @@
     <p class="eyebrow">Receipts Express</p>
     <h1>Consumer Health Data Privacy Policy</h1>
     <p class="dates">Washington My Health My Data Act · Effective 8 August 2026</p>
+    <p class="header-return"><a class="back-to-app" href="../">← Back to Receipts Express</a></p>
   </header>
 
   <main>
@@ -261,6 +312,9 @@
         This notice is published for transparency. It is not an admission that the author is a
         "regulated entity" or a "small business" as those terms are defined in RCW 19.373.010.
       </p>
+      <div class="footer-return">
+        <a class="back-to-app at-end" href="../">← Back to Receipts Express</a>
+      </div>
     </footer>
   </main>
 </body>

@@ -97,6 +97,37 @@
       z-index: 10;
     }
 
+    /* The way into the app. The deck is opened from inside the app, but
+       it is also reached directly, and a reader landing here should not
+       need the footer to find the product. First element of the header
+       chrome, so it stays on screen whichever slide is showing. A plain
+       <a> on purpose — the keyboard handler already leaves keys alone
+       when a focused link handles them, and the a:focus-visible rule
+       below covers focus. */
+    .back-to-app {
+      display: inline-flex;
+      align-items: center;
+      min-height: 32px;
+      padding: 0.25rem 0.9rem;
+      margin-right: 1.25rem;
+      border-radius: 9999px;
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      color: #e2e8f0;
+      font-family: var(--font-display);
+      font-size: 0.85rem;
+      font-weight: 500;
+      white-space: nowrap;
+      text-decoration: none;
+      transition: background 0.3s, border-color 0.3s, color 0.3s;
+    }
+
+    .back-to-app:hover {
+      background: rgba(255, 255, 255, 0.2);
+      border-color: rgba(255, 255, 255, 0.4);
+      color: #ffffff;
+    }
+
     .brand-title {
       display: flex;
       align-items: center;
@@ -314,6 +345,15 @@
     .footer-meta a:hover {
       color: #ffffff;
       text-decoration: underline;
+    }
+
+    /* The footer's app link keeps its neighbours' look; the padding and
+       matching negative margin enlarge only the touch target, past
+       24px, without moving the line. */
+    .footer-meta .footer-app-link {
+      display: inline-block;
+      padding: 6px 4px;
+      margin: -6px -4px;
     }
 
     .controls-wrapper {
@@ -765,6 +805,13 @@
         font-size: 0.95rem;
       }
 
+      .back-to-app {
+        min-height: 28px;
+        margin-right: 0;
+        padding: 0.2rem 0.75rem;
+        font-size: 0.8rem;
+      }
+
       /* Slide text adjustments */
       h1.slide-title {
         font-size: 1.6rem;
@@ -904,6 +951,7 @@
     
     <!-- Top Header -->
     <header class="deck-header">
+      <a class="back-to-app" href="../">← Open the app</a>
       <div class="brand-title">
         <svg class="brand-icon-svg" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
           <rect width="512" height="512" rx="96" fill="#0f766e"/>
@@ -1218,7 +1266,7 @@
     <footer class="deck-footer">
       <div class="footer-meta">
         <div>
-          Introduction to Receipts Express | Github: <a href="https://github.com/Jwtc2000" target="_blank" rel="noopener noreferrer">Jwtc2000</a> | <a href="https://github.com/Jwtc2000/Receipts-Express/issues" target="_blank" rel="noopener noreferrer" style="color: var(--teal); text-decoration: none; font-weight: 500;">Report Bug</a> | Inspired by <a href="https://github.com/arigatoexpress/AI-Efficiency" target="_blank" rel="noopener noreferrer">AI-Efficiency</a>
+          Introduction to Receipts Express | <a href="../" class="footer-app-link">← Open the app</a> | Github: <a href="https://github.com/Jwtc2000" target="_blank" rel="noopener noreferrer">Jwtc2000</a> | <a href="https://github.com/Jwtc2000/Receipts-Express/issues" target="_blank" rel="noopener noreferrer" style="color: var(--teal); text-decoration: none; font-weight: 500;">Report Bug</a> | Inspired by <a href="https://github.com/arigatoexpress/AI-Efficiency" target="_blank" rel="noopener noreferrer">AI-Efficiency</a>
         </div>
         <div style="margin-top: 0.25rem;">
           Independent personal project — no affiliation with, endorsement from, or approval by FedEx or any employer.

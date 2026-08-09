@@ -8,6 +8,31 @@ user-facing features, and `PATCH` for fixes with no visible feature change. The
 version lives in `package.json` and is shown in the app under Menu → About. Every
 merge to `main` that changes app behavior gets a version bump and a tag.
 
+## [1.14.0] - 2026-08-09
+
+### Added
+- A "Back to Receipts Express" control on all four standalone pages —
+  the Privacy Policy, Terms of Use, Consumer Health Data Privacy Policy
+  and the pilot deck. The legal pages carry it in the header and again
+  at the foot, since a reader who has scrolled a long document should
+  not have to scroll back to leave; the deck carries it in its fixed
+  footer and as a corner button visible on every slide. These pages are
+  reached from search and from direct links as well as from the app, and
+  until now a reader landing on one had no path to the product. The link
+  is relative (`../`), so it resolves on GitHub Pages and on a local
+  preview alike.
+
+### Changed
+- The app icon and favicon are now the header logo: the same receipt
+  glyph, path data reused rather than redrawn, on the same teal-to-violet
+  gradient. Previously the icon was a flat teal tile with a different
+  receipt drawing, so the browser tab, the home-screen icon and the
+  in-app header showed two different marks. The glyph is sized to sit
+  inside the maskable safe zone, since the manifest declares the 512px
+  icon maskable and Android may crop it to a circle; the apple-touch
+  icon is generated square-cornered and fully opaque, because iOS
+  composites transparency onto black and applies its own mask.
+
 ## [1.13.0] - 2026-08-09
 
 ### Added
