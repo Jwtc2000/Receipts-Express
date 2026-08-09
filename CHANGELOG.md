@@ -8,6 +8,144 @@ user-facing features, and `PATCH` for fixes with no visible feature change. The
 version lives in `package.json` and is shown in the app under Menu → About. Every
 merge to `main` that changes app behavior gets a version bump and a tag.
 
+## [1.13.0] - 2026-08-08
+
+### Added
+- Privacy Policy and Terms of Use, published as standalone pages
+  (`docs/privacy.html`, `docs/terms.html`) and linked from the app under
+  Menu → About. The Privacy Policy states only what the code actually
+  does — the IndexedDB stores and the five `br.*` localStorage keys by
+  name, on-device OCR and PDF rasterization, no accounts/analytics/
+  cookies/ads/payments, that the full OCR transcript is discarded rather
+  than saved, and that GitHub Pages is the sole third party (seeing
+  standard web request logs when the app is loaded). It also states the
+  limits plainly: storage is not separately encrypted, and there is no
+  single "delete all data" button, so full erasure is via the browser's
+  clear-site-data.
+- A one-time acknowledgment on first launch. Terms reachable only from a
+  menu are browsewrap, which generally fails — the Ninth Circuit wants
+  conspicuous notice *and* an unambiguous act of assent, so a warranty
+  disclaimer nobody agreed to protects nobody. The notice sits directly
+  above the button at full contrast, both policies are linked so they can
+  be read first, and the button says "I Agree". The acknowledgment is
+  recorded in `br.termsAccepted` with the terms version, and reappears
+  only when `TERMS_VERSION` is bumped for a material change
+  (`src/terms.ts`, `src/components/FirstRunNotice.tsx`).
+- A Consumer Health Data Privacy Policy (`docs/consumer-health-data.html`)
+  as a separate, distinctly-linked page. Washington's My Health My Data
+  Act treats that link as its own requirement, and a scanned pharmacy
+  receipt is the kind of thing it contemplates — even though nothing here
+  ever leaves the device.
+- Protective clauses the Terms previously lacked: governing law and venue
+  (Washington), a liability cap that survives if the blanket exclusion is
+  struck, indemnification, eligibility, acceptable use, a disclaimer that
+  exports are not warranted to satisfy Internal Revenue Service
+  substantiation or any employer's reimbursement policy, and the standard
+  machinery (severability, entire agreement, survival, assignment,
+  notices, trademark reservation). The warranty and liability sections are
+  now set off in bordered boxes with uppercase leads, since
+  RCW 62A.1-201(b)(10) turns on whether a reasonable person ought to have
+  noticed the term.
+- Affirmative "does not sell, share, rent, or trade" and Global Privacy
+  Control statements in the Privacy Policy. Both were true before and
+  implied throughout, but the statutory words appeared nowhere.
+
+### Changed
+- Inter and Outfit are now self-hosted from the app's own origin, and the
+  pilot deck no longer loads them from Google's font CDN. That deck is
+  linked from inside the app, so opening it sent every reader's IP to
+  Google — quietly contradicting the "no third-party requests of any
+  kind" claim in `SECURITY.md` and in the new privacy policy. Vendored by
+  `scripts/copy-font-assets.mjs` into `public/fonts/` alongside each
+  family's OFL notice, following the existing Tesseract/PDF.js pattern.
+  Variable fonts, so two files cover the whole weight axis and the deck's
+  `font-weight: 900` is real rather than synthesized.
+- The fonts are excluded from the install-time precache (`globIgnores`)
+  and cached at runtime instead, so the service worker doesn't grow for
+  the majority of users who never open a docs page.
+- `copyPilotDeckPlugin` is now `copyStaticDocsPlugin`, driven by a list
+  of pages, so every standalone page under `docs/` reaches `dist/`. The
+  existing `docs/**` entries in `globIgnores` and
+  `navigateFallbackDenylist` already cover the new pages.
+- Drawer links to those pages share a `.drawer-link` class instead of the
+  inline style the pilot-deck link carried. The class also moves them off
+  teal-400, which sat at roughly 1.8:1 against the white drawer panel and
+  failed WCAG AA, onto the brand `--teal` at 5.4:1.
+
+- The repository's Content-Security-Policy claims were rewritten to say
+  what the policy does: it restricts fetch, XMLHttpRequest, WebSocket,
+  EventSource and beacon requests to the app's own origin, and blocks
+  form submissions to other origins. It is delivered in a `<meta>` tag
+  because GitHub Pages cannot send custom response headers, so it does
+  not govern top-level navigation. A strong control, not an absolute
+  one. `README.md`, `SECURITY.md`, both pilot decks, `docs/privacy.html`
+  and `docs/governance/REVIEW.md` had variously described it as stopping
+  everything outgoing, asserted that a compromised dependency could not
+  get receipts off the device, and called the live site secure without
+  qualification. The sweep was not complete: the HTML pilot deck kept
+  absolute claims its Markdown twin had already lost, which a re-audit
+  caught.
+- A denylist test (`src/legalPages.test.ts`) now fails the build if any
+  of seven specific overstatements reappears. Its scope is narrower than
+  "the repository" — it is the files listed in `CLAIM_CHECKED_FILES`,
+  covering the four pages under `docs/`, the pilot and governance
+  markdown, `README.md` and `SECURITY.md`. It also matches fixed
+  phrasings rather than judging whether a claim is supportable, so an
+  overstatement the audit did not already name passes it even in a file
+  it covers.
+- The pilot decks no longer publish an employer's internal filing
+  deadline or record-retention target, no longer rank named consumer
+  cloud services as a destination for confidential receipts, and now
+  open by saying to use synthetic or personal receipts unless the
+  organization has approved the tool. "Governance Snapshot" is now
+  "Governance Self-Assessment", because nothing in it has been reviewed
+  by anyone — which the repo's own `docs/PILOT.md` already said.
+- The brand gradient moves from `#660099 → #ff6600` to
+  `#0f766e → #6d28d9`. White on the old orange end computed 2.94:1 and
+  failed WCAG AA; the new sweep clears it end to end — 5.47:1 at the
+  teal end, its worst point, rising to 7.1:1 at the violet end — and the
+  endpoints are colours already in the design system (the app icon's
+  teal and the existing `--purple-dark`). Day banners interpolate
+  between them, so they and the PDF export change too.
+- Third-party attribution now ships: `THIRD_PARTY_NOTICES.md` at the
+  repository root and in the build, and the two Tesseract licence
+  sidecars the shipped worker already referenced but which the copy
+  script never copied — a live 404.
+
+### Fixed
+- The Terms' licence section pointed at the wrong two section numbers for
+  its own warranty and liability clauses, and subordinated them to
+  Apache-2.0. The licence covers the *code*; these terms cover use of the
+  *hosted app* — now stated as such.
+- The Terms' small-claims clause preserved access to small claims
+  "instead of the courts named in section 13". Section 13 is Privacy;
+  the courts are named in section 14.
+- A non-numeric `br.lastBackupAt` made `backupIsStale()` return false
+  forever, silently disabling the stale-backup warning — `Number(raw)`
+  yields `NaN`, and `Date.now() - NaN > STALE_AFTER_MS` is false. Both
+  timestamp parses are now guarded with `Number.isFinite`.
+- Restoring a backup overwrote same-ID records with no confirmation,
+  including newer local data replaced by older backup data. Restore now
+  validates first and asks, showing the report and expense counts, how
+  many records would be replaced, and when the backup was taken.
+- The first-run gate could be tabbed straight out of into the app
+  behind, so a keyboard user could use the whole product without ever
+  accepting the Terms — which is the entire point of the gate. Focus is
+  now trapped, and everything behind it is `inert`.
+- Keyboard users could not open a report or an expense at all: the only
+  reachable control on a card was Delete. Cards are real buttons now,
+  with Delete kept separate rather than nested inside them.
+- The exported PDF — the only thing this app puts in front of someone
+  who never accepted the Terms — now carries a line saying the amounts
+  and dates are user-entered or machine-extracted and are not
+  independently verified.
+- The standalone pages under `docs/` shipped with no Content-Security-
+  Policy at all; the build only injected it into `index.html`. They also
+  weren't cached by the service worker, so the Terms and Privacy links
+  in the first-run gate were dead offline.
+- The CSV formula-injection guard covered some columns but not the date
+  or category columns.
+
 ## [1.12.0] - 2026-08-06
 
 ### Added

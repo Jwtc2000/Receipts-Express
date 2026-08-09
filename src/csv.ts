@@ -8,9 +8,14 @@ const HEADERS = ['Date', 'Title', 'Merchant', 'Category', 'Amount', 'Personal Am
 const UTF8_BOM = '﻿'
 
 // A cell whose first character is one of these is read as a formula by
-// Excel/Sheets rather than literal text (CWE-1236 / CSV injection) — only
-// applied to free-text fields. Amount/Personal Amount are genuine signed
-// numbers, where a leading "-" must stay a literal minus sign.
+// Excel/Sheets rather than literal text (CWE-1236 / CSV injection) — applied
+// to every field this app doesn't generate itself. Date and Category look
+// like fixed vocabularies but aren't: both are plain strings on Expense, and
+// a restored backup can carry anything in them, so they get the same guard.
+// A real ISO date or category name never starts with one of these characters,
+// so nothing legitimate is altered. Amount/Personal Amount are the exception:
+// they are numbers this file formats, where a leading "-" must stay a literal
+// minus sign.
 function neutralizeFormula(value: string): string {
   return /^[=+\-@]/.test(value) ? `'${value}` : value
 }
@@ -25,10 +30,10 @@ export function buildExpenseCsv(expenses: Expense[]): string {
   const rows = [
     HEADERS,
     ...expenses.map((e) => [
-      e.date,
+      neutralizeFormula(e.date),
       neutralizeFormula(e.title),
       neutralizeFormula(e.merchant),
-      e.category,
+      neutralizeFormula(e.category),
       e.amount.toFixed(2),
       e.personalAmount ? e.personalAmount.toFixed(2) : '0.00',
       neutralizeFormula(e.currency),

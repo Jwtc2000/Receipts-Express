@@ -1,9 +1,13 @@
 export type Rgb = [number, number, number]
 
 /** The app's brand gradient endpoints, used for the header background and
- * as the basis for the day-banner color sequence. */
-export const HEADER_GRADIENT_A: Rgb = [102, 0, 153]
-export const HEADER_GRADIENT_B: Rgb = [255, 102, 0]
+ * as the basis for the day-banner color sequence. Teal-700 (#0f766e, also
+ * the app icon and the manifest theme_color) to violet-700 (#6d28d9, the
+ * --purple-dark token in styles.css) — far enough apart in hue that six
+ * distinguishable day colors fall out of the interpolation below, and both
+ * dark enough that white text clears WCAG AA across the whole sweep. */
+export const HEADER_GRADIENT_A: Rgb = [15, 118, 110]
+export const HEADER_GRADIENT_B: Rgb = [109, 40, 217]
 
 const DAY_COLOR_STEPS = 6
 

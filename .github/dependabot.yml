@@ -16,9 +16,14 @@ updates:
       interval: "weekly"
     cooldown:
       default-days: 7
-    # Batch routine version bumps into two PRs a week instead of a dozen.
-    # Security updates are ungrouped and ignore the cooldown, so an
-    # advisory still gets its own PR the day it lands.
+    # Batch routine version bumps into two PRs per weekly run instead of
+    # one per dependency. This grouping and the cooldown above govern
+    # these scheduled version updates only. Dependabot security updates
+    # are a separate, repository-level setting that this file does not
+    # configure, so nothing here determines how fast an advisory becomes
+    # a PR — the blocking `npm audit --audit-level=high` in the Actions
+    # `test` job and the Jenkins Supply chain stage are what actually
+    # stop a known-vulnerable dependency from merging.
     groups:
       production-dependencies:
         dependency-type: "production"

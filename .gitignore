@@ -1,6 +1,7 @@
 node_modules
 public/tesseract
 public/pdfjs
+public/fonts
 dist
 dev-dist
 *.local
@@ -12,3 +13,7 @@ dev-dist
 *.keystore
 key.properties
 keystore.properties
+
+# Local working notes. Not published — the conclusions land in the code and
+# the published pages, which are what anyone cloning this needs.
+audit/

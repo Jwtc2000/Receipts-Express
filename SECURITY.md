@@ -22,11 +22,17 @@ accordingly:
   from GitHub Pages. No analytics, no telemetry, no third-party requests
   of any kind.
 
-This last point is not just a policy promise — it's enforced by a
-[Content-Security-Policy](./vite.config.ts) restricting `connect-src` to
-`'self'`, injected into every production build, so the browser itself
-blocks any script (including a compromised dependency) from making a
-network request anywhere else.
+That last point is backed by more than a policy promise. The deployed app
+carries a [Content-Security-Policy](./vite.config.ts) that restricts
+fetch, XMLHttpRequest, WebSocket, EventSource and beacon requests to the
+app's own origin, and blocks form submissions to other origins. It is
+delivered in a `<meta>` tag, because GitHub Pages cannot send custom
+response headers, so it does not govern top-level navigation — a
+compromised dependency could still navigate the page elsewhere. It is a
+strong control, not an absolute one.
+[`src/csp.test.ts`](./src/csp.test.ts) runs a real production build and
+asserts the policy is present in the output, so it cannot quietly go
+missing without the test suite failing.
 
 **Known limitation: no clickjacking defense.** The CSP is delivered via a
 `<meta>` tag, since GitHub Pages (this app's static host) has no mechanism
@@ -38,6 +44,36 @@ the app has no login, session, or server-side action to trick a user into
 triggering from within an iframe — all data is local to the device. Closing
 this gap for real would require moving to a host that can set response
 headers (e.g. Cloudflare Pages, an edge proxy in front of GitHub Pages).
+
+**Known limitation: the service worker is outside the CSP.** A worker gets
+its policy from the HTTP response headers of its own script, not from the
+document that registered it — and GitHub Pages sends no such headers. The
+`<meta>` CSP therefore covers the document and nothing else: the generated
+service worker (`sw.js`, from `vite-plugin-pwa`) runs with no CSP at all,
+and so do the self-hosted OCR and PDF workers, which are loaded the same
+way. What that code does is precache the app shell and cache the OCR/PDF
+engines from this app's own origin — but that is a property of the code
+as written, not something the browser is enforcing on it. The `<meta>` CSP
+does still decide whether those workers may be created (`worker-src 'self'
+blob:`); it just has no say over what they do afterwards. The fix is the
+same as for `frame-ancestors`: a host that can set response headers.
+
+**Disclosure: two unused CDN URLs inside the vendored OCR worker.** The
+"never a CDN" claim above is about what the app does, not about every
+string in the shipped bytes. `public/tesseract/worker.min.js` contains two
+`https://cdn.jsdelivr.net/...` URLs — tesseract.js's own built-in defaults
+for where to fetch its WASM core and its language data — and a third of
+the same kind, the default worker script URL, is compiled into the app
+bundle from tesseract.js's entry point. All three are overridden at
+`src/ocr.ts:20-22`, which passes explicit `workerPath`, `corePath` and
+`langPath` pointing at this app's own origin; the library spreads the
+caller's options over its defaults, and the two inside the worker are read
+as `corePath || <default>` and `langPath || <default>`, so with values
+supplied the defaults are never evaluated and the URLs are never
+requested. They are dead strings rather than live endpoints. They are
+recorded here because they are in the deployed files, and anyone grepping
+the build for `jsdelivr` deserves to find this note rather than a
+surprise.
 
 ## Durability note
 

@@ -16,6 +16,14 @@
 # different commit or file, is not covered by this ignore and still
 # fails the build.
 #
+# Related, and also accepted: a laptop hostname appears in the author and
+# committer metadata of some early commits (an author email on a .local
+# mDNS name). No fingerprint is listed for it, because the full-history
+# scan matches on commit content rather than on commit metadata, so it
+# never produces a finding. It stays for the same reason as the above —
+# a hostname is not a secret, and rewriting history over one would break
+# every existing clone and fork.
+#
 # f8eaec7:docs/governance/REVIEW.md:15 — file:// path leaking username
 f8eaec7d26a1ff710b6aecc91cf912d9549f653c:docs/governance/REVIEW.md:privacy-local-file-uri:15
 # f8eaec7:docs/governance/REVIEW.md:15 — /Users/<name> path, same line

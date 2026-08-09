@@ -1,5 +1,62 @@
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { parseReceiptText } from './ocr'
+
+// The real library would be loaded (and a real worker started) just to read
+// the options it was handed, so it is replaced with a recorder.
+const { createWorker } = vi.hoisted(() => ({ createWorker: vi.fn() }))
+vi.mock('tesseract.js', () => ({ createWorker }))
+
+/**
+ * tesseract.js defaults all three of these to a jsdelivr CDN — the worker
+ * script, the WASM core, and the language data. Nothing about self-hosting is
+ * automatic: it is these three lines in src/ocr.ts and nothing else. Delete
+ * any one of them and the app silently starts downloading part of its OCR
+ * engine from a third party the first time someone scans a receipt.
+ *
+ * That is not only a supply-chain question. docs/privacy.html section 5 tells
+ * the reader that both engines "are served from this app's own address — the
+ * app does not load code from external CDNs", and the CSP's `script-src 'self'`
+ * would block the load, so the failure mode is a published false statement
+ * plus a scanner that no longer works. The overrides had no test at all.
+ */
+describe('OCR engine assets are self-hosted', () => {
+  beforeEach(() => {
+    vi.resetModules()
+    createWorker.mockReset()
+    createWorker.mockResolvedValue({
+      recognize: vi.fn().mockResolvedValue({ data: { text: '' } }),
+    })
+  })
+
+  async function workerOptions(): Promise<Record<string, string>> {
+    const { extractReceipt } = await import('./ocr')
+    await extractReceipt(new Blob(['receipt']))
+    expect(createWorker).toHaveBeenCalledTimes(1)
+    return createWorker.mock.calls[0][2] as Record<string, string>
+  }
+
+  it.each(['workerPath', 'corePath', 'langPath'])(
+    'overrides %s with a path under the app\'s own base URL',
+    async (option) => {
+      const options = await workerOptions()
+      const value = options[option]
+      expect(typeof value).toBe('string')
+      expect(value.startsWith(import.meta.env.BASE_URL)).toBe(true)
+      // Nothing with a scheme, and nothing protocol-relative — either would
+      // leave the app's origin however the string was built.
+      expect(value).not.toMatch(/^(?:[a-z][a-z0-9+.-]*:)?\/\//i)
+      expect(value).not.toMatch(/jsdelivr|unpkg|cdn/i)
+    },
+  )
+
+  it('points all three at the vendored copy under /tesseract', async () => {
+    const options = await workerOptions()
+    const base = `${import.meta.env.BASE_URL}tesseract`
+    expect(options.workerPath).toBe(`${base}/worker.min.js`)
+    expect(options.corePath).toBe(base)
+    expect(options.langPath).toBe(base)
+  })
+})
 
 describe('parseReceiptText', () => {
   it('picks the largest keyword-matched total over a plain subtotal', () => {

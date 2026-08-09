@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import type { Expense } from '../types'
 import { CATEGORIES, newId, todayIso } from '../types'
 import { getExpense, saveExpenseWithImage, getImage, nextPosition } from '../db'
@@ -25,6 +25,25 @@ interface Draft {
   notes: string
   personalAmount: string
 }
+
+/** The fields save() can reject, and so the fields it can send focus back to. */
+type InvalidField = 'title' | 'amount' | 'personalAmount'
+
+/**
+ * Longest text any free-text field here may hold. It has to match
+ * MAX_STRING_LENGTH in backup.ts, which is what the restore path enforces:
+ * with no cap at entry, a long note produced a backup file the app's own
+ * importer then refused, and the user's only copy of their data was
+ * unreadable by the app that wrote it. Capping at entry rather than raising
+ * the importer's limit, because the limit is what keeps a hostile file from
+ * carrying megabyte-long strings into storage, and nothing a person types
+ * into a receipt field comes near 2,000 characters anyway.
+ *
+ * Kept as a literal rather than imported from backup.ts so this screen
+ * doesn't pull the whole export/restore module in for one number — if that
+ * limit moves, this has to move with it.
+ */
+const MAX_FIELD_LENGTH = 2000
 
 const emptyDraft: Draft = {
   title: '',
@@ -59,11 +78,19 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [captureError, setCaptureError] = useState<string | null>(null)
+  // What save() rejected, if anything. Save stays enabled and reports the
+  // reason here — a disabled button explains nothing, and a screen-reader user
+  // got no way at all to find out why it wouldn't press.
+  const [invalid, setInvalid] = useState<{ field: InvalidField; message: string } | null>(null)
   // True once the user has typed a field or attached/removed a photo — i.e. there
   // is unsaved work that Back / tab-close / a service-worker reload would discard.
   const [dirty, setDirty] = useState(false)
   const cameraInput = useRef<HTMLInputElement>(null)
   const fileInput = useRef<HTMLInputElement>(null)
+  const titleInput = useRef<HTMLInputElement>(null)
+  const amountInput = useRef<HTMLInputElement>(null)
+  const personalAmountInput = useRef<HTMLInputElement>(null)
+  const errorId = useId()
   // Bumped on every pick; a still-in-flight pick whose generation no longer
   // matches when it resolves has been superseded by a newer one and must
   // not overwrite whatever the newer pick already applied.
@@ -140,8 +167,25 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
     return () => setHasUnsavedWork(false)
   }, [])
 
+  // Send focus to the field that was rejected, after the message it points at
+  // has rendered. A fresh object is stored on every rejection, so pressing
+  // Save again with the same problem still moves focus back rather than
+  // leaving the user wondering whether anything happened.
+  useEffect(() => {
+    if (!invalid) return
+    const inputs: Record<InvalidField, typeof titleInput> = {
+      title: titleInput,
+      amount: amountInput,
+      personalAmount: personalAmountInput,
+    }
+    inputs[invalid.field].current?.focus()
+  }, [invalid])
+
   const set = (patch: Partial<Draft>) => {
     setDirty(true)
+    // Typing is the user answering the message, so clear it rather than
+    // leaving a complaint on screen about a value they have since changed.
+    setInvalid(null)
     setDraft((d) => ({ ...d, ...patch }))
   }
 
@@ -254,8 +298,58 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
     // same tick (e.g. a fast double-tap) from both passing the disabled
     // check and each creating their own duplicate expense record.
     if (submittingRef.current) return
+
     const amount = parseFloat(draft.amount)
-    if (isNaN(amount)) return
+    // Number.isFinite rather than isNaN: a number input accepts "1e999", which
+    // parses to Infinity. That saves, then fails the importer's Number.isFinite
+    // check when the user restores their own backup.
+    if (!Number.isFinite(amount)) {
+      setInvalid({ field: 'amount', message: 'Enter the amount on the receipt before saving.' })
+      return
+    }
+    // A negative total is caught here, against the Amount field. It used to
+    // fall through to the personal-amount comparison below, where the default
+    // personal amount of 0 is greater than any negative total — so the save was
+    // rejected, the message blamed a field the user had never typed in, and
+    // focus jumped there. Nothing they could type in that field helped:
+    // anything >= 0 still exceeds a negative total, and anything < 0 is
+    // rejected by the check just above it, so the expense could not be saved at
+    // all. Rejected rather than accepted because the rest of the app takes an
+    // amount to be non-negative — the input carries min="0", the personal
+    // portion is capped by it, and report totals sum them.
+    if (amount < 0) {
+      setInvalid({
+        field: 'amount',
+        message: "The amount can't be negative — enter the total on the receipt.",
+      })
+      return
+    }
+    if (!draft.title.trim() && !draft.merchant.trim()) {
+      setInvalid({ field: 'title', message: 'Enter a title or a merchant before saving.' })
+      return
+    }
+    // The personal portion used to be clamped into [0, amount] silently, which
+    // saved a number the user never typed — an entry of 80 against a $50
+    // receipt became 50, and nothing said so. Reject it and let them decide
+    // which of the two figures is wrong.
+    const typedPersonal = draft.personalAmount.trim()
+    const personalAmount = typedPersonal ? parseFloat(typedPersonal) : 0
+    if (!Number.isFinite(personalAmount) || personalAmount < 0) {
+      setInvalid({
+        field: 'personalAmount',
+        message: 'The personal amount has to be a number, and not less than zero.',
+      })
+      return
+    }
+    if (personalAmount > amount) {
+      setInvalid({
+        field: 'personalAmount',
+        message: `The personal amount can't be more than the expense total of ${amount.toFixed(2)}.`,
+      })
+      return
+    }
+    setInvalid(null)
+
     submittingRef.current = true
     setSaving(true)
     setSaveError(null)
@@ -294,9 +388,6 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
           extraImageIds = undefined
         }
       }
-      // Clamped to [0, amount] — the personal portion can't exceed the
-      // expense's total or go negative.
-      const personalAmount = Math.min(amount, Math.max(0, parseFloat(draft.personalAmount) || 0))
       const expense: Expense = {
         id: existing?.id ?? newId(),
         reportId: existing?.reportId ?? reportId,
@@ -332,8 +423,6 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
     }
   }
 
-  const canSave = !isNaN(parseFloat(draft.amount)) && (draft.title.trim() || draft.merchant.trim())
-
   return (
     <>
       <header className="topbar">
@@ -342,7 +431,11 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
           <Icon name="chevron-left" size={22} />
         </button>
         <h1>{expenseId ? 'Edit Expense' : 'New Expense'}</h1>
-        <button className="btn primary small" onClick={() => void save()} disabled={!canSave || saving || picking}>
+        {/* Enabled whatever the draft looks like — the two remaining disabled
+            states are transient (a save in flight, a file still being
+            processed), not a judgement on what has been typed. save() checks
+            the fields and says what is wrong. */}
+        <button className="btn primary small" onClick={() => void save()} disabled={saving || picking}>
           {saving ? 'Saving…' : 'Save'}
         </button>
       </header>
@@ -426,23 +519,32 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
           </div>
         )}
 
+        {/* role="status" on each state of the scan banner: what the OCR pass
+            is doing, and what it found, is otherwise reported only by the
+            banner appearing on screen. It's a status rather than an alert
+            because none of it interrupts anything — the fields it fills in are
+            right below, and every one of them can still be edited by hand. */}
         {picking && scanState !== 'scanning' && (
-          <div className="scan-banner">
+          <div className="scan-banner" role="status">
             <div className="spinner" />
             Processing file…
           </div>
         )}
         {scanState === 'scanning' && (
-          <div className="scan-banner">
+          <div className="scan-banner" role="status">
             <div className="spinner" />
             Reading receipt… {scanPct}%
           </div>
         )}
         {scanState === 'done' && (
-          <div className="scan-banner success">Details extracted — review and adjust below</div>
+          <div className="scan-banner success" role="status">
+            Details extracted — review and adjust below
+          </div>
         )}
         {scanState === 'failed' && (
-          <div className="scan-banner warn">Couldn't read the receipt — enter details manually</div>
+          <div className="scan-banner warn" role="status">
+            Couldn't read the receipt — enter details manually
+          </div>
         )}
         {captureError && (
           <div className="scan-banner warn" role="alert">{captureError}</div>
@@ -450,12 +552,21 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
         {saveError && (
           <div className="scan-banner warn" role="alert">{saveError}</div>
         )}
+        {invalid && (
+          <div className="scan-banner warn" role="alert" id={errorId}>
+            {invalid.message}
+          </div>
+        )}
 
         <div className="field-grid">
           <label className="field span-2">
             <span>Title</span>
             <input
+              ref={titleInput}
+              maxLength={MAX_FIELD_LENGTH}
               placeholder="e.g. Team lunch"
+              aria-invalid={invalid?.field === 'title' || undefined}
+              aria-describedby={invalid?.field === 'title' ? errorId : undefined}
               value={draft.title}
               onChange={(e) => set({ title: e.target.value })}
             />
@@ -463,6 +574,7 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
           <label className="field span-2">
             <span>Merchant</span>
             <input
+              maxLength={MAX_FIELD_LENGTH}
               placeholder="e.g. Joe's Diner"
               value={draft.merchant}
               onChange={(e) => set({ merchant: e.target.value })}
@@ -471,11 +583,14 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
           <label className="field">
             <span>Amount</span>
             <input
+              ref={amountInput}
               type="number"
               inputMode="decimal"
               step="0.01"
               min="0"
               placeholder="0.00"
+              aria-invalid={invalid?.field === 'amount' || undefined}
+              aria-describedby={invalid?.field === 'amount' ? errorId : undefined}
               value={draft.amount}
               onChange={(e) => set({ amount: e.target.value })}
             />
@@ -492,12 +607,15 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
           <label className="field span-2">
             <span>Personal amount (pay back to company)</span>
             <input
+              ref={personalAmountInput}
               type="number"
               inputMode="decimal"
               step="0.01"
               min="0"
               max={draft.amount || undefined}
               placeholder="0.00"
+              aria-invalid={invalid?.field === 'personalAmount' || undefined}
+              aria-describedby={invalid?.field === 'personalAmount' ? errorId : undefined}
               value={draft.personalAmount}
               onChange={(e) => set({ personalAmount: e.target.value })}
             />
@@ -520,6 +638,7 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
             <span>Notes</span>
             <textarea
               rows={3}
+              maxLength={MAX_FIELD_LENGTH}
               placeholder="Optional details for the report"
               value={draft.notes}
               onChange={(e) => set({ notes: e.target.value })}

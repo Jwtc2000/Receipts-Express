@@ -11,8 +11,8 @@
 >
 > Structured after the [AI Pilot Program
 > Template](https://github.com/arigatoexpress/AI-Efficiency/blob/main/docs/pilot-program-template.md)
-> from the FedEx AI Efficiency Hub
-> ([arigatoexpress/AI-Efficiency](https://github.com/arigatoexpress/AI-Efficiency)) —
+> published in the public GitHub repository
+> [arigatoexpress/AI-Efficiency](https://github.com/arigatoexpress/AI-Efficiency) —
 > credit to that project for the governance framework this proposal is
 > formatted against.
 >
@@ -47,7 +47,7 @@
 | Field | Proposed Answer |
 | --- | --- |
 | **Data sources** | Real personal/financial data — receipt images and the merchant, date, and amount extracted from them. Not public or synthetic data. |
-| **Data classification** | Confidential. Processed and stored exclusively on-device, never transmitted — see [SECURITY.md](../SECURITY.md) for the full classification and how it's enforced (including by a Content-Security-Policy, not just written policy). |
+| **Data classification** | Confidential. Processed and stored on-device; the app makes no network request that carries receipt data. See [SECURITY.md](../SECURITY.md) for the full classification. A Content-Security-Policy backs that up rather than leaving it to written policy alone: the policy restricts fetch, XMLHttpRequest, WebSocket, EventSource and beacon requests to the app's own origin, and blocks form submissions to other origins. It is delivered in a `<meta>` tag because GitHub Pages cannot send custom response headers, so it does not govern top-level navigation. A strong control, not an absolute one. |
 | **AI tool** | On-device OCR only (self-hosted Tesseract.js). PDF receipts are rasterized on-device the same way (self-hosted PDF.js) before OCR runs. No cloud AI vendor, no API calls, nothing sent off-device for processing. |
 | **Tool approval status** | Not yet reviewed by any organization's governance process — this document is the proposal to start that review. |
 | **Data retention** | Indefinite, but exclusively in the employee's own browser storage (IndexedDB), until they delete it or export and remove it themselves. See the durability note in [SECURITY.md](../SECURITY.md) — this is a capture-and-export tool, not an archive. |
