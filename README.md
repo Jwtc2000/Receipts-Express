@@ -181,7 +181,7 @@ The user-facing versions of these commitments are published as three standalone 
 * **[Terms of Use (docs/terms.html)](./docs/terms.html)** — no affiliation, Apache-2.0 licensing, as-is with no warranty, Washington governing law, and what you're responsible for.
 * **[Consumer Health Data Privacy Policy (docs/consumer-health-data.html)](./docs/consumer-health-data.html)** — a separate, distinctly-linked page, because Washington's My Health My Data Act treats that link as its own requirement and a scanned pharmacy receipt is the kind of thing it contemplates.
 
-Every claim in the Privacy Policy is traceable to code in this repository. All three pages are deliberately self-contained — no external fonts, scripts, or styles — and so is the pilot deck, which used to load its fonts from Google's CDN. [`src/legalPages.test.ts`](./src/legalPages.test.ts) enforces that for all four, and also checks that the localStorage keys the policy enumerates are still the ones the app writes.
+The Privacy Policy describes what this repository's code does, and says where something is outside it — GitHub's handling of the requests that serve the app is governed by GitHub's own privacy statement, not by this one. All three pages are deliberately self-contained — no external fonts, scripts, or styles — and so is the pilot deck, which used to load its fonts from Google's CDN. [`src/legalPages.test.ts`](./src/legalPages.test.ts) enforces that for all four, and also checks that the localStorage keys the policy enumerates are still the ones the app writes.
 
 These pages are not a substitute for legal advice, and they have not been reviewed by an attorney.
 

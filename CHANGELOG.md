@@ -87,13 +87,12 @@ merge to `main` that changes app behavior gets a version bump and a tag.
   caught.
 - A denylist test (`src/legalPages.test.ts`) now fails the build if any
   of seven specific overstatements reappears. Its scope is narrower than
-  "the repository" — the six files in `CLAIM_CHECKED_FILES`:
-  `docs/privacy.html`, `docs/terms.html`, `docs/consumer-health-data.html`,
-  `docs/pilot-deck.html`, `README.md` and `SECURITY.md`.
-  `docs/PILOT_DECK.md`, `docs/PILOT.md` and `docs/governance/REVIEW.md`
-  are not guarded. It also matches fixed phrasings rather than judging
-  whether a claim is supportable, so an overstatement the audit did not
-  already name passes it even in a file it covers.
+  "the repository" — it is the files listed in `CLAIM_CHECKED_FILES`,
+  covering the four pages under `docs/`, the pilot and governance
+  markdown, `README.md` and `SECURITY.md`. It also matches fixed
+  phrasings rather than judging whether a claim is supportable, so an
+  overstatement the audit did not already name passes it even in a file
+  it covers.
 - The pilot decks no longer publish an employer's internal filing
   deadline or record-retention target, no longer rank named consumer
   cloud services as a destination for confidential receipts, and now

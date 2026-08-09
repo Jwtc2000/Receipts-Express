@@ -14,9 +14,6 @@ dev-dist
 key.properties
 keystore.properties
 
-# Working notes from the legal and compliance review. Deliberately not
-# published: they catalogue the project's known weaknesses and the author's
-# own exposure, which is material for deciding what to fix, not material to
-# hand to anyone who happens to clone the repo. The fixes land in the code
-# and the published pages; the reasoning stays local.
+# Local working notes. Not published — the conclusions land in the code and
+# the published pages, which are what anyone cloning this needs.
 audit/

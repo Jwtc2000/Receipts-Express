@@ -15,12 +15,10 @@ import { fileURLToPath } from 'node:url'
  * may go, not whether one is made at all.
  *
  * So the claim is exactly as durable as this test. If it fails, the app has
- * gained a way to open a connection of its own, and three documents that are
- * published on the public web have become false statements about a product —
- * which under the Washington Consumer Protection Act is itself the actionable
- * practice, and which the Terms' liability cap expressly does not reach.
- * Deleting or loosening this test to make a build pass is therefore not a test
- * change. Either the new code goes, or those pages have to be rewritten first.
+ * gained a way to open a connection of its own, and three pages published on
+ * the public web have become false descriptions of it. Deleting or loosening
+ * this test to make a build pass is therefore not a test change. Either the
+ * new code goes, or those pages have to be rewritten first.
  *
  * What is deliberately *not* flagged: static and dynamic `import(...)`, which
  * load the app's own modules from its own origin and are what the service

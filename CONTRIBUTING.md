@@ -8,9 +8,10 @@ welcome, but read this first — it is short, and every line of it matters legal
 Contributions are licensed inbound on the same terms as the project: **Apache License,
 Version 2.0**. Section 5 of the licence does this by default — unless you explicitly state
 otherwise, any contribution you intentionally submit for inclusion is under the Apache-2.0
-terms, without any additional terms or conditions. That is the whole of the clause. It sets
-no form for stating otherwise and asks nothing else of you, and there is no separate CLA to
-sign.
+terms, without any additional terms or conditions. The clause adds only that a separate
+licence agreement you have actually executed with the author would take precedence — there
+is no such agreement here, and no CLA to sign. It sets no form for stating otherwise and
+asks nothing else of you.
 
 If you want different terms, say so in the pull request. I will not merge a contribution I
 cannot take under Apache-2.0.

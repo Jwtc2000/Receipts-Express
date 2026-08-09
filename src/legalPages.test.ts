@@ -136,14 +136,10 @@ describe('legal pages', () => {
   })
 
   /*
-   * Under the Washington Consumer Protection Act, chapter 19.86 RCW, an
-   * unsupportable claim about a product is itself the actionable practice. It
-   * does not have to have caused anyone a loss, and it does not matter that
-   * the app is free and has no customers — a false statement in the material
-   * that persuades someone to install it is the violation. The terms
-   * deliberately carve the CPA out of the liability cap, because it cannot be
-   * waived by contract, so a sentence in a README that overstates what the app
-   * does is a larger exposure than a missing clause in the terms would be.
+   * A published page must not describe behaviour the code does not have. That
+   * is the whole rule, and it is worth a test because the failure is silent:
+   * the code changes, the prose does not, and a page that was accurate when it
+   * was written quietly becomes a false description of the product.
    *
    * These files are the ones that make claims to a reader deciding whether to
    * trust the app and have no other test coverage: the four docs/ pages are
