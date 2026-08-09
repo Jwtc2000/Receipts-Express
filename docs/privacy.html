@@ -95,6 +95,66 @@
       opacity: 0.9;
     }
 
+    /* The way back to the product. These pages are mostly opened from
+       inside the app, but they are also reached directly and from search,
+       and a reader landing here would otherwise have no path to the app.
+       The href is "../", so it resolves against wherever this copy of the
+       site is served from. White on the gradient clears the 4.5:1 minimum
+       at both ends — 5.5:1 over the teal, 7.1:1 over the violet — and the
+       12% white fill costs some of that, but the button sits mid-gradient,
+       where about 5:1 remains. */
+    a.back-to-app {
+      display: inline-flex;
+      align-items: center;
+      min-height: 40px;
+      padding: 8px 18px;
+      border: 1.5px solid rgba(255, 255, 255, 0.7);
+      border-radius: 9999px;
+      background: rgba(255, 255, 255, 0.12);
+      color: #fff;
+      font-size: 0.9rem;
+      font-weight: 600;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    a.back-to-app:hover {
+      background: rgba(255, 255, 255, 0.22);
+      color: #fff;
+    }
+
+    a.back-to-app:focus-visible {
+      outline: 2px solid #fff;
+      outline-offset: 3px;
+    }
+
+    header.page-header .header-return { margin-top: 18px; }
+
+    /* The same control again at the very end: this is a long document,
+       and a reader who has scrolled to the footer should not have to
+       scroll back to leave. Down here it sits on the page background, so
+       the header gradient becomes the button's own fill, and white text
+       keeps the same margins as above. */
+    .footer-return {
+      text-align: center;
+      margin-top: 24px;
+    }
+
+    a.back-to-app.at-end {
+      border-color: transparent;
+      background: linear-gradient(135deg, var(--header-gradient-a) 0%, var(--header-gradient-b) 100%);
+      box-shadow: var(--shadow);
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+    }
+
+    a.back-to-app.at-end:hover {
+      background: linear-gradient(135deg, #115e59 0%, #5b21b6 100%);
+    }
+
+    a.back-to-app.at-end:focus-visible {
+      outline-color: var(--purple);
+    }
+
     main {
       max-width: 720px;
       margin: 0 auto;
@@ -202,6 +262,7 @@
     <p class="eyebrow">Receipts Express</p>
     <h1>Privacy Policy</h1>
     <p class="dates">Effective 8 August 2026 · Last updated 8 August 2026</p>
+    <p class="header-return"><a class="back-to-app" href="../">← Back to Receipts Express</a></p>
   </header>
 
   <main>
@@ -604,6 +665,9 @@
         Independent personal project — no affiliation with, endorsement from, or approval by
         FedEx or any employer.
       </p>
+      <div class="footer-return">
+        <a class="back-to-app at-end" href="../">← Back to Receipts Express</a>
+      </div>
     </footer>
   </main>
 </body>
