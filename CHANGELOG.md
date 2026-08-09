@@ -8,7 +8,7 @@ user-facing features, and `PATCH` for fixes with no visible feature change. The
 version lives in `package.json` and is shown in the app under Menu → About. Every
 merge to `main` that changes app behavior gets a version bump and a tag.
 
-## [1.13.0] - 2026-08-08
+## [1.13.0] - 2026-08-09
 
 ### Added
 - Privacy Policy and Terms of Use, published as standalone pages
@@ -49,6 +49,14 @@ merge to `main` that changes app behavior gets a version bump and a tag.
 - Affirmative "does not sell, share, rent, or trade" and Global Privacy
   Control statements in the Privacy Policy. Both were true before and
   implied throughout, but the statutory words appeared nowhere.
+- A precache assertion in `src/csp.test.ts` that reads the generated
+  service worker instead of the config meant to produce it. Everything in
+  the install-time precache is downloaded by every user before the app
+  runs once, and the `globIgnores` drift below is exactly what a
+  source-reading test cannot see: the build stayed green and so did every
+  test. It now asserts that the app shell is precached and that the
+  webfonts, OCR engine, PDF worker, docs pages and unreachable chunks are
+  not.
 
 ### Changed
 - Inter and Outfit are now self-hosted from the app's own origin, and the
@@ -111,6 +119,35 @@ merge to `main` that changes app behavior gets a version bump and a tag.
   repository root and in the build, and the two Tesseract licence
   sidecars the shipped worker already referenced but which the copy
   script never copied — a live 404.
+- React 18 → 19, Tesseract.js 5 → 7, TypeScript 5 → 7 and Vite 6 → 8,
+  with `@vitejs/plugin-react` 4 → 6 and `vite-plugin-pwa` 0.21 → 1.3.
+  Nothing in the app looks or behaves differently — scanning, PDF export,
+  backup and restore, and offline use are unchanged. The entries below are
+  what it took to keep that true.
+- `scripts/copy-tesseract-assets.mjs` now reads the `tesseract.js-core`
+  package directory and copies every WASM core it finds, instead of the
+  four names it listed by hand. Version 5 shipped exactly those four;
+  version 7 ships six — adding the two relaxed-SIMD builds, which it
+  prefers on Chromium — so a hardcoded list leaves the app asking for a
+  core that was never copied: a 404 inside the OCR worker, every scan
+  falling through to manual entry behind the "Couldn't read the receipt"
+  banner, and no crash or console error to say so. The script also throws
+  when it finds no cores at all, so a package restructure stops the build
+  rather than shipping an app whose scanning quietly does nothing.
+- The `globIgnores` patterns for the unreachable jsPDF chunks no longer
+  spell out the bundler's chunk naming. They named
+  `assets/html2canvas.esm-*.js`, and Vite 8 emits `html2canvas-<hash>.js`
+  with no `.esm` — an exact pattern that stops matching puts 195 KB of
+  code this app never calls back into the install-time download every user
+  pays before the app runs once. The patterns are now loose about the
+  suffix, and the generated manifest is what is actually checked.
+- `useModal` lets its return type be inferred rather than naming it.
+  React 18 types `useRef<T>(null)` as `RefObject<T>` and React 19 as
+  `RefObject<T | null>`; writing either one pins the hook to a single
+  React major.
+- `THIRD_PARTY_NOTICES.md` is re-derived against what is now installed —
+  six versions corrected and `is-electron` dropped, read back off the v7
+  worker's source map.
 
 ### Fixed
 - The Terms' licence section pointed at the wrong two section numbers for
@@ -146,7 +183,7 @@ merge to `main` that changes app behavior gets a version bump and a tag.
 - The CSV formula-injection guard covered some columns but not the date
   or category columns.
 
-## [1.12.0] - 2026-08-06
+## [1.12.0] - 2026-08-08
 
 ### Added
 - Multiple project numbers: save a list of the projects you charge to
