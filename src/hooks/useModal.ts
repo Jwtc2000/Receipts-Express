@@ -1,4 +1,4 @@
-import { useEffect, useRef, type RefObject } from 'react'
+import { useEffect, useRef } from 'react'
 
 /**
  * Everything inside the surface that Tab can reach. Written as a selector
@@ -59,7 +59,11 @@ export function useModal<T extends HTMLElement = HTMLElement>(
   open: boolean,
   onClose: () => void,
   { modal = true }: ModalOptions = {},
-): RefObject<T> {
+) {
+  // Return type is inferred rather than annotated. React 18 types this as
+  // RefObject<T> and React 19 as RefObject<T | null>, and the two are not
+  // mutually assignable — naming either one pins the hook to that major and
+  // breaks the other. Inference gives each version the shape it expects.
   const ref = useRef<T>(null)
   // Read through a ref so an inline arrow passed as `onClose` — which is a new
   // function on every render — doesn't tear down and re-add the key listener

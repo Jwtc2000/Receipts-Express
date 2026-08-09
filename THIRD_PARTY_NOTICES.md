@@ -55,9 +55,9 @@ its own terms.
 
 | Component | Version | Copyright (verbatim) | Project |
 |---|---|---|---|
-| react | 18.3.1 | `Copyright (c) Facebook, Inc. and its affiliates.` | https://github.com/facebook/react |
-| react-dom | 18.3.1 | `Copyright (c) Facebook, Inc. and its affiliates.` | https://github.com/facebook/react |
-| scheduler | 0.23.2 | `Copyright (c) Facebook, Inc. and its affiliates.` | https://github.com/facebook/react |
+| react | 19.2.8 | `Copyright (c) Facebook, Inc. and its affiliates.` | https://github.com/facebook/react |
+| react-dom | 19.2.8 | `Copyright (c) Facebook, Inc. and its affiliates.` | https://github.com/facebook/react |
+| scheduler | 0.27.0 | `Copyright (c) Facebook, Inc. and its affiliates.` | https://github.com/facebook/react |
 | regenerator-runtime | 0.13.11 | `Copyright (c) 2014-present, Facebook, Inc.` | https://github.com/facebook/regenerator |
 
 `regenerator-runtime` is here, and not in §2.3 with the unreachable `.html()` chunks, because
@@ -115,7 +115,7 @@ served, not because any code path reaches them.
 | svg-pathdata | 6.0.3 | `Copyright © 2017 Nicolas Froidure` | https://github.com/nfroidure/svg-pathdata |
 | raf | 3.4.1 | `Copyright 2013 Chris Dickinson <chris@neversaw.us>` | https://github.com/chrisdickinson/raf |
 | performance-now | 2.1.0 | `Copyright (c) 2013 Braveg1rl` (from `license.txt`) | https://github.com/braveg1rl/performance-now |
-| core-js | 3.49.0 | `Copyright (c) 2013–2025 Denis Pushkarev (zloirock.ru)` / `Copyright (c) 2025–2026 CoreJS Company (core-js.io)` | https://github.com/zloirock/core-js |
+| core-js | 3.50.0 | `Copyright (c) 2013–2025 Denis Pushkarev (zloirock.ru)` / `Copyright (c) 2025–2026 CoreJS Company (core-js.io)` | https://github.com/zloirock/core-js |
 | html2canvas | 1.4.1 | `Copyright (c) 2012 Niklas von Hertzen` | https://html2canvas.hertzen.com |
 | css-line-break | 2.1.0 | `Copyright (c) 2017 Niklas von Hertzen` | https://github.com/niklasvh/css-line-break |
 | text-segmentation | 1.0.3 | `Copyright (c) 2021 Niklas von Hertzen` | https://github.com/niklasvh/text-segmentation |
@@ -145,10 +145,12 @@ pre-minified by tesseract.js.
 
 What is inside that file is not inference. `node_modules/tesseract.js/dist/worker.min.js.map`
 lists its `sources`, and the shipped `tesseract/worker.min.js` is byte-identical to the one in
-`node_modules/` (same MD5), so the map describes what users get. Ten third-party modules are in
-there — `base64-js`, `bmp-js`, `buffer`, `idb-keyval`, `ieee754`, `is-electron`, `is-url`,
+`node_modules/` (same MD5), so the map describes what users get. Nine third-party modules are in
+there — `base64-js`, `bmp-js`, `buffer`, `idb-keyval`, `ieee754`, `is-url`,
 `regenerator-runtime`, `wasm-feature-detect` and `zlibjs` — plus tesseract.js's own `src/`. The
-four rows below are the ones this section has to account for. `buffer`, `ieee754`,
+three rows below are the ones this section has to account for. (`is-electron` was a tenth until
+tesseract.js 7 dropped it; re-read from the v7 source map, it is no longer in the worker and its
+row has gone with it.) `buffer`, `ieee754`,
 `regenerator-runtime` and `zlibjs` have their notices in
 `tesseract/worker.min.js.LICENSE.txt` (§5.1); `idb-keyval` and `wasm-feature-detect` are
 Apache-2.0 (§4); `base64-js` has no notice anywhere, which is dealt with in §5.1.
@@ -156,7 +158,6 @@ Apache-2.0 (§4); `base64-js` has no notice anywhere, which is dealt with in §5
 | Component | Version | Copyright (verbatim) | Project |
 |---|---|---|---|
 | bmp-js | 0.1.0 | `Copyright (c) 2014 @丝刀口` | https://github.com/shaozilee/bmp-js |
-| is-electron | 2.2.2 | `Copyright (c) 2016-2018 Cheton Wu` | https://github.com/cheton/is-electron |
 | zlibjs | 0.3.1 | `Copyright (c) 2012 imaya` | https://github.com/imaya/zlib.js |
 | is-url | 1.2.4 | `node_modules/is-url/LICENSE-MIT` opens `MIT LICENSE` and contains **no copyright line**. `package.json` declares MIT. There is no notice to reproduce. | https://github.com/segmentio/is-url |
 
@@ -275,8 +276,8 @@ Apache-2.0 §4(a) asks for. It is not reproduced again here.
 | Component | Version | Copyright | Project |
 |---|---|---|---|
 | pdfjs-dist | 6.2.108 | `Copyright 2024 Mozilla Foundation` — from the `@licstart` header of `node_modules/pdfjs-dist/build/pdf.mjs`. The package's own `LICENSE` is the bare Apache-2.0 text with an unfilled appendix, so it names no holder. | https://mozilla.github.io/pdf.js/ |
-| tesseract.js | 5.1.1 | **UNDETERMINED — verify before publishing.** `LICENSE.md` is the bare Apache-2.0 text; the appendix placeholder is unfilled and `package.json` has no author. | https://github.com/naptha/tesseract.js |
-| tesseract.js-core | 5.1.1 | **UNDETERMINED — verify before publishing.** `LICENSE` is the bare Apache-2.0 text, appendix still reading `Copyright {yyyy} {name of copyright owner}`. `package.json` names `antimatter15`, which is metadata, not a notice. | https://github.com/naptha/tesseract.js-core |
+| tesseract.js | 7.0.0 | **UNDETERMINED — verify before publishing.** `LICENSE.md` is the bare Apache-2.0 text; the appendix placeholder is unfilled and `package.json` has no author. | https://github.com/naptha/tesseract.js |
+| tesseract.js-core | 7.0.0 | **UNDETERMINED — verify before publishing.** `LICENSE` is the bare Apache-2.0 text, appendix still reading `Copyright {yyyy} {name of copyright owner}`. `package.json` names `antimatter15`, which is metadata, not a notice. | https://github.com/naptha/tesseract.js-core |
 | idb-keyval | 6.3.0 | `Copyright 2016, Jake Archibald` — verbatim from `node_modules/idb-keyval/LICENCE`, which is the Apache-2.0 short header form with the holder filled in. Reaches the build inside `tesseract/worker.min.js`. | https://github.com/jakearchibald/idb-keyval |
 | wasm-feature-detect | 1.8.0 | `LICENSE` is the bare Apache-2.0 text with no filled copyright line. `package.json` names `Surma <surma@surma.link>`, repository `GoogleChromeLabs/wasm-feature-detect`. Imported by tesseract.js. | https://github.com/GoogleChromeLabs/wasm-feature-detect |
 

@@ -89,4 +89,48 @@ describe('production build', () => {
     expect(sw).toContain('registerRoute(/\\/docs\\//')
     expect(sw).toContain('docs-pages')
   })
+
+  /*
+   * What is in the install-time precache, asserted against the worker that was
+   * actually generated rather than against the config that was meant to produce
+   * it. Everything here is downloaded by every user before the app will run
+   * once, so anything that lands in it by accident is paid for on every install
+   * and every worker update.
+   *
+   * This exists because the config drifted and nothing noticed. `globIgnores`
+   * named one chunk as `assets/html2canvas.esm-*.js`; a Vite major changed the
+   * emitted name to `assets/html2canvas-<hash>.js`, the pattern quietly stopped
+   * matching, and 195 KB of code with no reachable call path rejoined the
+   * precache. The build stayed green and all 333 tests stayed green, because
+   * every one of them tested the source and none of them read the artifact.
+   *
+   * The excluded set is not arbitrary. The OCR engine and language data are
+   * ~22 MB and are fetched on first scan; the PDF worker likewise; the webfonts
+   * style only the standalone docs pages; the docs pages themselves are read
+   * rarely. All four are runtime-cached instead. The unreachable chunks are
+   * jsPDF's optional .html() renderer and its dependencies, which this app
+   * never calls.
+   */
+  it('precaches the app shell and nothing that should be fetched on demand', () => {
+    const sw = readFileSync(join(outDir, 'sw.js'), 'utf-8')
+    // Both key spellings: workbox emits `url:"x"` when the worker is minified
+    // and `"url": "x"` when it is not, and which one you get depends on the
+    // build. Matching only the minified form silently yields an empty list —
+    // which is why the length assertion below is not redundant. A precache
+    // test that scans nothing passes every time.
+    const urls = [...sw.matchAll(/"?url"?\s*:\s*"([^"]+)"/g)].map((m) => m[1])
+    expect(urls.length).toBeGreaterThan(0)
+
+    for (const url of urls) {
+      expect(url, `${url} must not be precached`).not.toMatch(
+        /\.woff2$|^tesseract\/|^pdfjs\/|^docs\/|html2canvas|purify|index\.es-/i,
+      )
+    }
+
+    // And the things that must be there, so this can't pass by precaching
+    // nothing at all.
+    expect(urls).toContain('index.html')
+    expect(urls.some((u) => /^assets\/index-.*\.js$/.test(u))).toBe(true)
+    expect(urls.some((u) => /^assets\/index-.*\.css$/.test(u))).toBe(true)
+  })
 })
