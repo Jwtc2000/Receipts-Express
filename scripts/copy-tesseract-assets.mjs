@@ -30,15 +30,30 @@ const copies = [
   ['node_modules/tesseract.js-core/LICENSE', 'LICENSE-tesseract-core.txt'],
   ['node_modules/@tesseract.js-data/eng/4.0.0/eng.traineddata.gz', 'eng.traineddata.gz'],
 ]
-for (const variant of ['', '-simd', '-lstm', '-simd-lstm']) {
-  copies.push([
-    `node_modules/tesseract.js-core/tesseract-core${variant}.wasm.js`,
-    `tesseract-core${variant}.wasm.js`,
-  ])
-  copies.push([
-    `node_modules/tesseract.js-core/tesseract-core${variant}.wasm`,
-    `tesseract-core${variant}.wasm`,
-  ])
+// Every WASM core the package ships, discovered rather than listed.
+//
+// tesseract.js picks a core at runtime from what the browser supports, and the
+// set of variants grows between majors: v5 shipped four, v7 added the two
+// relaxed-SIMD builds and prefers them on Chromium. A hardcoded list therefore
+// fails in the worst possible way — the one core the app asks for is the one
+// never copied, the request 404s inside the OCR worker, and every scan falls
+// back to manual entry behind a soft "Couldn't read the receipt" banner. No
+// crash, no console error, a green build and a green test suite.
+//
+// Globbing keeps this correct across upgrades. The guard below is the other
+// half: if the package ever ships no cores under this name, that is a
+// restructure, and it should stop the build rather than quietly ship an app
+// whose scanning does nothing.
+const coreDir = path.join(root, 'node_modules/tesseract.js-core')
+const cores = fs.readdirSync(coreDir).filter((f) => /^tesseract-core.*\.wasm(\.js)?$/.test(f))
+if (cores.length === 0) {
+  throw new Error(
+    `No tesseract-core*.wasm files found in ${coreDir} — the package layout changed. ` +
+      'OCR would silently fall back to manual entry; fix the copy before shipping.',
+  )
+}
+for (const file of cores) {
+  copies.push([`node_modules/tesseract.js-core/${file}`, file])
 }
 
 for (const [from, to] of copies) {

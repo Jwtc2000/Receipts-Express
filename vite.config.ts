@@ -237,7 +237,23 @@ export default defineConfig({
         // pages under docs/ — the app's own UI uses the system stack. Left
         // in, they would sit in every user's mandatory install-time
         // precache to style pages most users never open.
-        globIgnores: ['tesseract/**', 'pdfjs/**', 'docs/**', 'fonts/**', 'assets/index.es-*.js', 'assets/html2canvas.esm-*.js', 'assets/purify.es-*.js'],
+        // Patterns are deliberately loose about the chunk suffix. They used to
+        // name it exactly — `html2canvas.esm-*.js` — and that broke silently on
+        // a Vite major: Rollup started emitting `html2canvas-<hash>.js` with no
+        // `.esm`, the pattern stopped matching, and 195 KB of unreachable code
+        // rejoined the mandatory install-time precache. Green build, green
+        // tests, nobody notices. `src/csp.test.ts` now asserts the generated
+        // manifest, which is the real guard; these patterns only have to be
+        // wide enough not to depend on a bundler's naming whims.
+        globIgnores: [
+          'tesseract/**',
+          'pdfjs/**',
+          'docs/**',
+          'fonts/**',
+          'assets/index.es-*.js',
+          'assets/html2canvas*',
+          'assets/purify*',
+        ],
         // vite-plugin-pwa's generateSW registers an SPA navigation route that
         // serves index.html (the app shell) for every navigation request. The
         // pilot deck and the privacy/terms pages are real, standalone pages
