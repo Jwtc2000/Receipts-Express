@@ -22,7 +22,7 @@
     "@tesseract.js-data/eng": "^1.0.0",
     "idb": "^8.0.0",
     "jspdf": "^4.2.1",
-    "pdfjs-dist": "^6.2.108",
+    "pdfjs-dist": "^6.3.289",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "tesseract.js": "^7.0.0"
