@@ -1,0 +1,57 @@
+# Jenkins controller + scanning agent for this repo's CI (stages: see ci/README.md and the Jenkinsfile).
+# Runs on a dedicated Linux VM under Docker Compose. Jenkins is published only through Tailscale Serve
+# (`tailscale serve --bg 8080`, tailnet-only, never Funnel); nothing listens on the LAN.
+#
+# Usage on the VM, from the repo checkout:
+#   AGENT_SECRET_FILE=/path/outside/the/repo/agent_secret docker compose -f ci/compose.yaml up -d
+# The agent secret file (mode 600, owned by uid 1000) is never committed: its path comes from the environment.
+name: jenkins
+
+services:
+  jenkins:
+    # Exact LTS, pinned by digest. Bump it deliberately in a PR; never use a floating tag.
+    image: jenkins/jenkins:2.580.2-jdk21@sha256:74401de6a6f92e1afe1b02d1c8e3d0c33f263bfb5275dd8813f9150355f2367b
+    container_name: jenkins
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080"        # loopback only; no 50000 (the agent connects over WebSocket)
+    volumes:
+      - jenkins_home:/var/jenkins_home
+    environment:
+      TZ: America/Los_Angeles
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    networks: [ci]
+
+  jenkins-agent:
+    build:
+      context: ./agent                # ci/agent/Dockerfile: inbound-agent base, every scan tool pinned by ARG
+    image: jenkins-agent-sec:local
+    container_name: jenkins-agent
+    restart: unless-stopped
+    init: true
+    # agent.jar reads the secret from the mounted file (the "@" prefix), so it never appears in env or argv.
+    command: ["-url", "http://jenkins:8080/", "-webSocket", "-name", "agent1",
+              "-secret", "@/run/secrets/agent_secret", "-workDir", "/home/jenkins/agent"]
+    secrets: [agent_secret]
+    volumes:
+      - agent_work:/home/jenkins/agent
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    depends_on: [jenkins]
+    networks: [ci]
+
+secrets:
+  agent_secret:
+    file: ${AGENT_SECRET_FILE:?set AGENT_SECRET_FILE to the agent secret file (outside the repo)}
+
+volumes:
+  jenkins_home:
+    name: jenkins_home
+  agent_work:
+    name: agent_work
+
+networks:
+  ci: {}
