@@ -42,23 +42,32 @@ The full-history secrets scan and SBOM generation are main-only because both are
 
 `semgrep`, previously installed unpinned, now has its own `ARG SEMGREP_VERSION` like every other tool (this was hadolint's DL3013 finding on first run — a legitimate catch, not an exception).
 
-## Windows host operations
+## Host operations
+
+Jenkins runs on a dedicated Linux VM under Docker Compose ([`ci/compose.yaml`](compose.yaml)). It was originally set up on a Windows host; `ci/blade-setup.ps1` is kept for reference only.
+
+From the repo checkout on the VM. The agent secret file lives outside the repo (mode 600, owned by uid 1000), and Compose refuses to start without `AGENT_SECRET_FILE`:
 
 ```
-docker start jenkins jenkins-agent
-docker stop jenkins jenkins-agent
+AGENT_SECRET_FILE=/path/to/agent_secret docker compose -f ci/compose.yaml up -d   # start, or apply a change
+docker compose -f ci/compose.yaml stop                                            # stop
 ```
 
-All state (job config, build history, workspace) persists in the `jenkins_home` and `agent_work` named volumes — stopping/starting the containers does not lose anything. Provisioning details: `ci/blade-setup.ps1`.
+- The controller listens on `127.0.0.1:8080` only and is published to the tailnet with Tailscale Serve (`tailscale serve --bg 8080`): tailnet-only, never Funnel.
+- The agent (`agent1`) connects over WebSocket on the Compose network. The controller's inbound TCP agent port is disabled, so nothing listens on 50000.
+- The agent reads its secret from the mounted file (`-secret @/run/secrets/agent_secret`), so it never appears in an environment variable, a command line or the repo.
+- The GitHub credential (`github-pat`) lives in the `receipts-express` folder's credential store, not the global store.
+
+All state (job config, build history, workspace) persists in the `jenkins_home` and `agent_work` named volumes. Stopping, starting or recreating the containers loses nothing.
 
 ## Working rhythm
 
-1. Start containers (`docker start jenkins jenkins-agent`)
+1. Start containers (`docker compose -f ci/compose.yaml up -d` on the VM, with `AGENT_SECRET_FILE` set)
 2. Push branch, open PR
 3. In Jenkins: **Scan Repository Now**
 4. Review both required checks on the PR
 5. Merge on green
-6. Stop containers (`docker stop jenkins jenkins-agent`)
+6. Stop containers (`docker compose -f ci/compose.yaml stop`)
 
 ## Branch protection facts
 
@@ -71,14 +80,17 @@ All state (job config, build history, workspace) persists in the `jenkins_home` 
 
 ## Firewall verification test
 
-- From a non-Tailscale device on the LAN: `http://<blade-lan-ip>:8080` must be **unreachable**.
-- From a Tailscale (tailnet) device: it must load.
+- From a non-Tailscale device on the LAN: the VM's LAN address must **not answer** on `8080`, `443` or `50000`. Jenkins is bound to loopback, and Tailscale Serve listens only on the tailnet interface.
+- From a Tailscale (tailnet) device: `https://<vm-name>.<tailnet>.ts.net` must load with a valid certificate.
 
 ## Update procedures
 
-- **Jenkins controller**: `docker pull jenkins/jenkins:lts-jdk21`, recreate the `jenkins` container. Volumes preserve all state.
-- **Jenkins agent**: on tool bumps (gitleaks/semgrep/zizmor/osv-scanner/hadolint/syft versions in `ci/agent/Dockerfile`), rebuild the image and recreate the `jenkins-agent` container.
-- **GitHub PAT**: rotates at its 90-day expiry.
+All commands run on the VM from the repo checkout, with `AGENT_SECRET_FILE` set.
+
+- **Jenkins controller**: bump the digest-pinned image in `ci/compose.yaml` through a PR (never a floating tag), then `docker compose -f ci/compose.yaml up -d jenkins`. Volumes preserve all state. For a large catch-up, update plugins with published security warnings first, then core, then the remaining plugins, with a scan and build after each pass.
+- **Jenkins agent**: on tool bumps (gitleaks/semgrep/zizmor/osv-scanner/hadolint/syft versions in `ci/agent/Dockerfile`), rebuild and recreate it: `docker compose -f ci/compose.yaml up -d --build jenkins-agent`.
+- **Java**: both images use the `-jdk21` variants. Jenkins supports Java 21 until September 2027 and Java 25 from LTS 2.541.1 ([support policy](https://www.jenkins.io/doc/book/platform-information/support-policy-java/)). Move the controller and the agent to the `-jdk25` variants before then.
+- **GitHub PAT**: fine-grained, this repository only (Contents read, Metadata read, Commit statuses read/write). It rotates at its 90-day expiry: update the `github-pat` credential in the folder store.
 
 ## Escape hatch
 
