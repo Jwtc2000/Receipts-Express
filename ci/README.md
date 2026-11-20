@@ -13,7 +13,7 @@ Neither pipeline duplicates the other's stages.
 
 Every stage below runs on every Jenkins build of a branch unless marked **main-only** — the `Jenkinsfile` gates those two with `when { branch 'main' }`.
 
-A build is not triggered by the push. The controller is reachable only over the tailnet, so GitHub cannot deliver a webhook to it; a build starts when the multibranch job scans the repository, which is why **Scan Repository Now** is a step in the working rhythm below.
+A build is not triggered by the push; it starts when the multibranch job scans the repository, which is why **Scan Repository Now** is a step in the working rhythm below.
 
 | Stage | Tool | Version | What it checks |
 |---|---|---|---|
@@ -42,23 +42,12 @@ The full-history secrets scan and SBOM generation are main-only because both are
 
 `semgrep`, previously installed unpinned, now has its own `ARG SEMGREP_VERSION` like every other tool (this was hadolint's DL3013 finding on first run — a legitimate catch, not an exception).
 
-## Windows host operations
-
-```
-docker start jenkins jenkins-agent
-docker stop jenkins jenkins-agent
-```
-
-All state (job config, build history, workspace) persists in the `jenkins_home` and `agent_work` named volumes — stopping/starting the containers does not lose anything. Provisioning details: `ci/blade-setup.ps1`.
-
 ## Working rhythm
 
-1. Start containers (`docker start jenkins jenkins-agent`)
-2. Push branch, open PR
-3. In Jenkins: **Scan Repository Now**
-4. Review both required checks on the PR
-5. Merge on green
-6. Stop containers (`docker stop jenkins jenkins-agent`)
+1. Push branch, open PR
+2. In Jenkins: **Scan Repository Now**
+3. Review both required checks on the PR
+4. Merge on green
 
 ## Branch protection facts
 
@@ -68,21 +57,6 @@ All state (job config, build history, workspace) persists in the `jenkins_home` 
 - `continuous-integration/jenkins/pr-merge` — classic Status API (no app binding)
 
 `build` and `deploy` are **not** required — they `skip` on PRs by design (deploy-only-on-`main`-push gate), and requiring them would deadlock every merge. The two main-only Jenkins stages (full-history secrets scan, SBOM) are likewise not required on PRs, for the same reason — they only ever run on `main` pushes/rescans, never on a PR build.
-
-## Firewall verification test
-
-- From a non-Tailscale device on the LAN: `http://<blade-lan-ip>:8080` must be **unreachable**.
-- From a Tailscale (tailnet) device: it must load.
-
-## Update procedures
-
-- **Jenkins controller**: `docker pull jenkins/jenkins:lts-jdk21`, recreate the `jenkins` container. Volumes preserve all state.
-- **Jenkins agent**: on tool bumps (gitleaks/semgrep/zizmor/osv-scanner/hadolint/syft versions in `ci/agent/Dockerfile`), rebuild the image and recreate the `jenkins-agent` container.
-- **GitHub PAT**: rotates at its 90-day expiry.
-
-## Escape hatch
-
-If the Jenkins host is unavailable, temporarily remove `continuous-integration/jenkins/pr-merge` from the required checks in branch protection so GitHub-Actions-only PRs can still merge. Do this deliberately, and revert it once Jenkins is back.
 
 ## First-catch note
 

@@ -72,7 +72,7 @@ Every claim below is something you can verify by reading this repository, not so
 
 ## Continuous Integration & Deployment (CI/CD)
 
-**In plain terms:** two independent automated systems inspect a change before it's allowed anywhere near the live app. One lives on GitHub's own servers and handles "does it work" (does it compile, do the tests pass, is the deploy safe to run); it starts by itself on every push and every pull request. The other lives on a private machine and handles "is it safe" (no leaked secrets, no risky code patterns, no vulnerable dependencies); because that machine isn't reachable from the internet, GitHub can't notify it, so its runs are kicked off from the Jenkins side rather than by the push. Both have to say yes before a change can merge into `main`; if either says no — or hasn't reported yet — the merge is blocked.
+**In plain terms:** two independent automated systems inspect a change before it's allowed anywhere near the live app. One lives on GitHub's own servers and handles "does it work" (does it compile, do the tests pass, is the deploy safe to run); it starts by itself on every push and every pull request. The other runs separately and handles "is it safe" (no leaked secrets, no risky code patterns, no vulnerable dependencies); its runs are started from the Jenkins side rather than by the push. Both have to say yes before a change can merge into `main`; if either says no — or hasn't reported yet — the merge is blocked.
 
 **In technical terms:** the two pipelines are deliberately non-overlapping — neither repeats a check the other already owns. Full reasoning and configuration notes live in [ci/README.md](./ci/README.md); the summary below is what each one runs.
 
@@ -90,7 +90,7 @@ Permissions are minimal by default (`contents: read` at the workflow level), eac
 
 ### Jenkins — [`Jenkinsfile`](./Jenkinsfile)
 
-Hosted on a separate, self-hosted machine, reachable only over a private Tailscale network rather than the public internet. That has a consequence worth stating plainly: GitHub cannot deliver a push or pull-request webhook to a machine it cannot reach, so a Jenkins build is not triggered by the push itself. It starts when the multibranch job scans the repository — in practice a **Scan Repository Now** once the containers are up, which is why that step is in the working rhythm in [ci/README.md](./ci/README.md). Every stage below then runs against the branch being built, except the two marked main-only, which the `Jenkinsfile` gates with `when { branch 'main' }`:
+Runs separately from GitHub Actions. A Jenkins build is not triggered by the push itself: it starts when the multibranch job scans the repository — in practice a **Scan Repository Now**, which is why that step is in the working rhythm in [ci/README.md](./ci/README.md). Every stage below then runs against the branch being built, except the two marked main-only, which the `Jenkinsfile` gates with `when { branch 'main' }`:
 
 | Stage | Tool | What it checks |
 | --- | --- | --- |
