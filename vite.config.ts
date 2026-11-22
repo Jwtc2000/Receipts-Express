@@ -168,6 +168,21 @@ export default defineConfig({
     __APP_VERSION__: JSON.stringify(pkg.version),
     __COMMIT_HASH__: JSON.stringify(commitHash),
   },
+  build: {
+    rolldownOptions: {
+      output: {
+        // Keep third-party licence headers in the emitted chunks. Without
+        // this the Vite 8 build drops every `/*! */` and `@license` comment,
+        // and with them the notices that MIT and BSD-3-Clause condition
+        // their grants on: jsPDF's own banner and the headers of the code it
+        // vendors (Adobe's JPEG encoder among them), tslib's, DOMPurify's
+        // and React's. THIRD_PARTY_NOTICES.md describes those headers as
+        // shipping inside the chunks they cover, so this option is what
+        // keeps that file true. It costs about 14 kB across all chunks.
+        comments: { legal: true },
+      },
+    },
+  },
   plugins: [
     cspPlugin(),
     copyStaticDocsPlugin(),
