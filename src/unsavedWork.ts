@@ -14,3 +14,18 @@ export function setHasUnsavedWork(value: boolean): void {
 export function hasUnsavedWork(): boolean {
   return unsaved
 }
+
+/**
+ * The user has already said, in the app's own prompt, that the unsaved work
+ * may go. The editor's beforeunload guard reads this so the browser does not
+ * ask the same question a second time while the page reloads.
+ */
+let discardConfirmed = false
+
+export function confirmDiscard(): void {
+  discardConfirmed = true
+}
+
+export function isDiscardConfirmed(): boolean {
+  return discardConfirmed
+}

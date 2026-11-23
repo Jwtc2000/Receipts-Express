@@ -90,6 +90,18 @@ describe('production build', () => {
     expect(sw).toContain('docs-pages')
   })
 
+  // With the worker installed, a navigation to one of the shipped licence
+  // files was answered with the app shell. They must be left to the network.
+  it('does not answer a navigation to the licence and notice files with the app', () => {
+    const sw = readFileSync(join(outDir, 'sw.js'), 'utf-8')
+    const denylist = /denylist:\s*\[([^\]]*)\]/.exec(sw)?.[1] ?? ''
+    const patterns = [...denylist.matchAll(/\/((?:\\\/|[^/])+)\/[a-z]*/g)].map((m) => new RegExp(m[1]))
+    expect(patterns.length).toBeGreaterThan(0)
+    for (const path of ['/Receipts-Express/LICENSE.txt', '/Receipts-Express/THIRD_PARTY_NOTICES.md']) {
+      expect(patterns.some((re) => re.test(path)), path).toBe(true)
+    }
+  })
+
   /*
    * What is in the install-time precache, asserted against the worker that was
    * actually generated rather than against the config that was meant to produce

@@ -5,6 +5,7 @@ import UpdateBanner from './components/UpdateBanner'
 import StorageWarning from './components/StorageWarning'
 import GlobalErrorToast from './components/GlobalErrorToast'
 import FirstRunNotice from './components/FirstRunNotice'
+import ErrorBoundary from './components/ErrorBoundary'
 import './styles.css'
 
 // StorageWarning requests durable storage (navigator.storage.persist) on mount
@@ -39,7 +40,9 @@ function Root() {
             the screen and was only ever seen by someone who scrolled to the
             end of the page. */}
         <StorageWarning />
-        <App />
+        <ErrorBoundary>
+          <App />
+        </ErrorBoundary>
         <UpdateBanner />
         <GlobalErrorToast />
       </div>

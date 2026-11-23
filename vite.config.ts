@@ -209,7 +209,8 @@ export default defineConfig({
         theme_color: '#0f766e',
         background_color: '#f8fafc',
         display: 'standalone',
-        orientation: 'portrait',
+        // No orientation lock: an installed app that refuses to turn is a
+        // problem for anyone whose device is mounted sideways (WCAG 1.3.4).
         icons: [
           {
             src: 'icons/icon-192.png',
@@ -277,7 +278,11 @@ export default defineConfig({
         // browser fetches the real page.
         // Matched against the full pathname, which includes the /<repo>/ base
         // on GitHub Pages, so this stays unanchored rather than /^\/docs\//.
-        navigateFallbackDenylist: [/\/docs\//],
+        //
+        // The licence and notice files are exempt for the same reason. With
+        // the worker installed, opening LICENSE.txt or THIRD_PARTY_NOTICES.md
+        // by URL showed the app instead of the file.
+        navigateFallbackDenylist: [/\/docs\//, /\.(?:txt|md)$/],
         runtimeCaching: [
           {
             urlPattern: /\/tesseract\//,

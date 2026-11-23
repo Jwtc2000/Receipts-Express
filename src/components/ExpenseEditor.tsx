@@ -5,7 +5,7 @@ import { getExpense, saveExpenseWithImage, getImage, nextPosition } from '../db'
 import { compressImage } from '../image'
 import { isPdfFile } from '../pdfDetect'
 import { extractReceipt } from '../ocr'
-import { setHasUnsavedWork } from '../unsavedWork'
+import { setHasUnsavedWork, isDiscardConfirmed } from '../unsavedWork'
 import Icon from './icons'
 import { HeaderPlanes } from './decorative'
 
@@ -155,6 +155,7 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
   useEffect(() => {
     if (!dirty) return
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isDiscardConfirmed()) return
       e.preventDefault()
       e.returnValue = ''
     }
