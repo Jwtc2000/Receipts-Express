@@ -16,11 +16,13 @@ merge to `main` that changes app behavior gets a version bump and a tag.
   first page. The merchant, date and total come out exactly as printed, from
   every page rather than only the first, in a fraction of a second, and
   without first downloading the recognition model. The banner says "Details
-  read from the PDF" when this happens.
-- A scanned PDF, which is only pictures of pages, and a PDF whose text looks
-  broken (fonts with no Unicode map) are still read with text recognition.
-  Text recognition now goes on to the next page of a scanned PDF while it
-  has not found a total, up to five pages, instead of reading only page 1.
+  read from the PDF" when this happens. Runs of text that touch are joined
+  without a space, so a number the PDF draws in two pieces stays one number.
+- A scanned PDF, which is only pictures of pages, a PDF with some pages that
+  are only pictures, and a PDF whose text looks broken (fonts with no
+  Unicode map) are still read with text recognition. Text recognition now
+  goes on to the next page of a scanned PDF while it has not found a line
+  labelled as the total, up to five pages, instead of reading only page 1.
 - The merchant is picked with more care. A line the recognition engine is
   unsure of (a photo's table or background read as letters) is passed over,
   and so are addresses, phone numbers, dates, till fields ("Server:",

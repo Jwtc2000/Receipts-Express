@@ -86,9 +86,10 @@ export async function forgetOldModelCopies(currentKey: string): Promise<void> {
   }
 }
 
-// A scanned PDF is read page by page only until a total turns up: most
-// receipts have it on page 1, and an itinerary or folio rarely needs more
-// than a few pages to reach it.
+// A scanned PDF is read page by page only until a line labelled as the total
+// turns up: most receipts have it on page 1, and an itinerary or folio rarely
+// needs more than a few pages to reach it. A page with amounts but no total
+// line does not stop the scan, since its largest amount is only a guess.
 const MAX_SCANNED_PAGES = 5
 
 /**
@@ -96,8 +97,8 @@ const MAX_SCANNED_PAGES = 5
  * purchase date and total amount.
  *
  * Given several pages (a scanned PDF), page 1 is read first and later pages
- * only while no total has been found, so a one-page receipt costs no more
- * than before.
+ * only while no labelled total has been found, so a one-page receipt costs no
+ * more than before. With none on any page read, the largest amount stands in.
  */
 export async function extractReceipt(
   images: Blob | Blob[],
@@ -122,8 +123,9 @@ export async function extractReceipt(
       const result = await worker.recognize(input, {}, { text: true, blocks: true })
       texts.push(result.data.text)
       lines.push(...linesOf(result.data.blocks))
-      parsed = parseReceiptText(texts.join('\n'), lines)
-      if (parsed.total !== undefined) break
+      const { totalIsLabelled, ...found } = parseReceipt(texts.join('\n'), lines)
+      parsed = found
+      if (totalIsLabelled) break
     }
     return { ...parsed, rawText: texts.join('\n') }
   } finally {
@@ -272,6 +274,20 @@ function toIsoDate(d: Date): string {
  * apart from the noise a photo's background turns into.
  */
 export function parseReceiptText(text: string, ocrLines?: OcrLine[]): Omit<ExtractedReceipt, 'rawText'> {
+  const { totalIsLabelled: _labelled, ...parsed } = parseReceipt(text, ocrLines)
+  return parsed
+}
+
+/**
+ * parseReceiptText, also saying whether the total came from a line labelled
+ * as one ("Total", "Amount due") or is only the largest amount seen. The
+ * second is a guess, and on page 1 of a scan a fare or a subtotal can be
+ * larger than anything else there while the real total is on page 2.
+ */
+function parseReceipt(
+  text: string,
+  ocrLines?: OcrLine[],
+): Omit<ExtractedReceipt, 'rawText'> & { totalIsLabelled: boolean } {
   const lines = text
     .split('\n')
     .map((l) => l.trim())
@@ -294,6 +310,7 @@ export function parseReceiptText(text: string, ocrLines?: OcrLine[]): Omit<Extra
       if (total === undefined || lineMax > total) total = lineMax
     }
   }
+  const totalIsLabelled = total !== undefined
   if (total === undefined && fallbackMax > 0) total = fallbackMax
 
   // --- Date: the earliest one on the receipt ---
@@ -322,7 +339,7 @@ export function parseReceiptText(text: string, ocrLines?: OcrLine[]): Omit<Extra
 
   const merchant = pickMerchant(lines, ocrLines)
 
-  return { merchant, date, total }
+  return { merchant, date, total, totalIsLabelled }
 }
 
 const DATE_WINDOW_DAYS = 92
@@ -333,7 +350,9 @@ const MONTH_GLUED = /\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[
 // of the header lines: "Here's your receipt for Taco Palace (12 Elm St)",
 // "From: Coastal Air Receipts <...>", "Thank you for choosing Coastal Air."
 const NAMED_FORMS = [
-  /\b(?:receipt|order|purchase)\s+(?:for|from)\s+(?!(?:your|our|the|this|a|confirmation|order|purchase|booking|reservation)\b)(.+)/i,
+  // "Order for Jane Doe" names the customer, so an order or purchase counts
+  // only when it is "from" someone.
+  /\b(?:receipt\s+(?:for|from)|(?:order|purchase)\s+from)\s+(?!(?:your|our|the|this|a|confirmation|order|purchase|booking|reservation)\b)(.+)/i,
   /^from:\s*(.+)/i,
   /\bthank(?:s|\s+you)\s+for\s+(?:choosing|shopping\s+(?:at|with)|dining\s+(?:at|with)|visiting|flying(?:\s+with)?|staying\s+(?:at|with))\s+(.+)/i,
 ]

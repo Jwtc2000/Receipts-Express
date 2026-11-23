@@ -18,7 +18,7 @@ const { getExpense, saveExpenseWithImage, getImage, nextPosition } = vi.hoisted(
 vi.mock('../db', () => ({ getExpense, saveExpenseWithImage, getImage, nextPosition }))
 vi.mock('../ocr', () => ({ extractReceipt: vi.fn().mockResolvedValue({}), receiptFromText: vi.fn(() => null) }))
 vi.mock('../pdfReceipt', () => ({
-  readPdfReceipt: vi.fn(() => Promise.resolve({ pages: [new Blob(['page'])], text: '' })),
+  readPdfReceipt: vi.fn(() => Promise.resolve({ pages: [new Blob(['page'])], text: '', pagesWithoutText: 1 })),
 }))
 vi.mock('../image', () => ({ compressImage: vi.fn(() => Promise.resolve(new Blob(['compressed']))) }))
 
@@ -202,7 +202,7 @@ describe('ExpenseEditor PDF text', () => {
     const { extractReceipt, receiptFromText } = await import('../ocr')
     const { readPdfReceipt } = await import('../pdfReceipt')
     vi.mocked(extractReceipt).mockClear()
-    vi.mocked(readPdfReceipt).mockResolvedValueOnce({ pages: [new Blob(['page'])], text: 'Acme Car Rental ... Total 162.00' })
+    vi.mocked(readPdfReceipt).mockResolvedValueOnce({ pages: [new Blob(['page'])], text: 'Acme Car Rental ... Total 162.00', pagesWithoutText: 0 })
     vi.mocked(receiptFromText).mockReturnValueOnce({ merchant: 'Acme Car Rental', total: 162, date: '2026-03-05', rawText: '' })
     const user = userEvent.setup()
     const { container } = render(<ExpenseEditor reportId="report-1" onDone={vi.fn()} />)
@@ -214,6 +214,22 @@ describe('ExpenseEditor PDF text', () => {
     expect(extractReceipt).not.toHaveBeenCalled()
     expect(screen.getByLabelText('Amount')).toHaveValue(162)
     expect(screen.getByPlaceholderText("e.g. Joe's Diner")).toHaveValue('Acme Car Rental')
+  })
+
+  it('scans a PDF whose text pages are mixed with picture pages, rather than trust the text alone', async () => {
+    const { extractReceipt, receiptFromText } = await import('../ocr')
+    const { readPdfReceipt } = await import('../pdfReceipt')
+    vi.mocked(extractReceipt).mockClear()
+    vi.mocked(receiptFromText).mockClear()
+    const pages = [new Blob(['text page']), new Blob(['picture page'])]
+    vi.mocked(readPdfReceipt).mockResolvedValueOnce({ pages, text: 'Coastal Air\nFare 100.00', pagesWithoutText: 1 })
+    const user = userEvent.setup()
+    const { container } = render(<ExpenseEditor reportId="report-1" onDone={vi.fn()} />)
+
+    await user.upload(pickFileInput(container), new File(['%PDF'], 'mixed.pdf', { type: 'application/pdf' }))
+    await screen.findByText(/Details extracted/)
+    expect(receiptFromText).not.toHaveBeenCalled()
+    expect(extractReceipt).toHaveBeenCalledWith(pages, expect.any(Function))
   })
 
   it('scans the first page when the PDF has no usable text', async () => {

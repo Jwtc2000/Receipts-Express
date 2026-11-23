@@ -7,8 +7,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 // this test focused on renderPdfPages' own loop/cap logic — the off-by-one
 // risk the audit flagged — without needing real rasterization.
 // A text run as PDF.js gives it: the last two numbers of `transform` are x and y.
-function run(str: string, x: number, y: number, size = 10) {
-  return { str, transform: [size, 0, 0, size, x, y], height: size }
+function run(str: string, x: number, y: number, size = 10, width?: number) {
+  return { str, transform: [size, 0, 0, size, x, y], height: size, width }
 }
 
 function makePage(width = 100, height = 100, getTextContent = vi.fn(() => Promise.resolve({ items: [] as unknown[] }))) {
@@ -128,6 +128,20 @@ describe('readPdfReceipt', () => {
     expect(text).toBe('Hotel Marigold\nTotal $312.40')
   })
 
+  it('counts the pages that carry next to no text', async () => {
+    const { getDocument } = await import('pdfjs-dist')
+    const texts: Record<number, unknown[]> = {
+      1: [run('Lakeside Inn & Suites, 10 Oak St, Millbrook', 10, 700)],
+      2: [run('Page 2', 10, 20)],
+      3: [],
+    }
+    const task = makeLoadingTask(3, (n) => makePage(100, 100, vi.fn(() => Promise.resolve({ items: texts[n] }))))
+    ;(getDocument as ReturnType<typeof vi.fn>).mockReturnValue(task)
+
+    const { readPdfReceipt } = await import('./pdfReceipt')
+    expect((await readPdfReceipt(new Blob(['pdf-bytes']))).pagesWithoutText).toBe(2)
+  })
+
   it('treats a page whose text cannot be read as a scanned page', async () => {
     const { getDocument } = await import('pdfjs-dist')
     const task = makeLoadingTask(1, () => makePage(100, 100, vi.fn(() => Promise.reject(new Error('bad font')))))
@@ -146,6 +160,20 @@ describe('textItemsToLines', () => {
     // Drawn out of order, as PDFs often are: the amount before its label.
     const items = [run('9.75', 300, 100), run('Total', 20, 101), run('Corner Bakery', 20, 500), { type: 'beginMarkedContent' }, run(' ', 0, 0)]
     expect(textItemsToLines(items)).toBe('Corner Bakery\nTotal 9.75')
+  })
+
+  it('joins runs that touch without a space, so a number split by a font change stays whole', async () => {
+    const { textItemsToLines } = await import('./pdfReceipt')
+    // "Total" ends at x=45 and the amount starts at 200: a gap, so a space.
+    // "1" ends at 205 and "234.56" starts there: one number in two runs.
+    const items = [run('Total', 20, 100, 10, 25), run('1', 200, 100, 10, 5), run('234.56', 205, 100, 10, 30)]
+    expect(textItemsToLines(items)).toBe('Total 1234.56')
+  })
+
+  it('keeps a space a run carries, and adds one where a run has no width', async () => {
+    const { textItemsToLines } = await import('./pdfReceipt')
+    expect(textItemsToLines([run('Total ', 20, 100, 10, 30), run('9.75', 50, 100, 10, 20)])).toBe('Total 9.75')
+    expect(textItemsToLines([run('Total', 20, 100), run('9.75', 50, 100)])).toBe('Total 9.75')
   })
 })
 

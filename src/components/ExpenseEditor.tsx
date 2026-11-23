@@ -277,6 +277,7 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
     // and the freshly picked receipt vanished with no message.
     let pages: Blob[]
     let pdfText = ''
+    let pdfPagesWithoutText = 0
     try {
       if (isPdfFile(file)) {
         // Loaded on demand so the PDF.js engine — sizeable — never ships to
@@ -287,7 +288,7 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
         } catch {
           throw new PdfReaderUnavailable()
         }
-        ;({ pages, text: pdfText } = await readPdfReceipt(file))
+        ;({ pages, text: pdfText, pagesWithoutText: pdfPagesWithoutText } = await readPdfReceipt(file))
       } else {
         pages = [await compressImage(file)]
       }
@@ -319,11 +320,13 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
     // even though OCR (below) is still running in the background.
     setPicking(false)
 
-    // Auto-extract details: from a PDF's own text when it has usable text,
-    // which is exact and covers every page; otherwise with on-device OCR,
-    // which reads further pages of a scanned PDF only until it finds a total.
+    // Auto-extract details: from a PDF's own text when every page has usable
+    // text, which is exact; otherwise with on-device OCR, which reads further
+    // pages of a scanned PDF only until it finds a total. A PDF with some
+    // pages that are only pictures goes to OCR whole: the total may be on a
+    // picture page, and the text pages alone would give a wrong one.
     const scan = ++scanGenRef.current
-    const fromText = pdfText ? receiptFromText(pdfText) : null
+    const fromText = pdfText && pdfPagesWithoutText === 0 ? receiptFromText(pdfText) : null
     setReadFromText(!!fromText)
     setScanState('scanning')
     setScanPct(0)

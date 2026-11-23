@@ -480,8 +480,12 @@ describe('legal pages', () => {
       expect(months[Number(month) - 1], `TERMS_VERSION is not an ISO date: ${TERMS_VERSION}`).toBeDefined()
       const written = `${Number(day)} ${months[Number(month) - 1]} ${year}${revision ? ` (revision ${revision})` : ''}`
 
-      // Not followed by a revision the version does not have.
-      expect(readProse(page)).toMatch(new RegExp(`Last updated ${written.replace(/[()]/g, '\\$&')}(?! \\(revision)`))
+      // The date line under the title, whole: a sentence elsewhere on the
+      // page that happened to give the right date would not do.
+      const dates = readProse(page).match(/<p class="dates">([^<]*)<\/p>/)
+      expect(dates, `${page} has no <p class="dates"> line`).not.toBeNull()
+      expect(dates![1].trim()).toMatch(/^Effective \d{1,2} [A-Z][a-z]+ \d{4} · Last updated /)
+      expect(dates![1].trim().endsWith(`Last updated ${written}`)).toBe(true)
     },
   )
 })

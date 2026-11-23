@@ -206,6 +206,11 @@ describe('parseReceiptText', () => {
     expect(parseReceiptText(text.join('\n')).merchant).toBe('Coastal Air')
   })
 
+  it('does not take the customer an order is for as the merchant', () => {
+    expect(parseReceiptText('Corner Bakery\nOrder for Jane Doe\nTotal 9.75').merchant).toBe('Corner Bakery')
+    expect(parseReceiptText('Your order from Taco Palace\nTotal 9.75').merchant).toBe('Taco Palace')
+  })
+
   it('takes the name from "Thank you for choosing ..."', () => {
     expect(parseReceiptText('Thank you for choosing Coastal Air.\nTotal 20.00').merchant).toBe('Coastal Air')
   })
@@ -343,6 +348,27 @@ describe('extractReceipt', () => {
     const got = await extractReceipt([new Blob(['1']), new Blob(['2']), new Blob(['3'])])
     expect(recognize).toHaveBeenCalledTimes(2)
     expect(got).toMatchObject({ merchant: 'Coastal Air', date: '2026-03-02', total: 35 })
+  })
+
+  it('does not stop at a page whose only amount is the largest number on it', async () => {
+    const recognize = vi
+      .fn()
+      .mockResolvedValueOnce(page('Coastal Air\nFare 100.00\nTax 12.00'))
+      .mockResolvedValueOnce(page('Total 112.00'))
+    createWorker.mockResolvedValue({ recognize })
+    const { extractReceipt } = await import('./ocr')
+    const got = await extractReceipt([new Blob(['1']), new Blob(['2'])])
+    expect(recognize).toHaveBeenCalledTimes(2)
+    expect(got.total).toBe(112)
+  })
+
+  it('falls back to the largest amount when no page has a total line', async () => {
+    const recognize = vi.fn().mockResolvedValueOnce(page('Coastal Air\nFare 100.00')).mockResolvedValueOnce(page('Conditions'))
+    createWorker.mockResolvedValue({ recognize })
+    const { extractReceipt } = await import('./ocr')
+    const got = await extractReceipt([new Blob(['1']), new Blob(['2'])])
+    expect(recognize).toHaveBeenCalledTimes(2)
+    expect(got.total).toBe(100)
   })
 
   it('reads at most five pages', async () => {
