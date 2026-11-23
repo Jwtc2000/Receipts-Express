@@ -17,7 +17,10 @@ merge to `main` that changes app behavior gets a version bump and a tag.
   20238" for 202.38) and with a "$" read as a digit removed ("49.91" for
   $9.91), and a reading that agrees is used. Otherwise the printed total
   stands, so a tip or a fee that makes it larger than subtotal plus tax is
-  kept.
+  kept, and a larger total printed after one that agrees ("Total 32.40",
+  "Tip 6.00", "Grand Total 38.40") wins. Several tax lines are added up, or
+  a "Total Tax" line is used when there is one; "Taxable amount" is not
+  tax.
 - A tax rate ("Tax 8.25%") is never read as money, and cash handed over or
   change given is never taken for the total. "TOTAL" misread as "T0TAL",
   "TOTAI" or "TOTAS" is still a total line. With no total line, subtotal
