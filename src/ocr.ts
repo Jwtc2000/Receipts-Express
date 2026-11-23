@@ -323,7 +323,8 @@ function readingsOf(line: string): number[] {
       withoutFirstDigit(Number(m[1]))
     }
   }
-  return out.filter((n) => n > 0)
+  // Zero stays: a tax of 0.00 still checks a total. Totals leave it out.
+  return out.filter((n) => n >= 0)
 }
 
 /**
@@ -386,17 +387,20 @@ function pickTotal(lines: string[]): { total?: number; totalIsLabelled: boolean 
     // not the total of anything.
     const asRead = amounts.filter((x) => x > 0)
     if (asRead.length) totals.push({ value: Math.max(...asRead), at })
-    const r = readingsOf(line)
+    const r = readingsOf(line).filter((x) => x > 0)
     if (r.length) totalReadings.push({ readings: r, at })
   })
 
   const near = (a: number, b: number) => Math.abs(cents(a) - cents(b)) <= 1
   // The tax is a "Total Tax" line when there is one, otherwise all the tax
-  // lines added up ("State Tax", "Local Tax"). Each line on its own is kept
-  // as a check too, for a receipt that prints the same tax twice.
+  // lines added up ("State Tax", "Local Tax"). A tax printed twice (in the
+  // body and again in the summary) is also checked once: adding both copies
+  // would double it. Distinct lines are only ever checked together, or
+  // subtotal plus one of them could agree with a misread total.
   const tax = taxTotal ?? (taxParts.length ? taxParts.reduce((sum, t) => (cents(sum) + cents(t)) / 100, 0) : undefined)
   const sums = tax === undefined ? [] : subtotals.map((s) => (cents(s) + cents(tax)) / 100)
-  const checks = [...sums, ...subtotals.flatMap((s) => taxParts.map((t) => (cents(s) + cents(t)) / 100)), ...paid]
+  const repeated = taxParts.filter((t, i) => taxParts.findIndex((u) => cents(u) === cents(t)) !== i)
+  const checks = [...sums, ...subtotals.flatMap((s) => repeated.map((t) => (cents(s) + cents(t)) / 100)), ...paid]
   const agrees = (n: number) => checks.some((c) => near(n, c))
   // A larger total printed after the one that agrees is the total once a tip
   // or a fee was added ("Total 32.40", "Tip 6.00", "Grand Total 38.40").

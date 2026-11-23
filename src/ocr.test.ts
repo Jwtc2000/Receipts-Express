@@ -335,8 +335,19 @@ describe('parseReceiptText total, checked against the other lines', () => {
 
   it('adds up several tax lines, or uses the total tax line when there is one', () => {
     expect(total(['Corner Bakery', 'Subtotal 100.00', 'State Tax 6.00', 'Local Tax 2.00'])).toBe(108)
-    expect(total(['Corner Bakery', 'Subtotal 100.00', 'State Tax 6.00', 'Local Tax 2.00', 'Total Tax 8.00'])).toBe(108)
+    // The total tax line wins over adding up the lines: these add up to 16.
+    expect(total(['Corner Bakery', 'Subtotal 100.00', 'Tax 8.00', 'Tax 8.00', 'Total Tax 8.00'])).toBe(108)
     expect(total(['Corner Bakery', 'Subtotal 100.00', 'Taxable amount 100.00', 'Tax 8.00'])).toBe(108)
+  })
+
+  it('checks distinct tax lines only together', () => {
+    // 100 + 6 agrees with the first total; only 100 + 6 + 2 is the tax.
+    const lines = ['Corner Bakery', 'Total 106.00', 'Subtotal 100.00', 'State Tax 6.00', 'Local Tax 2.00', 'TOTAL 10800']
+    expect(total(lines)).toBe(108)
+  })
+
+  it('checks a total against a tax of 0.00', () => {
+    expect(total(['Corner Bakery', 'Subtotal 9.91', 'Tax 0.00', 'TOTAL 49.91'])).toBe(9.91)
   })
 
   it('never takes a tax rate for money', () => {
