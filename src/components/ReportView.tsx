@@ -15,7 +15,8 @@ import {
 import { exportReportPdf } from '../pdf'
 import { exportReportCsv } from '../csv'
 import { expenseMatches } from '../search'
-import { dayColor, contrastText, rgbToCss } from '../colors'
+import { contrastText, rgbToCss } from '../colors'
+import { bannerColor, currentSeason } from '../season'
 import { foodBalanceForDate, formatFoodBalance, formatPersonalTotal } from '../mealAllowance'
 import { getProfile, type Profile } from '../profile'
 import { MAX_STRING_LENGTH } from '../backup'
@@ -642,7 +643,7 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
             {expenses.map((expense, index) => {
               if (searching && !expenseMatches(expense, query)) return null
               const dayNumber = dayDividerAt.has(index) ? dayNumberByDate.get(expense.date) : undefined
-              const dayBg = dayNumber !== undefined ? dayColor(dayNumber) : null
+              const dayBg = dayNumber !== undefined ? bannerColor(dayNumber, currentSeason()) : null
               const foodBalance = report.dailyMealAllowance
                 ? foodBalanceForDate(expenses, expense.date, report.dailyMealAllowance)
                 : null

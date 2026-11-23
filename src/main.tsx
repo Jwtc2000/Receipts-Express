@@ -8,6 +8,10 @@ import FirstRunNotice from './components/FirstRunNotice'
 import ErrorBoundary from './components/ErrorBoundary'
 import { DB_VERSION_CHANGE_EVENT } from './db'
 import './styles.css'
+import { applySeason } from './season'
+
+// The holiday look, by date, before the first paint (src/season.ts).
+applySeason()
 
 // StorageWarning requests durable storage (navigator.storage.persist) on mount
 // and, if it isn't granted and the user has data, warns about the eviction risk.

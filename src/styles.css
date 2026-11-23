@@ -74,6 +74,27 @@ body {
   flex-direction: column;
 }
 
+/* Wider than the app's column, the header, the search bar and a report's
+   summary bar run the full width of the window, with their contents kept
+   in line with the column; before, the header was a 640px box floating on
+   an empty page. The bands reach out with negative margins and pull their
+   contents back in with padding. overflow-x: clip on the body keeps a
+   classic scrollbar's width from adding a sideways scroll; unlike hidden,
+   it does not stop the header sticking. */
+body {
+  overflow-x: clip;
+}
+
+@media (min-width: 641px) {
+  /* Scoped under .app so this outranks each bar's own padding further down. */
+  .app .topbar,
+  .app .search-bar,
+  .app .report-summary-bar {
+    margin-inline: calc(50% - 50vw);
+    padding-inline: calc(50vw - 50% + 16px);
+  }
+}
+
 /* ---- Top bar ---- */
 
 .topbar {
@@ -292,7 +313,8 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .topbar-plane {
+  .topbar-plane,
+  .topbar-snow {
     display: none;
   }
 }
@@ -457,7 +479,21 @@ body {
 }
 
 .icon-btn.danger {
+  /* Grey at rest, red when pointed at or focused. Red trash cans beside every
+     amount made the most dangerous control the loudest thing on the screen;
+     every delete still asks before it acts. */
+  color: var(--muted);
+}
+
+.icon-btn.danger:focus-visible {
   color: var(--danger);
+}
+
+@media (hover: hover) {
+  .icon-btn.danger:not(:disabled):hover {
+    color: var(--danger);
+    background: #fef2f2;
+  }
 }
 
 .fab {
@@ -989,6 +1025,7 @@ body {
      of its own, so without a ring a keyboard user has nothing to look at. */
   outline: 2px solid var(--teal);
   outline-offset: -1px;
+  border-radius: 6px;
 }
 
 .search-bar .icon-btn {
@@ -1138,6 +1175,8 @@ body {
   border-radius: 10px;
   object-fit: cover;
   background: var(--bg);
+  /* A white receipt on a white card had no edge at all. */
+  border: 1px solid var(--border);
   flex-shrink: 0;
 }
 
@@ -1586,4 +1625,140 @@ body {
   display: flex;
   gap: 12px;
   margin: 20px 0 12px;
+}
+
+/* ---- Holiday season (src/season.ts) ----
+
+   From 15 November to 6 January the page carries data-season="harvest" or
+   "winter", set from the device's date at start-up, and these rules recolour
+   the app around it. Every colour that text sits on or is drawn in was
+   checked for WCAG AA (src/season.test.ts). Exported PDFs keep the everyday
+   colours. */
+
+:root[data-season] {
+  --teal: #166534;
+  --teal-dark: #14532d;
+  --teal-light: #fdf3dc;
+  --purple: #9f1239;
+  --purple-dark: #881337;
+  --purple-light: #ffe4e6;
+  --bg: #faf6ef;
+  /* The everyday slate-500 is 4.4:1 on the cream background: under AA. */
+  --muted: #5f6b7d;
+  --border: #ebe3d6;
+  --gold: #a16207;
+  --light-1: #fbbf24;
+  --light-2: #f97316;
+  --light-3: #dc2626;
+}
+
+:root[data-season='harvest'] {
+  --header-gradient-a: #7c2d12;
+  --header-gradient-b: #881337;
+}
+
+:root[data-season='winter'] {
+  --header-gradient-a: #14532d;
+  --header-gradient-b: #0f3d2e;
+  --light-1: #fbbf24;
+  --light-2: #ef4444;
+  --light-3: #4ade80;
+}
+
+/* The floating button and its focus ring follow the season's cranberry
+   rather than the everyday teal-to-violet sweep, which would pass through
+   brown between the two new ends. */
+:root[data-season] .fab {
+  background: linear-gradient(135deg, var(--purple-dark) 0%, var(--purple) 100%);
+  box-shadow: 0 6px 20px rgba(136, 19, 55, 0.35);
+}
+
+:root[data-season] .fab:focus-visible {
+  box-shadow:
+    0 0 0 4px var(--gold),
+    0 6px 20px rgba(136, 19, 55, 0.35);
+}
+
+:root[data-season] .empty-icon,
+:root[data-season] .expense-thumb.placeholder {
+  color: var(--gold);
+}
+
+/* A string of lights along the bottom edge of the header: a fine wire with
+   a bulb every 14px in the season's three colours, and a soft glow. Purely
+   decoration; it hangs half over the page below and takes no clicks. */
+:root[data-season] .topbar::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -6px;
+  height: 12px;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 6px, var(--light-1) 0 2.4px, transparent 2.6px) 0 0 / 42px 12px repeat-x,
+    radial-gradient(circle at 50% 6px, var(--light-2) 0 2.4px, transparent 2.6px) 14px 0 / 42px 12px repeat-x,
+    radial-gradient(circle at 50% 6px, var(--light-3) 0 2.4px, transparent 2.6px) 28px 0 / 42px 12px repeat-x,
+    linear-gradient(rgba(15, 23, 42, 0.35), rgba(15, 23, 42, 0.35)) 0 5px / 100% 1px no-repeat;
+  filter: drop-shadow(0 0 2px rgba(251, 191, 36, 0.55));
+}
+
+/* Snow in winter: two layers of soft flakes drifting down behind the header's
+   glyphs. One tile height (60px) of travel loops seamlessly, and it moves by
+   transform alone. Hidden under reduced motion, with the glyphs: standing
+   still, the flakes read as stray marks. */
+.topbar-snow {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -60px;
+  bottom: 0;
+  background:
+    radial-gradient(circle, rgba(255, 255, 255, 0.5) 0 0.9px, transparent 1.4px) 0 0 / 47px 60px,
+    radial-gradient(circle, rgba(255, 255, 255, 0.32) 0 1.1px, transparent 1.7px) 23px 31px / 71px 60px;
+  animation: snow-fall 7s linear infinite;
+  will-change: transform;
+}
+
+@keyframes snow-fall {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(60px);
+  }
+}
+
+/* A season's glyphs read a little brighter than the travel ones. */
+:root[data-season] .topbar-plane {
+  opacity: 0.4;
+}
+
+.season-greeting {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 2px 0 14px;
+  padding: 10px 14px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--gold);
+  border-radius: 12px;
+  color: var(--teal-dark);
+  font-size: 0.92rem;
+  font-weight: 600;
+  box-shadow: var(--shadow);
+}
+
+.season-greeting-glyph {
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  color: var(--gold);
+}
+
+.season-greeting-glyph svg {
+  width: 100%;
+  height: 100%;
 }

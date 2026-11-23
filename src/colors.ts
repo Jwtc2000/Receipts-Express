@@ -21,7 +21,9 @@ function lerp(a: number, b: number, t: number): number {
  * gradient as the header (Day 1 = A, Day `DAY_COLOR_STEPS` = B), so the
  * palette reads as one consistent brand — and cycle for longer trips.
  * Used identically by the in-app timeline and the PDF export, so the two
- * always agree on which color a given day gets.
+ * agree on which color a given day gets, except in the holiday season, when
+ * the app's banners take the season's colors instead (season.ts bannerColor)
+ * and the PDF keeps these.
  */
 export function dayColor(dayNumber: number): Rgb {
   const step = (((dayNumber - 1) % DAY_COLOR_STEPS) + DAY_COLOR_STEPS) % DAY_COLOR_STEPS
