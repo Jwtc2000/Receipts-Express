@@ -111,6 +111,8 @@ describe('production build', () => {
       'script-src': ["'self'", "'wasm-unsafe-eval'"],
       'style-src': ["'self'"],
       'worker-src': ["'self'", 'blob:'],
+      'object-src': ["'none'"],
+      'frame-src': ["'none'"],
       'base-uri': ["'self'"],
       'form-action': ["'self'"],
     })
@@ -148,6 +150,13 @@ describe('production build', () => {
     expect(d['connect-src']).toEqual(["'self'"])
     expect(d['form-action']).toEqual(["'self'"])
     expect(d['base-uri']).toEqual(["'self'"])
+    // Nothing the app needs and a page of text does not: no WebAssembly, no
+    // workers, no plugin content, no frames, no blob: or data: images.
+    expect(d['script-src']).not.toContain("'wasm-unsafe-eval'")
+    expect(d['worker-src']).toEqual(["'none'"])
+    expect(d['img-src']).toEqual(["'self'"])
+    expect(d['object-src']).toEqual(["'none'"])
+    expect(d['frame-src']).toEqual(["'none'"])
   })
 
   // The docs/ pages are excluded from the install-time precache, so without a

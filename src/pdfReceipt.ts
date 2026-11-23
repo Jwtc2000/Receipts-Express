@@ -5,7 +5,35 @@ import { PDFJS_DIR } from './engineDirs'
 // Self-hosted, matching the Tesseract setup (see scripts/copy-pdfjs-assets.mjs)
 // so a PDF receipt can be rasterized fully offline, with no CDN calls.
 const ASSET_BASE = `${import.meta.env.BASE_URL}${PDFJS_DIR}`
-pdfjsLib.GlobalWorkerOptions.workerSrc = `${ASSET_BASE}/pdf.worker.min.mjs`
+const WORKER_URL = `${ASSET_BASE}/pdf.worker.min.mjs`
+pdfjsLib.GlobalWorkerOptions.workerSrc = WORKER_URL
+
+/**
+ * The PDF.js worker, started from a blob: URL that imports the real worker
+ * script, and handed to PDF.js ready-made.
+ *
+ * A worker started directly from its own URL takes its Content-Security-
+ * Policy from that script's HTTP headers, and GitHub Pages sends none, so the
+ * PDF.js worker used to run with no policy at all. A blob: worker inherits the
+ * policy of the page that made it, which is the app's <meta> CSP: the worker
+ * now gets the same limits as the page, including connect-src 'self'.
+ *
+ * If a browser cannot start it this way, PDF.js falls back to workerSrc above
+ * and works as before.
+ */
+function startWorker(): Worker | null {
+  if (typeof Worker === 'undefined' || typeof URL.createObjectURL !== 'function') return null
+  try {
+    const absolute = new URL(WORKER_URL, window.location.href).href
+    const wrapper = new Blob([`import ${JSON.stringify(absolute)}`], { type: 'text/javascript' })
+    return new Worker(URL.createObjectURL(wrapper), { type: 'module' })
+  } catch {
+    return null
+  }
+}
+
+const worker = startWorker()
+if (worker) pdfjsLib.GlobalWorkerOptions.workerPort = worker
 
 const MAX_RENDER_DIM = 1800
 // A real receipt/invoice is a handful of pages; a much larger PDF is almost

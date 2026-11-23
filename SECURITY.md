@@ -50,20 +50,22 @@ triggering from within an iframe — all data is local to the device. Closing
 this gap for real would require moving to a host that can set response
 headers (e.g. Cloudflare Pages, an edge proxy in front of GitHub Pages).
 
-**Known limitation: the service worker and the PDF worker are outside the
-CSP.** A worker loaded from its own URL gets its policy from the HTTP
-response headers of that script, not from the document that started it —
-and GitHub Pages sends no such headers. So the generated service worker
-(`sw.js`, from `vite-plugin-pwa`) runs with no CSP at all, and so does the
-PDF.js worker, which PDF.js starts directly from its same-origin URL. The
-OCR worker is different: tesseract.js starts it from a `blob:` URL, and a
-`blob:` worker inherits the document's policy, so it is covered. What the
-uncovered code does is precache the app shell and render PDF pages from
-this app's own origin — but that is a property of the code as written, not
-something the browser enforces. The `<meta>` CSP does still decide whether
-workers may be created (`worker-src 'self' blob:`). The PDF worker could be
-brought under the policy without changing hosts, by starting it from a
-`blob:` wrapper; the service worker needs a host that sets response headers.
+**Known limitation: the service worker is outside the CSP.** A worker
+loaded from its own URL gets its policy from the HTTP response headers of
+that script, not from the document that started it — and GitHub Pages sends
+no such headers. So the generated service worker (`sw.js`, from
+`vite-plugin-pwa`) runs with no CSP at all. What it does is precache the app
+shell and cache the OCR and PDF engines from this app's own origin — but that
+is a property of the code as written, not something the browser enforces.
+Closing this needs a host that sets response headers.
+
+Both other workers are covered. tesseract.js starts the OCR worker from a
+`blob:` URL, and `src/pdfReceipt.ts` starts the PDF.js worker the same way, as
+a `blob:` module that imports the real worker script. A `blob:` worker inherits
+the policy of the page that made it, so both run under the app's `<meta>` CSP:
+in the built app, a request to another origin from inside either worker is
+refused. Until 1.16.1 the PDF worker was started from its own URL and so ran with
+no policy.
 
 **Known limitation: WebRTC is outside the CSP.** `connect-src` does not
 govern `RTCPeerConnection`, and the meta policy sets nothing that does.
