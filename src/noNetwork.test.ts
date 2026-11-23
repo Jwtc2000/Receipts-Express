@@ -130,13 +130,14 @@ function stripComments(source: string): string {
 
 /** Every forbidden name in `source`, as "line N: <the line>" strings. */
 /**
- * The line with the contents of its string literals removed. Template
- * literals keep their `${...}` expressions, which are code.
+ * The line with the contents of its quoted strings removed. A line holding
+ * a template literal is left whole: template text and the code inside
+ * `${...}` cannot be told apart reliably here, and leaving it in can only
+ * make the check stricter.
  */
 function codeOnly(line: string): string {
-  return line
-    .replace(/(["'])(?:\\.|(?!\1)[^\\])*\1/g, '""')
-    .replace(/`[^`]*`/g, (t) => '`' + [...t.matchAll(/\$\{[^}]*\}/g)].map((m) => m[0]).join(' ') + '`')
+  if (line.includes('`')) return line
+  return line.replace(/(["'])(?:\\.|(?!\1)[^\\])*\1/g, '""')
 }
 
 function findNetworkCalls(source: string): string[] {
@@ -206,12 +207,13 @@ describe('the app opens no network connection of its own', () => {
       expect(findNetworkCalls('const get = fetch;')).toHaveLength(1)
       expect(findNetworkCalls('const get = fetch.bind(window)')).toHaveLength(1)
       expect(findNetworkCalls('const s = `${fetch}`')).toHaveLength(1)
+      expect(findNetworkCalls('const s = `"${fetch}"`')).toHaveLength(1)
+      expect(findNetworkCalls('const s = `${[{}, fetch].length}`')).toHaveLength(1)
     })
 
     it('leaves the word alone in running text', () => {
       expect(findNetworkCalls('const note = "no live rate to fetch automatically"')).toEqual([])
       expect(findNetworkCalls('const note = "Tap to fetch."')).toEqual([])
-      expect(findNetworkCalls('const note = `Tap to fetch.`')).toEqual([])
     })
 
     it('leaves import() alone — loading the app is not sending data', () => {

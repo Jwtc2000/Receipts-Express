@@ -66,7 +66,13 @@ function storageKeysInSource(): string[] {
   const keys = new Set<string>()
   for (const file of files) {
     const code = readFileSync(file, 'utf-8')
-    const constants = new Map([...code.matchAll(/const\s+([A-Z_]+_KEY)\s*=\s*['"`]([^'"`]+)['"`]/g)].map((m) => [m[1], m[2]]))
+    const constants = new Map<string, string>()
+    for (const m of code.matchAll(/const\s+([A-Z_]+_KEY)\s*=\s*['"`]([^'"`]+)['"`]/g)) {
+      // Two constants of one name in a file would make one key hide the other.
+      const seen = constants.get(m[1])
+      if (seen !== undefined && seen !== m[2]) throw new Error(`${file}: ${m[1]} is defined twice with different values`)
+      constants.set(m[1], m[2])
+    }
     for (const m of code.matchAll(/localStorage\.(?:get|set|remove)Item\(\s*([^,)]+)/g)) {
       const arg = m[1].trim()
       const value = constants.get(arg)
