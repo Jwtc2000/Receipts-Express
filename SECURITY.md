@@ -13,11 +13,14 @@ accordingly:
   multi-page) are rasterized the same way, against a self-hosted copy of
   PDF.js — worker, WASM codecs, standard fonts, and color profiles are all
   served from this app's own origin as well.
-- **Storage is exclusively on-device IndexedDB.** Nothing is written to
-  a server or a third-party service.
-- **Export is exclusively a local PDF** (or CSV), generated in-browser and
-  handed to the browser's own download/share mechanism. There is no
-  upload step.
+- **Storage is the browser's own on-device storage.** Reports, expenses
+  and receipt images are in IndexedDB. The optional profile (name,
+  employee ID, cost center, project numbers) and four small flags and
+  timestamps are in localStorage; the Privacy Policy lists all five keys.
+  Nothing is written to a server or a third-party service.
+- **Export is a local file only**: a PDF or CSV of a report, or a JSON
+  backup of everything, generated in-browser and handed to the browser's
+  own download/share mechanism. There is no upload step.
 - **The sole network access this app makes is loading the app itself**
   from GitHub Pages. No analytics, no telemetry, no third-party requests
   of any kind.
@@ -45,18 +48,37 @@ triggering from within an iframe — all data is local to the device. Closing
 this gap for real would require moving to a host that can set response
 headers (e.g. Cloudflare Pages, an edge proxy in front of GitHub Pages).
 
-**Known limitation: the service worker is outside the CSP.** A worker gets
-its policy from the HTTP response headers of its own script, not from the
-document that registered it — and GitHub Pages sends no such headers. The
-`<meta>` CSP therefore covers the document and nothing else: the generated
-service worker (`sw.js`, from `vite-plugin-pwa`) runs with no CSP at all,
-and so do the self-hosted OCR and PDF workers, which are loaded the same
-way. What that code does is precache the app shell and cache the OCR/PDF
-engines from this app's own origin — but that is a property of the code
-as written, not something the browser is enforcing on it. The `<meta>` CSP
-does still decide whether those workers may be created (`worker-src 'self'
-blob:`); it just has no say over what they do afterwards. The fix is the
-same as for `frame-ancestors`: a host that can set response headers.
+**Known limitation: the service worker and the PDF worker are outside the
+CSP.** A worker loaded from its own URL gets its policy from the HTTP
+response headers of that script, not from the document that started it —
+and GitHub Pages sends no such headers. So the generated service worker
+(`sw.js`, from `vite-plugin-pwa`) runs with no CSP at all, and so does the
+PDF.js worker, which PDF.js starts directly from its same-origin URL. The
+OCR worker is different: tesseract.js starts it from a `blob:` URL, and a
+`blob:` worker inherits the document's policy, so it is covered. What the
+uncovered code does is precache the app shell and render PDF pages from
+this app's own origin — but that is a property of the code as written, not
+something the browser enforces. The `<meta>` CSP does still decide whether
+workers may be created (`worker-src 'self' blob:`). The PDF worker could be
+brought under the policy without changing hosts, by starting it from a
+`blob:` wrapper; the service worker needs a host that sets response headers.
+
+**Known limitation: WebRTC is outside the CSP.** `connect-src` does not
+govern `RTCPeerConnection`, and the meta policy sets nothing that does.
+The app uses no WebRTC, and the source check in `src/noNetwork.test.ts`
+fails the build if `RTCPeerConnection` or `WebTransport` appears in it, so
+the protection is the test, not the browser.
+
+**Known limitation: the origin is shared with the account's other Pages
+sites.** GitHub Pages serves this app as a project site under the account's
+`github.io` host, with no domain of its own. Browser storage (IndexedDB,
+localStorage, the service-worker caches) belongs to the origin, not the
+path, so any other site this account publishes on GitHub Pages would run on
+the same origin and could read this app's data. The standing rule is
+therefore that no other Pages site is published from this account unless it
+meets the same bar as this one. A domain of its own is the real fix, but
+not a casual one: a new origin starts with empty storage, so every existing
+user would need to back up and restore across the move.
 
 **Disclosure: two unused CDN URLs inside the vendored OCR worker.** The
 "never a CDN" claim above is about what the app does, not about every
@@ -74,6 +96,11 @@ requested. They are dead strings rather than live endpoints. They are
 recorded here because they are in the deployed files, and anyone grepping
 the build for `jsdelivr` deserves to find this note rather than a
 surprise.
+
+The same goes for one string in the built jsPDF chunk: a `cdnjs` URL for
+the `pdfobject` library, which jsPDF uses only when asked to open a PDF in
+a new window. This app only ever asks jsPDF for the file
+(`output('blob')` in `src/pdf.ts`), so it is never requested.
 
 ## Durability note
 

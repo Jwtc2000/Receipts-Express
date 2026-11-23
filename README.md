@@ -16,7 +16,7 @@ If you are a co-worker looking to help pilot Receipts Express, check out the fol
 * **[Pilot Proposal (docs/PILOT.md)](./docs/PILOT.md)**: Standardized capture proposal for departments.
 * **[Interactive Slide Deck (docs/pilot-deck.html)](./docs/pilot-deck.html)**: Interactive presentation slideshow for team meetings.
 * **[Slide Deck Content (docs/PILOT_DECK.md)](./docs/PILOT_DECK.md)**: Markdown version of the presentation deck.
-* **[Project Governance Review (docs/governance/REVIEW.md)](./docs/governance/REVIEW.md)**: Compliance checklist based on corporate templates.
+* **[Project Governance Review (docs/governance/REVIEW.md)](./docs/governance/REVIEW.md)**: Compliance checklist based on a publicly published pilot template, filled in as a self-assessment.
 * **[Privacy Policy (docs/privacy.html)](./docs/privacy.html)**, **[Terms of Use (docs/terms.html)](./docs/terms.html)**, and **[Consumer Health Data Privacy Policy (docs/consumer-health-data.html)](./docs/consumer-health-data.html)**: The user-facing legal pages, linked from the app under Menu → About and acknowledged once on first launch.
 
 ---
@@ -110,7 +110,7 @@ Branch protection on `main` requires **both** systems to report success before a
 
 | Component | Technology | In Plain Terms |
 | --- | --- | --- |
-| **User Interface (UI)** | React 18 + TypeScript + Vite | **React** handles rendering the screens and components; **TypeScript** is a programming language that catches bugs early by checking code types; **Vite** is a packager (build tool) that compiles files for the web. |
+| **User Interface (UI)** | React 19 + TypeScript + Vite | **React** handles rendering the screens and components; **TypeScript** is a programming language that catches bugs early by checking code types; **Vite** is a packager (build tool) that compiles files for the web. |
 | **Receipt OCR** | Tesseract.js (runs fully in-browser) | An offline engine that runs in-browser to transcribe text out of pictures using **WebAssembly (WASM)**, which lets native binary code run fast in the browser. |
 | **PDF Receipt Rasterization** | PDF.js (runs fully in-browser) | Converts an uploaded PDF receipt into one image per page on-device, so it flows through the same OCR/storage/export path as a photographed receipt. |
 | **Storage** | IndexedDB via `idb` | A local database inside your browser that holds reports, expenses, and receipt images. The browser keeps it sandboxed away from other sites; the app writes it unencrypted, so what guards it is the device's own lock screen and disk encryption. |
