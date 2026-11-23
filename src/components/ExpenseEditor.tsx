@@ -210,7 +210,9 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
   // Mirrors `dirty` into a module-level signal UpdateBanner can check — it's
   // an unrelated sibling with no shared state, and beforeunload above isn't
   // reliable on iOS Safari (browser tab or installed Home Screen PWA).
+  const dirtyRef = useRef(dirty)
   useEffect(() => {
+    dirtyRef.current = dirty
     setHasUnsavedWork(dirty)
   }, [dirty])
   useEffect(() => {
@@ -250,6 +252,10 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
     // of overwriting whatever the newer pick already applied.
     const gen = ++pickGenRef.current
     setPicking(true)
+    // Counted as an edit now, before the file is processed: a reload in that
+    // window must ask again rather than drop the receipt being attached.
+    setHasUnsavedWork(true)
+    noteEdit()
     // Rendering/compression can genuinely fail (an unsupported photo format
     // like HEIC on some browsers, a corrupt file, a password-protected or
     // malformed PDF, or canvas.toBlob returning null). Without this catch
@@ -272,6 +278,8 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
       }
     } catch (err) {
       if (gen !== pickGenRef.current) return
+      // Nothing was attached, so only earlier edits still count.
+      setHasUnsavedWork(dirtyRef.current)
       setPicking(false)
       setCaptureError(captureErrorMessage(err, isPdfFile(file)))
       return

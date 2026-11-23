@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { defineConfig, type Plugin, type ResolvedConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+import { NAVIGATION_DENYLIST } from './src/navigationDenylist'
 
 // package.json's "version" is the single source of truth for the app's
 // version — bump it there (semver) and it flows into the build and the
@@ -271,18 +272,10 @@ export default defineConfig({
           'assets/purify*',
         ],
         // vite-plugin-pwa's generateSW registers an SPA navigation route that
-        // serves index.html (the app shell) for every navigation request. The
-        // pilot deck and the privacy/terms pages are real, standalone pages
-        // under docs/, so without this their links keep the URL bar at e.g.
-        // docs/privacy.html but render the app instead. Exempt docs/ so the
-        // browser fetches the real page.
-        // Matched against the full pathname, which includes the /<repo>/ base
-        // on GitHub Pages, so this stays unanchored rather than /^\/docs\//.
-        //
-        // The licence and notice files are exempt for the same reason. With
-        // the worker installed, opening LICENSE.txt or THIRD_PARTY_NOTICES.md
-        // by URL showed the app instead of the file.
-        navigateFallbackDenylist: [/\/docs\//, /^[^?]*\.(?:txt|md)(?:\?|$)/],
+        // serves index.html (the app shell) for every navigation request.
+        // These are the navigations that must reach the real file instead;
+        // see src/navigationDenylist.ts for each one and why.
+        navigateFallbackDenylist: NAVIGATION_DENYLIST,
         runtimeCaching: [
           {
             urlPattern: /\/tesseract\//,
