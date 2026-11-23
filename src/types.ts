@@ -169,6 +169,16 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000
  * reports created before trip dates existed. Expenses with no date aren't
  * given a day number.
  */
+/**
+ * How a day banner names its day. With a trip start date, an expense dated
+ * before it gets a day number below 1, and the banner used to read "Day -254".
+ * Those are labelled as before the trip instead; the number is kept for
+ * ordering and colour.
+ */
+export function dayLabel(dayNumber: number): string {
+  return dayNumber >= 1 ? `Day ${dayNumber}` : 'Pre-trip'
+}
+
 export function dayNumbersByDate(expenses: { date: string }[], tripStartDate?: string): Map<string, number> {
   const uniqueDates = [...new Set(expenses.map((e) => e.date).filter(Boolean))]
   const map = new Map<string, number>()

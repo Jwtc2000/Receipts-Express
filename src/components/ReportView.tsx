@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
 import type { Report, Expense } from '../types'
-import { formatMoney, formatTotal, formatDate, dayNumbersByDate, resolveDateAfterMove, todayIso, usdTotal } from '../types'
+import { formatMoney, formatTotal, formatDate, dayLabel, dayNumbersByDate, resolveDateAfterMove, todayIso, usdTotal } from '../types'
 import {
   getReport,
   saveReport,
@@ -654,7 +654,7 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
                   style={{ backgroundColor: rgbToCss(dayBg), color: rgbToCss(contrastText(dayBg)) }}
                 >
                   <div className="day-divider-top">
-                    <span className="day-divider-label">Day {dayNumber}</span>
+                    <span className="day-divider-label">{dayLabel(dayNumber)}</span>
                     <span className="day-divider-date">{formatDate(expense.date)}</span>
                   </div>
                   {foodBalance && (
@@ -767,7 +767,8 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
         )}
 
         <button className="fab" onClick={onAddExpense}>
-          + Add Expense
+          <Icon name="plus" size={20} />
+          Add Expense
         </button>
       </main>
     </>

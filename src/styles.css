@@ -34,6 +34,26 @@
   padding: 0;
 }
 
+/* One visible keyboard focus ring for every control. The browser default is
+   a thin ring that all but disappears on the gradient header and the teal
+   buttons; this one is 2px with a gap, purple on the page and white on the
+   header. Mouse and touch focus (not :focus-visible) still draw nothing. */
+:focus-visible {
+  outline: 2px solid var(--purple);
+  outline-offset: 2px;
+}
+
+.topbar :focus-visible,
+.fab:focus-visible {
+  outline-color: #fff;
+}
+
+.fab:focus-visible {
+  box-shadow:
+    0 0 0 4px var(--purple),
+    0 6px 20px rgba(109, 40, 217, 0.35);
+}
+
 html,
 body {
   height: 100%;
@@ -63,8 +83,12 @@ body {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 12px;
-  padding: calc(env(safe-area-inset-top, 0px) + 14px) 16px 14px;
+  /* The icon buttons carry their own 12px of space around a 20px glyph now
+     that they are 44px targets, so the bar's gap only has to separate them.
+     At 12px the report screen's controls no longer fitted beside the title
+     on a 420px phone and the menu button dropped to a second row. */
+  gap: 4px;
+  padding: calc(env(safe-area-inset-top, 0px) + 10px) 12px 10px;
   background: linear-gradient(135deg, var(--header-gradient-a) 0%, var(--header-gradient-b) 100%);
   color: #fff;
   /* White text clears AA against the gradient itself at both ends now that
@@ -85,186 +109,185 @@ body {
      never needs `overflow: hidden` on .topbar itself — which would
      otherwise clip the export dropdown and other absolutely-positioned
      menus that intentionally extend below the header. overflow: hidden
-     lives here instead, scoped to just this layer, to clip planes as
-     they enter/exit past the header's left and right edges. */
+     lives here instead, scoped to just this layer, to clip glyphs as
+     they enter/exit past the header's left and right edges.
+
+     container-type: size lets the flight paths below be written in cqw/cqh,
+     fractions of this layer's own width and height, so each glyph can be
+     moved with transform alone. The paths used to animate left and top,
+     which re-runs layout on every frame for as long as the header is on
+     screen; a transform is composited and costs the main thread nothing. */
   position: absolute;
   inset: 0;
   z-index: -1;
   overflow: hidden;
   pointer-events: none;
+  container-type: size;
+  /* Glyphs fade in and out at the edges instead of being cut off by them. */
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
 }
 
 .topbar-plane {
   position: absolute;
-  width: 15px;
-  height: 15px;
+  left: 0;
+  top: 0;
+  width: 14px;
+  height: 14px;
   color: #fff;
-  opacity: 0.32;
+  opacity: 0.3;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  will-change: transform;
+}
+
+.topbar-plane svg {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .topbar-plane-a {
-  animation: plane-fly-a 17s linear infinite;
+  width: 15px;
+  height: 15px;
+  animation-name: plane-fly-a;
+  animation-duration: 17s;
   animation-delay: -4s;
 }
 
 .topbar-plane-b {
-  width: 12px;
-  height: 12px;
-  animation: plane-fly-b 21s linear infinite;
+  width: 13px;
+  height: 13px;
+  animation-name: plane-fly-b;
+  animation-duration: 21s;
   animation-delay: -11s;
 }
 
 .topbar-plane-c {
   width: 13px;
   height: 13px;
-  animation: plane-fly-c 25s linear infinite;
+  animation-name: plane-fly-c;
+  animation-duration: 25s;
   animation-delay: -18s;
 }
 
 .topbar-plane-d {
-  width: 14px;
-  height: 14px;
-  animation: plane-fly-d 23s linear infinite;
+  width: 15px;
+  height: 15px;
+  animation-name: plane-fly-d;
+  animation-duration: 23s;
   animation-delay: -7s;
 }
 
 .topbar-plane-e {
-  width: 12px;
-  height: 12px;
-  animation: plane-fly-e 27s linear infinite;
+  width: 13px;
+  height: 13px;
+  animation-name: plane-fly-e;
+  animation-duration: 27s;
   animation-delay: -15s;
 }
 
 .topbar-plane-f {
   width: 14px;
   height: 14px;
-  animation: plane-fly-f 20s linear infinite;
+  animation-name: plane-fly-f;
+  animation-duration: 20s;
   animation-delay: -2s;
 }
 
 .topbar-plane-g {
-  width: 13px;
-  height: 13px;
-  animation: plane-fly-g 24s linear infinite;
+  width: 12px;
+  height: 12px;
+  animation-name: plane-fly-g;
+  animation-duration: 24s;
   animation-delay: -9s;
 }
 
 .topbar-plane-h {
-  width: 15px;
-  height: 15px;
-  animation: plane-fly-h 28s linear infinite;
+  width: 14px;
+  height: 14px;
+  animation-name: plane-fly-h;
+  animation-duration: 28s;
   animation-delay: -22s;
 }
 
-/* left-to-right, gently rising (Plane) */
+/* Plane, left to right, gently rising */
 @keyframes plane-fly-a {
   from {
-    left: -8%;
-    top: 62%;
-    transform: rotate(12deg);
+    transform: translate(-8cqw, 62cqh) rotate(88deg);
   }
   to {
-    left: 108%;
-    top: 42%;
-    transform: rotate(12deg);
+    transform: translate(108cqw, 42cqh) rotate(88deg);
   }
 }
 
-/* right-to-left, gently descending (Food, upright) */
+/* Coffee, right to left, gently descending */
 @keyframes plane-fly-b {
   from {
-    left: 108%;
-    top: 22%;
-    transform: rotate(-5deg);
+    transform: translate(108cqw, 22cqh);
   }
   to {
-    left: -8%;
-    top: 38%;
-    transform: rotate(-5deg);
+    transform: translate(-8cqw, 38cqh);
   }
 }
 
-/* steep diagonal, bottom-left to top-right (Gas can, upright) */
+/* Fuel, steep diagonal, bottom left to top right */
 @keyframes plane-fly-c {
   from {
-    left: -8%;
-    top: 88%;
-    transform: rotate(5deg);
+    transform: translate(-8cqw, 80cqh);
   }
   to {
-    left: 108%;
-    top: 2%;
-    transform: rotate(5deg);
+    transform: translate(108cqw, 4cqh);
   }
 }
 
-/* right-to-left, gently rising (Car, flipped horizontally) */
+/* Car, right to left, facing its direction of travel */
 @keyframes plane-fly-d {
   from {
-    left: 108%;
-    top: 75%;
-    transform: scaleX(-1) rotate(-3deg);
+    transform: translate(108cqw, 70cqh) scaleX(-1);
   }
   to {
-    left: -8%;
-    top: 55%;
-    transform: scaleX(-1) rotate(-3deg);
+    transform: translate(-8cqw, 52cqh) scaleX(-1);
   }
 }
 
-/* left-to-right, gently descending (Hotel, upright) */
+/* Bed, left to right, gently descending */
 @keyframes plane-fly-e {
   from {
-    left: -8%;
-    top: 15%;
-    transform: rotate(2deg);
+    transform: translate(-8cqw, 12cqh);
   }
   to {
-    left: 108%;
-    top: 30%;
-    transform: rotate(2deg);
+    transform: translate(108cqw, 28cqh);
   }
 }
 
-/* steep diagonal, bottom-right to top-left (Plane, facing left) */
+/* Plane, right to left, climbing */
 @keyframes plane-fly-f {
   from {
-    left: 108%;
-    top: 85%;
-    transform: rotate(208deg);
+    transform: translate(108cqw, 80cqh) rotate(-80deg);
   }
   to {
-    left: -8%;
-    top: 15%;
-    transform: rotate(208deg);
+    transform: translate(-8cqw, 14cqh) rotate(-80deg);
   }
 }
 
-/* left-to-right, flat drift (Food, upright) */
+/* Coffee, left to right, flat */
 @keyframes plane-fly-g {
   from {
-    left: -8%;
-    top: 48%;
-    transform: rotate(-4deg);
+    transform: translate(-8cqw, 46cqh);
   }
   to {
-    left: 108%;
-    top: 48%;
-    transform: rotate(-4deg);
+    transform: translate(108cqw, 46cqh);
   }
 }
 
-/* right-to-left, flat drift (Car, flipped horizontally) */
+/* Car, right to left, flat */
 @keyframes plane-fly-h {
   from {
-    left: 108%;
-    top: 65%;
-    transform: scaleX(-1) rotate(0deg);
+    transform: translate(108cqw, 62cqh) scaleX(-1);
   }
   to {
-    left: -8%;
-    top: 65%;
-    transform: scaleX(-1) rotate(0deg);
+    transform: translate(-8cqw, 62cqh) scaleX(-1);
   }
 }
 
@@ -401,11 +424,25 @@ body {
   cursor: pointer;
   color: inherit;
   padding: 6px 8px;
-  border-radius: 8px;
+  border-radius: 10px;
   line-height: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  /* 44px is the smallest comfortable touch target (WCAG 2.5.5, Apple HIG).
+     A 20px glyph with 6-8px padding came to 32-36px. */
+  min-width: 44px;
+  min-height: 44px;
+}
+
+@media (hover: hover) {
+  .icon-btn:not(:disabled):hover {
+    background: rgba(15, 23, 42, 0.06);
+  }
+
+  .topbar .icon-btn:not(:disabled):hover {
+    background: rgba(255, 255, 255, 0.16);
+  }
 }
 
 .btn.with-icon {
@@ -428,6 +465,10 @@ body {
   bottom: calc(env(safe-area-inset-bottom, 0px) + 20px);
   left: 50%;
   transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
   background: linear-gradient(135deg, var(--teal) 0%, var(--purple) 100%);
   color: #fff;
   border: none;

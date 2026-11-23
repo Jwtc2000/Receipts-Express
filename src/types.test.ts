@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { formatTotal, usdTotal, dayNumbersByDate, sortExpensesByDate, resolveDateAfterMove, todayIso } from './types'
+import { formatTotal, usdTotal, dayLabel, dayNumbersByDate, sortExpensesByDate, resolveDateAfterMove, todayIso } from './types'
 import type { Expense } from './types'
 
 function makeExpense(overrides: Partial<Expense> = {}): Expense {
@@ -273,5 +273,17 @@ describe('todayIso', () => {
     process.env.TZ = 'Asia/Tokyo'
     vi.setSystemTime(new Date('2026-07-28T01:00:00+09:00'))
     expect(todayIso()).toBe('2026-07-28')
+  })
+})
+
+describe('dayLabel', () => {
+  it('numbers days from the trip start', () => {
+    expect(dayLabel(1)).toBe('Day 1')
+    expect(dayLabel(12)).toBe('Day 12')
+  })
+
+  it('labels a receipt dated before the trip instead of numbering it below 1', () => {
+    expect(dayLabel(0)).toBe('Pre-trip')
+    expect(dayLabel(-254)).toBe('Pre-trip')
   })
 })

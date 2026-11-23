@@ -693,7 +693,8 @@ export default function ReportList({ onOpenReport, onEditExpense }: Props) {
                 setCreating(true)
               }}
             >
-              + New Report
+              <Icon name="plus" size={20} />
+              New Report
             </button>
           ))}
       </main>
