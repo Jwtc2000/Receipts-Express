@@ -19,6 +19,11 @@ function makeExpense(overrides: Partial<Expense> = {}): Expense {
   }
 }
 
+// The money formatting follows the machine's locale, as the app does. These
+// tests are about the arithmetic, so the expected text is formatted the same
+// way; written as '$35.00' they failed on any machine not set to US English.
+const usd = (n: number) => new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(n)
+
 describe('formatTotal', () => {
   it('sums same-currency expenses into a single total', () => {
     expect(
@@ -26,7 +31,7 @@ describe('formatTotal', () => {
         { amount: 20, currency: 'USD' },
         { amount: 15, currency: 'USD' },
       ]),
-    ).toBe('$35.00')
+    ).toBe(usd(35))
   })
 
   it('keeps different currencies separate instead of summing raw numbers', () => {
@@ -40,7 +45,7 @@ describe('formatTotal', () => {
   })
 
   it('returns a zero total for an empty report', () => {
-    expect(formatTotal([])).toBe('$0.00')
+    expect(formatTotal([])).toBe(usd(0))
   })
 
   it('merges currency codes that only differ by case (regression)', () => {
@@ -49,7 +54,7 @@ describe('formatTotal', () => {
         { amount: 20, currency: 'USD' },
         { amount: 15, currency: 'usd' },
       ]),
-    ).toBe('$35.00')
+    ).toBe(usd(35))
   })
 })
 
@@ -248,7 +253,10 @@ describe('todayIso', () => {
 
   afterEach(() => {
     vi.useRealTimers()
-    process.env.TZ = originalTz
+    // An unset TZ restored as the string "undefined" would be read as a
+    // time-zone name by whatever ran next.
+    if (originalTz === undefined) delete process.env.TZ
+    else process.env.TZ = originalTz
   })
 
   it('returns the local calendar date, not the UTC date (regression)', () => {

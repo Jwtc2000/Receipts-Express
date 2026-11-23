@@ -5,7 +5,7 @@ import { getExpense, saveExpenseWithImage, getImage, nextPosition } from '../db'
 import { compressImage } from '../image'
 import { isPdfFile } from '../pdfDetect'
 import { extractReceipt } from '../ocr'
-import { setHasUnsavedWork } from '../unsavedWork'
+import { setHasUnsavedWork, isDiscardConfirmed, noteEdit } from '../unsavedWork'
 import Icon from './icons'
 import { HeaderPlanes } from './decorative'
 
@@ -59,8 +59,40 @@ const emptyDraft: Draft = {
   personalAmount: '',
 }
 
+/** The PDF reader itself could not be loaded, as opposed to the file being bad. */
+class PdfReaderUnavailable extends Error {
+  constructor() {
+    super('PDF reader unavailable')
+    this.name = 'PdfReaderUnavailable'
+  }
+}
+
+// What PDF.js calls a file it cannot open: encrypted, malformed, or empty.
+const BAD_PDF_ERRORS = new Set(['PasswordException', 'InvalidPDFException', 'MissingPDFException'])
+
+/**
+ * The message for a receipt that could not be attached. A PDF failure used
+ * to be blamed on the file every time, including when the cause was the PDF
+ * reader failing to load, which no other file would have fixed.
+ */
+function captureErrorMessage(err: unknown, isPdf: boolean): string {
+  const name = err instanceof Error ? err.name : ''
+  if (name === 'PdfTooManyPages' && err instanceof Error) return err.message
+  if (!isPdf) return "Couldn't process that photo — try again, or pick a different image."
+  if (BAD_PDF_ERRORS.has(name)) {
+    return "Couldn't read that PDF — it may be password-protected or corrupted. Try a different file."
+  }
+  return "Couldn't open the PDF reader. If you're offline, connect once so it can load, then try again. Photos still work."
+}
+
 export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
   const [draft, setDraft] = useState<Draft>(() => ({ ...emptyDraft, date: todayIso() }))
+  // The draft as last rendered, for code that runs after an await and must
+  // decide something before calling setDraft (see the scan title below).
+  const draftRef = useRef(draft)
+  useEffect(() => {
+    draftRef.current = draft
+  }, [draft])
   const [existing, setExisting] = useState<Expense | null>(null)
   const [imageBlob, setImageBlob] = useState<Blob | null>(null)
   const [imageUrl, setImageUrl] = useState<string | null>(null)
@@ -95,6 +127,16 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
   // matches when it resolves has been superseded by a newer one and must
   // not overwrite whatever the newer pick already applied.
   const pickGenRef = useRef(0)
+  // The OCR run for the receipt that is attached now. Separate from
+  // pickGenRef because a pick can fail: if the user picks a second file
+  // while the first is being read and that file cannot be opened, the first
+  // receipt stays attached, so its scan must still be allowed to finish.
+  // Sharing one counter left the "Reading receipt…" spinner stuck forever.
+  const scanGenRef = useRef(0)
+  // The title a scan filled in, if the field still holds it. A later scan of
+  // a replacement receipt may replace that title; it may never replace one
+  // the user typed.
+  const autoTitleRef = useRef<string | null>(null)
   // Fields the user has typed in during this editing session. A scan takes
   // 10-20 seconds and the fields stay usable while it runs, so its result
   // can arrive after the user has already entered the amount by hand. OCR
@@ -114,7 +156,9 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
       setDraft({
         title: expense.title,
         merchant: expense.merchant,
-        amount: expense.amount ? String(expense.amount) : '',
+        // A saved amount of 0 is still an amount. Shown as blank, it looked
+        // like the placeholder and Save then refused the expense as missing one.
+        amount: String(expense.amount ?? ''),
         currency: expense.currency,
         date: expense.date,
         category: expense.category,
@@ -152,20 +196,35 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
   // Warn the browser before it unloads (tab close, refresh, PWA back-gesture, or
   // the service-worker update reload) while there's an unsaved draft — otherwise
   // the typed fields and captured photo are gone with no confirmation.
+  // Also while a picked file is still being processed: it is not in the
+  // draft yet, but a reload would lose it all the same.
   useEffect(() => {
-    if (!dirty) return
+    if (!dirty && !picking) return
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isDiscardConfirmed()) return
       e.preventDefault()
       e.returnValue = ''
     }
     window.addEventListener('beforeunload', onBeforeUnload)
     return () => window.removeEventListener('beforeunload', onBeforeUnload)
-  }, [dirty])
+  }, [dirty, picking])
+
+  // Leaving the editor abandons any pick still in flight, so its late result
+  // (or failure) cannot touch the unsaved-work signal another editor now owns.
+  useEffect(
+    () => () => {
+      pickGenRef.current++
+      scanGenRef.current++
+    },
+    [],
+  )
 
   // Mirrors `dirty` into a module-level signal UpdateBanner can check — it's
   // an unrelated sibling with no shared state, and beforeunload above isn't
   // reliable on iOS Safari (browser tab or installed Home Screen PWA).
+  const dirtyRef = useRef(dirty)
   useEffect(() => {
+    dirtyRef.current = dirty
     setHasUnsavedWork(dirty)
   }, [dirty])
   useEffect(() => {
@@ -189,6 +248,7 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
   const set = (patch: Partial<Draft>) => {
     for (const key of Object.keys(patch)) typedRef.current.add(key as keyof Draft)
     setDirty(true)
+    noteEdit()
     // Typing is the user answering the message, so clear it rather than
     // leaving a complaint on screen about a value they have since changed.
     setInvalid(null)
@@ -204,6 +264,10 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
     // of overwriting whatever the newer pick already applied.
     const gen = ++pickGenRef.current
     setPicking(true)
+    // Counted as an edit now, before the file is processed: a reload in that
+    // window must ask again rather than drop the receipt being attached.
+    setHasUnsavedWork(true)
+    noteEdit()
     // Rendering/compression can genuinely fail (an unsupported photo format
     // like HEIC on some browsers, a corrupt file, a password-protected or
     // malformed PDF, or canvas.toBlob returning null). Without this catch
@@ -214,27 +278,28 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
       if (isPdfFile(file)) {
         // Loaded on demand so the PDF.js engine — sizeable — never ships to
         // someone who only ever attaches photos.
-        const { renderPdfPages } = await import('../pdfReceipt')
+        let renderPdfPages: (typeof import('../pdfReceipt'))['renderPdfPages']
+        try {
+          ;({ renderPdfPages } = await import('../pdfReceipt'))
+        } catch {
+          throw new PdfReaderUnavailable()
+        }
         pages = await renderPdfPages(file)
       } else {
         pages = [await compressImage(file)]
       }
     } catch (err) {
       if (gen !== pickGenRef.current) return
+      // Nothing was attached, so only earlier edits still count.
+      setHasUnsavedWork(dirtyRef.current)
       setPicking(false)
-      const tooManyPages = err instanceof Error && err.name === 'PdfTooManyPages'
-      setCaptureError(
-        tooManyPages
-          ? err.message
-          : isPdfFile(file)
-            ? "Couldn't read that PDF — it may be password-protected or corrupted. Try again, or pick a different file."
-            : "Couldn't process that photo — try again, or pick a different image.",
-      )
+      setCaptureError(captureErrorMessage(err, isPdfFile(file)))
       return
     }
     if (gen !== pickGenRef.current) return
     const [firstPage, ...restPages] = pages
     setDirty(true)
+    noteEdit()
     setImageBlob(firstPage)
     setImageChanged(true)
     setImageUrl((old) => {
@@ -252,11 +317,12 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
     setPicking(false)
 
     // Auto-extract details with on-device OCR, from the receipt's first page
+    const scan = ++scanGenRef.current
     setScanState('scanning')
     setScanPct(0)
     try {
       const extracted = await extractReceipt(firstPage, setScanPct)
-      if (gen !== pickGenRef.current) return
+      if (scan !== scanGenRef.current) return
       // OCR is a guess. It fills a field only when the user has not typed in
       // it, and, when an existing expense is being edited, only when that
       // field is empty: replacing the photo on a saved expense must not
@@ -267,27 +333,38 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
       // loading, and would then treat a saved expense as a new one.
       const mayFill = (key: keyof Draft, current: string) =>
         !typed.has(key) && (expenseId ? current === '' : true)
+      // Decided once, outside the updater, so the title and the record of who
+      // filled it cannot disagree: only a title this scan actually fills in
+      // is recorded as automatic, and so open to a later scan.
+      const currentTitle = draftRef.current.title
+      const fillTitle =
+        !typed.has('title') &&
+        !!extracted.merchant &&
+        (currentTitle === '' || currentTitle === autoTitleRef.current)
       setDraft((d) => ({
         ...d,
         merchant: extracted.merchant && mayFill('merchant', d.merchant) ? extracted.merchant : d.merchant,
-        title: d.title || (!typed.has('title') && extracted.merchant) || '',
+        title: fillTitle && extracted.merchant ? extracted.merchant : d.title,
         amount:
           extracted.total !== undefined && mayFill('amount', d.amount) ? extracted.total.toFixed(2) : d.amount,
         date: extracted.date && mayFill('date', d.date) ? extracted.date : d.date,
       }))
+      if (fillTitle && extracted.merchant) autoTitleRef.current = extracted.merchant
       setScanState('done')
     } catch {
       // The receipt is already attached; OCR failing just means manual entry.
-      if (gen === pickGenRef.current) setScanState('failed')
+      if (scan === scanGenRef.current) setScanState('failed')
     }
   }
 
   const removeImage = () => {
     // Invalidate any pick still in flight so its result can't land after
-    // the user has explicitly removed the receipt.
+    // the user has explicitly removed the receipt, and any scan of it.
     pickGenRef.current++
+    scanGenRef.current++
     setPicking(false)
     setDirty(true)
+    noteEdit()
     setImageBlob(null)
     setImageChanged(true)
     setExtraImageBlobs([])

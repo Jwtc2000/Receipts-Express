@@ -17,7 +17,11 @@ export async function shareOrDownloadFile(file: File, shareTitle: string): Promi
       return true
     } catch (err) {
       if ((err as DOMException).name === 'AbortError') return false
-      throw err
+      // Any other refusal falls through to the download below. The usual one
+      // is NotAllowedError: the share sheet needs a recent tap, and building
+      // a large PDF or backup can take longer than the browser allows. The
+      // file is already made, so saving it beats reporting a failure that
+      // retrying would only repeat.
     }
   }
   const url = URL.createObjectURL(file)
@@ -37,4 +41,12 @@ export async function shareOrDownloadFile(file: File, shareTitle: string): Promi
   // the browser has read the blob (a known footgun on some browsers). Defer it.
   setTimeout(() => URL.revokeObjectURL(url), 60_000)
   return true
+}
+
+/** Characters that cannot appear in a file name on one platform or another. */
+export function safeFileName(name: string, fallback: string): string {
+  // Letters in any script are kept. Stripping to ASCII turned a report named
+  // in Japanese or Greek into "_".
+  const cleaned = name.replace(/[\s\/\\:*?"<>|\u0000-\u001f]+/g, '_').replace(/^[._]+|[._]+$/g, '')
+  return /[\p{L}\p{N}]/u.test(cleaned) ? cleaned : fallback
 }

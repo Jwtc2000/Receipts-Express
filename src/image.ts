@@ -8,15 +8,34 @@ export async function compressImage(file: Blob, maxDim = 1800, quality = 0.85): 
   const canvas = document.createElement('canvas')
   canvas.width = width
   canvas.height = height
-  const ctx = canvas.getContext('2d')!
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('Image compression failed: no 2D canvas available')
+  // JPEG has no transparency. A transparent area drawn onto an unfilled
+  // canvas comes out black, so a PNG receipt with a transparent background
+  // was stored as dark text on black. Paper is white.
+  ctx.fillStyle = '#fff'
+  ctx.fillRect(0, 0, width, height)
   ctx.drawImage(bitmap, 0, 0, width, height)
+  if ('close' in bitmap) bitmap.close()
 
-  return new Promise((resolve, reject) => {
+  return encodeJpeg(canvas, quality)
+}
+
+/**
+ * Encode a canvas as JPEG and release its pixel buffer. A canvas holds its
+ * full-size buffer until it is garbage-collected, and a 25-page PDF makes
+ * one per page; on a phone that is enough to make the next allocation fail.
+ */
+export function encodeJpeg(canvas: HTMLCanvasElement, quality: number): Promise<Blob> {
+  return new Promise<Blob>((resolve, reject) => {
     canvas.toBlob(
       (blob) => (blob ? resolve(blob) : reject(new Error('Image compression failed'))),
       'image/jpeg',
       quality,
     )
+  }).finally(() => {
+    canvas.width = 0
+    canvas.height = 0
   })
 }
 

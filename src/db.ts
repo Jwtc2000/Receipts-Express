@@ -18,17 +18,58 @@ interface BestReceiptsDB extends DBSchema {
   }
 }
 
+/**
+ * A request inside a transaction whose outcome is reported by `tx.done`. If
+ * the transaction aborts, every request in it rejects as well; left
+ * unhandled, each of those surfaced a second time as a stray rejection.
+ */
+function quiet(request: Promise<unknown>): void {
+  request.catch(() => {})
+}
+
 let dbPromise: Promise<IDBPDatabase<BestReceiptsDB>> | null = null
+
+/**
+ * Fired when another tab is upgrading the database and needs this tab to let
+ * go of it. main.tsx can listen and ask the user to reload.
+ */
+export const DB_VERSION_CHANGE_EVENT = 'receipts-express:db-version-change'
 
 function getDB() {
   if (!dbPromise) {
-    dbPromise = openDB<BestReceiptsDB>('best-receipts', 1, {
-      upgrade(db) {
-        db.createObjectStore('reports', { keyPath: 'id' })
-        const expenses = db.createObjectStore('expenses', { keyPath: 'id' })
-        expenses.createIndex('by-report', 'reportId')
-        db.createObjectStore('images', { keyPath: 'id' })
+    const opening = openDB<BestReceiptsDB>('best-receipts', 1, {
+      // Written against oldVersion so that a version 2 adds its own step
+      // below this one instead of re-running it.
+      upgrade(db, oldVersion) {
+        if (oldVersion < 1) {
+          db.createObjectStore('reports', { keyPath: 'id' })
+          const expenses = db.createObjectStore('expenses', { keyPath: 'id' })
+          expenses.createIndex('by-report', 'reportId')
+          db.createObjectStore('images', { keyPath: 'id' })
+        }
       },
+      // Another tab wants to upgrade: close this connection so it is not
+      // blocked forever, forget it so the next call reopens, and say so.
+      blocking() {
+        dbPromise = null
+        // Closed before the prompt is raised: an unanswered prompt must not
+        // keep the other tab's upgrade waiting.
+        void opening.then((db) => {
+          db.close()
+          window.dispatchEvent(new Event(DB_VERSION_CHANGE_EVENT))
+        })
+      },
+      // The browser closed the connection underneath the app. Without this
+      // the dead connection stayed cached and every later read and write
+      // failed until the page was reloaded.
+      terminated() {
+        dbPromise = null
+      },
+    })
+    // A failed open is not cached either: the next call tries again.
+    dbPromise = opening.catch((err) => {
+      dbPromise = null
+      throw err
     })
   }
   return dbPromise
@@ -61,10 +102,10 @@ export async function deleteReport(id: string): Promise<void> {
   const expenses = await db.getAllFromIndex('expenses', 'by-report', id)
   const tx = db.transaction(['reports', 'expenses', 'images'], 'readwrite')
   for (const expense of expenses) {
-    void tx.objectStore('expenses').delete(expense.id)
-    for (const imageId of expenseImageIds(expense)) void tx.objectStore('images').delete(imageId)
+    quiet(tx.objectStore('expenses').delete(expense.id))
+    for (const imageId of expenseImageIds(expense)) quiet(tx.objectStore('images').delete(imageId))
   }
-  void tx.objectStore('reports').delete(id)
+  quiet(tx.objectStore('reports').delete(id))
   await tx.done
 }
 
@@ -101,16 +142,16 @@ export async function saveExpenseWithImage(
 ): Promise<void> {
   const db = await getDB()
   const tx = db.transaction(['expenses', 'images'], 'readwrite')
-  for (const image of newImages) void tx.objectStore('images').put(image)
-  void tx.objectStore('expenses').put(expense)
-  for (const id of staleImageIds) void tx.objectStore('images').delete(id)
+  for (const image of newImages) quiet(tx.objectStore('images').put(image))
+  quiet(tx.objectStore('expenses').put(expense))
+  for (const id of staleImageIds) quiet(tx.objectStore('images').delete(id))
   await tx.done
 }
 
 export async function saveExpenses(expenses: Expense[]): Promise<void> {
   const db = await getDB()
   const tx = db.transaction('expenses', 'readwrite')
-  for (const expense of expenses) void tx.store.put(expense)
+  for (const expense of expenses) quiet(tx.store.put(expense))
   await tx.done
 }
 
@@ -118,8 +159,8 @@ export async function deleteExpense(id: string): Promise<void> {
   const db = await getDB()
   const expense = await db.get('expenses', id)
   const tx = db.transaction(['expenses', 'images'], 'readwrite')
-  void tx.objectStore('expenses').delete(id)
-  if (expense) for (const imageId of expenseImageIds(expense)) void tx.objectStore('images').delete(imageId)
+  quiet(tx.objectStore('expenses').delete(id))
+  if (expense) for (const imageId of expenseImageIds(expense)) quiet(tx.objectStore('images').delete(imageId))
   await tx.done
 }
 
@@ -170,8 +211,28 @@ export async function importBackupData(
 ): Promise<void> {
   const db = await getDB()
   const tx = db.transaction(['reports', 'expenses', 'images'], 'readwrite')
-  for (const image of images) void tx.objectStore('images').put(image)
+  const expenseStore = tx.objectStore('expenses')
+  const imageStore = tx.objectStore('images')
+  // An expense being overwritten may point at receipt pages the backup's
+  // version does not: the photo was replaced, removed or re-paged since the
+  // backup was taken. Nothing would reference those pages afterwards, and
+  // nothing in the app could ever delete them. Read each one inside this
+  // transaction and drop the pages only it pointed at.
+  //
+  // Kept: every page the restored expenses point at, and every page an
+  // expense the restore does not touch points at. Two expenses can share a
+  // page id (the app never makes them, but a backup file can carry them),
+  // and restoring one must not take the other's receipt away.
+  const restoredIds = new Set(expenses.map((e) => e.id))
+  const stored = await expenseStore.getAll()
+  const keep = new Set(expenses.flatMap((e) => expenseImageIds(e)))
+  for (const e of stored) if (!restoredIds.has(e.id)) for (const id of expenseImageIds(e)) keep.add(id)
+  for (const old of stored) {
+    if (!restoredIds.has(old.id)) continue
+    for (const id of expenseImageIds(old)) if (!keep.has(id)) void imageStore.delete(id)
+  }
+  for (const image of images) void imageStore.put(image)
   for (const report of reports) void tx.objectStore('reports').put(report)
-  for (const expense of expenses) void tx.objectStore('expenses').put(expense)
+  for (const expense of expenses) void expenseStore.put(expense)
   await tx.done
 }

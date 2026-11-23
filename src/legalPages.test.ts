@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { TERMS_VERSION } from './terms'
 
@@ -37,6 +38,50 @@ function readProse(page: string): string {
 
 function readRepoProse(path: string): string {
   return readRepo(path).replace(/\s+/g, ' ')
+}
+
+
+/**
+ * Every localStorage key the app uses: the 'br.' string constants in its
+ * non-test source. A localStorage call whose key is not such a constant
+ * fails the test instead, so a key cannot reach storage unlisted.
+ */
+function storageKeysInSource(): string[] {
+  const srcDir = fileURLToPath(new URL('.', import.meta.url))
+  const files: string[] = []
+  const walk = (dir: string) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = join(dir, entry.name)
+      if (entry.isDirectory()) {
+        if (entry.name !== 'test') walk(full)
+      } else if (/\.tsx?$/.test(entry.name) && !/\.test\.tsx?$/.test(entry.name)) {
+        files.push(full)
+      }
+    }
+  }
+  walk(srcDir)
+  // The value of each constant a storage call is given, read from the file
+  // that defines it. A key in any other form fails here, rather than being
+  // left out of the list the policy is checked against.
+  const keys = new Set<string>()
+  for (const file of files) {
+    const code = readFileSync(file, 'utf-8')
+    const constants = new Map<string, string>()
+    for (const m of code.matchAll(/const\s+([A-Z_]+_KEY)\s*=\s*['"`]([^'"`]+)['"`]/g)) {
+      // Two constants of one name in a file would make one key hide the other.
+      const seen = constants.get(m[1])
+      if (seen !== undefined && seen !== m[2]) throw new Error(`${file}: ${m[1]} is defined twice with different values`)
+      constants.set(m[1], m[2])
+    }
+    for (const m of code.matchAll(/localStorage\.(?:get|set|remove)Item\(\s*([^,)]+)/g)) {
+      const arg = m[1].trim()
+      const value = constants.get(arg)
+      if (value === undefined) throw new Error(`${file}: localStorage key ${arg} is not a constant defined in that file`)
+      if (!/^br\.[A-Za-z]+$/.test(value)) throw new Error(`${file}: localStorage key ${value} does not use the br. form`)
+      keys.add(value)
+    }
+  }
+  return [...keys].sort()
 }
 
 describe('legal pages', () => {
@@ -103,16 +148,16 @@ describe('legal pages', () => {
     expect(prose).toMatch(/connect-src 'self'/)
   })
 
-  // The policy enumerates the localStorage keys by name, so a new key that
-  // isn't documented makes the page inaccurate. Keep this list in step with
-  // the app: br.termsAccepted is written by src/terms.ts.
-  it.each([
-    'br.profile',
-    'br.lastBackupAt',
-    'br.backupWarningDismissedAt',
-    'br.storageWarningDismissedAt',
-    'br.termsAccepted',
-  ])('the privacy policy documents the %s localStorage key', (key) => {
+  // The policy enumerates the localStorage keys by name, so a key that isn't
+  // documented makes the page inaccurate. The keys are read out of the source,
+  // not listed here: a list kept by hand stays green when the code changes.
+  const APP_KEYS = storageKeysInSource()
+
+  it('finds the localStorage keys in the source', () => {
+    expect(APP_KEYS.length).toBeGreaterThan(0)
+  })
+
+  it.each(APP_KEYS)('the privacy policy documents the %s localStorage key', (key) => {
     expect(read('privacy.html')).toContain(key)
   })
 

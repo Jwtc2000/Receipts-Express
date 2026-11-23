@@ -34,6 +34,40 @@ interface Props {
 
 export default function ReportView({ reportId, onBack, onAddExpense, onEditExpense }: Props) {
   const [report, setReport] = useState<Report | null>(null)
+  // The latest report, including changes whose write has not finished. Each
+  // save replaces the whole record, so two saves started from the same
+  // render (a rate and the meal allowance, both committed as the drawer
+  // closes) used to have the second write put the first one's field back.
+  // Saves now run one after another, each applied to the latest report.
+  const reportRef = useRef<Report | null>(null)
+  const saveChain = useRef<Promise<void>>(Promise.resolve())
+  useEffect(() => {
+    reportRef.current = report
+  }, [report])
+  const updateReport = (change: (latest: Report) => Report | null): Promise<void> => {
+    const run = async () => {
+      const latest = reportRef.current
+      if (!latest) return
+      const updated = change(latest)
+      if (!updated) return
+      reportRef.current = updated
+      setReport(updated)
+      try {
+        await saveReport(updated)
+      } catch (err) {
+        // Put back what is actually stored, so the screen does not show a
+        // change that was never saved and the same edit can be tried again.
+        if (reportRef.current === updated) {
+          reportRef.current = latest
+          setReport(latest)
+        }
+        throw err
+      }
+    }
+    const next = saveChain.current.then(run, run)
+    saveChain.current = next.catch(() => {})
+    return next
+  }
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [thumbs, setThumbs] = useState<Map<string, string>>(new Map())
   const [otherReports, setOtherReports] = useState<Report[]>([])
@@ -54,7 +88,15 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
   const [exchangeRateDrafts, setExchangeRateDrafts] = useState<Record<string, string>>({})
   const dragIndex = useRef<number | null>(null)
   const thumbsRef = useRef<Map<string, string>>(new Map())
-  const menuRef = useModal<HTMLElement>(menuOpen, () => setMenuOpen(false))
+  // Fields in the drawer save when they lose focus. Closing it with Escape,
+  // the backdrop or the close button used to remove the field without it
+  // ever losing focus, so the edit was dropped. Blur it first.
+  const closeMenu = () => {
+    const active = document.activeElement
+    if (active instanceof HTMLElement && menuRef.current?.contains(active)) active.blur()
+    setMenuOpen(false)
+  }
+  const menuRef = useModal<HTMLElement>(menuOpen, () => closeMenu())
   // modal: false — the export menu is a two-item popover hanging off its own
   // button, not a surface that covers the app. It keeps Escape and the focus
   // move; trapping Tab inside it and freezing the page scroll behind it were
@@ -197,7 +239,7 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
   }
 
   const removeExpense = async (expense: Expense) => {
-    if (!window.confirm(`Delete "${expense.title || 'this expense'}"?`)) return
+    if (!window.confirm(`Delete "${expense.title || 'this expense'}" and its receipt? This can't be undone.`)) return
     await deleteExpense(expense.id)
     await refresh()
   }
@@ -235,11 +277,8 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
   const saveRename = async () => {
     if (!report) return
     const name = nameDraft.trim()
-    if (name && name !== report.name) {
-      await saveReport({ ...report, name })
-      setReport({ ...report, name })
-    }
     setRenaming(false)
+    await updateReport((latest) => (name && name !== latest.name ? { ...latest, name } : null))
   }
 
   const openMenu = () => {
@@ -261,24 +300,22 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
   const saveExchangeRate = async (currency: string, value: string) => {
     if (!report) return
     const rate = parseFloat(value)
-    const current = { ...report.exchangeRates }
-    if (Number.isFinite(rate) && rate > 0) {
-      current[currency] = rate
-    } else {
-      // An empty/invalid entry clears the rate rather than storing 0/NaN —
-      // that currency's total goes back to "missing" instead of $0.
-      delete current[currency]
-    }
-    const updated = { ...report, exchangeRates: current }
-    await saveReport(updated)
-    setReport(updated)
+    await updateReport((latest) => {
+      const current = { ...latest.exchangeRates }
+      if (Number.isFinite(rate) && rate > 0) {
+        current[currency] = rate
+      } else {
+        // An empty/invalid entry clears the rate rather than storing 0/NaN —
+        // that currency's total goes back to "missing" instead of $0.
+        delete current[currency]
+      }
+      return { ...latest, exchangeRates: current }
+    })
   }
 
   const saveProjectNumber = async (projectNumber: string) => {
     if (!report) return
-    const updated = { ...report, projectNumber }
-    await saveReport(updated)
-    setReport(updated)
+    await updateReport((latest) => ({ ...latest, projectNumber }))
   }
 
   const saveTripSettings = async () => {
@@ -286,16 +323,14 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
     const startDate = tripStartDraft
     const endDate = tripEndDraft < startDate ? startDate : tripEndDraft
     const dailyMealAllowance = Math.max(0, parseFloat(mealAllowanceDraft)) || 0
-    if (
-      startDate !== report.startDate ||
-      endDate !== report.endDate ||
-      dailyMealAllowance !== (report.dailyMealAllowance ?? 0)
-    ) {
-      const updated = { ...report, startDate, endDate, dailyMealAllowance }
-      await saveReport(updated)
-      setReport(updated)
-    }
     setTripEndDraft(endDate)
+    await updateReport((latest) =>
+      startDate !== latest.startDate ||
+      endDate !== latest.endDate ||
+      dailyMealAllowance !== (latest.dailyMealAllowance ?? 0)
+        ? { ...latest, startDate, endDate, dailyMealAllowance }
+        : null,
+    )
   }
 
   if (!report) return <p className="muted center">Loading…</p>
@@ -400,7 +435,7 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
       </header>
 
       {menuOpen && (
-        <div className="drawer-backdrop" onClick={() => setMenuOpen(false)}>
+        <div className="drawer-backdrop" onClick={closeMenu}>
           <aside
             ref={menuRef}
             className="drawer"
@@ -411,7 +446,7 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
           >
             <div className="drawer-header">
               <h2 id="report-menu-title">Report Menu</h2>
-              <button className="icon-btn" aria-label="Close menu" onClick={() => setMenuOpen(false)}>
+              <button className="icon-btn" aria-label="Close menu" onClick={closeMenu}>
                 <Icon name="close" />
               </button>
             </div>
@@ -503,11 +538,17 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
                     ? "Which project this report is charged to — it's printed on the PDF summary page."
                     : 'Save project numbers in the home screen menu to charge reports to different projects.'}
                 </p>
-                {profile.projects.length > 0 && (
+                {/* Also when the list is empty but this report still has a
+                    number, so it can be changed or cleared. */}
+                {(profile.projects.length > 0 || !!report.projectNumber) && (
                   <div className="field-grid">
                     <ProjectSelect
                       value={report.projectNumber ?? ''}
-                      projects={profile.projects}
+                      projects={
+                        report.projectNumber && !profile.projects.includes(report.projectNumber)
+                          ? [...profile.projects, report.projectNumber]
+                          : profile.projects
+                      }
                       defaultProject={profile.projectNumber}
                       onChange={(value) => void saveProjectNumber(value)}
                       label="Charge to"

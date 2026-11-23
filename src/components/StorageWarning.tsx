@@ -26,8 +26,14 @@ function isInstalled(): boolean {
 }
 
 function snoozed(): boolean {
-  const at = localStorage.getItem(SNOOZE_KEY)
-  return at !== null && Date.now() - Number(at) < SNOOZE_MS
+  // localStorage can throw when site data is blocked. Treat that as not
+  // snoozed, so the warning is still shown rather than the check failing.
+  try {
+    const at = localStorage.getItem(SNOOZE_KEY)
+    return at !== null && Date.now() - Number(at) < SNOOZE_MS
+  } catch {
+    return false
+  }
 }
 
 /**
@@ -53,7 +59,15 @@ export default function StorageWarning() {
     }
 
     const checkForData = async () => {
-      const reports = await listReports()
+      // An advisory check. If storage cannot be read it says nothing, rather
+      // than raising the global "your change may not have been saved" toast
+      // over a change the user never made.
+      let reports
+      try {
+        reports = await listReports()
+      } catch {
+        return
+      }
       if (cancelled || reports.length === 0) return
       shown = true
       stop()
@@ -65,7 +79,7 @@ export default function StorageWarning() {
       // will (installed PWAs usually get it). We only *warn* when it's still not
       // persistent, the app isn't installed, the user hasn't snoozed, and there
       // is data to lose.
-      const granted = await navigator.storage.persist()
+      const granted = await navigator.storage.persist().catch(() => false)
       if (granted || cancelled || isInstalled() || snoozed()) return
       await checkForData()
       // Nothing to lose yet. Keep watching, because "yet" is the whole
@@ -92,7 +106,11 @@ export default function StorageWarning() {
   if (!show) return null
 
   const dismiss = () => {
-    localStorage.setItem(SNOOZE_KEY, String(Date.now()))
+    try {
+      localStorage.setItem(SNOOZE_KEY, String(Date.now()))
+    } catch {
+      // Blocked storage: the banner still hides for this session.
+    }
     setShow(false)
   }
 

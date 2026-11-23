@@ -25,6 +25,9 @@ function makeExpense(overrides: Partial<Expense> = {}): Expense {
   }
 }
 
+// Formatted the way the app formats, so the tests pass in any locale.
+const usd = (n: number) => new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(n)
+
 describe('businessAmount', () => {
   it('equals the full amount when nothing is marked personal', () => {
     expect(businessAmount(makeExpense({ amount: 20 }))).toBe(20)
@@ -75,6 +78,20 @@ describe('foodBalanceForDate', () => {
   })
 })
 
+describe('a day that spends exactly the allowance', () => {
+  // As floating-point, 5.02 + 29.6 + 15.38 is a hair over 50.
+  it('is not flagged as over', () => {
+    const day = [
+      makeExpense({ id: 'a', amount: 5.02 }),
+      makeExpense({ id: 'b', amount: 29.6 }),
+      makeExpense({ id: 'c', amount: 15.38 }),
+    ]
+    const balance = foodBalanceForDate(day, '2026-07-18', 50)
+    expect(balance.over).toBe(false)
+    expect(balance.remaining).toBe(0)
+  })
+})
+
 describe('a day with meals in more than one currency', () => {
   const day = [
     makeExpense({ id: 'a', amount: 12, currency: 'USD' }),
@@ -108,12 +125,12 @@ describe('a day with meals in more than one currency', () => {
 describe('formatFoodBalance', () => {
   it('formats an under-budget day', () => {
     const balance = foodBalanceForDate([makeExpense({ amount: 20 })], '2026-07-18', 50)
-    expect(formatFoodBalance(balance)).toBe('Food $20.00 used · $30.00 left')
+    expect(formatFoodBalance(balance)).toBe(`Food ${usd(20)} used · ${usd(30)} left`)
   })
 
   it('formats an over-budget day', () => {
     const balance = foodBalanceForDate([makeExpense({ amount: 60 })], '2026-07-18', 50)
-    expect(formatFoodBalance(balance)).toBe('Food $60.00 used · $10.00 over')
+    expect(formatFoodBalance(balance)).toBe(`Food ${usd(60)} used · ${usd(10)} over`)
   })
 })
 

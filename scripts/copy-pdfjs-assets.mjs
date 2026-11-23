@@ -29,7 +29,11 @@ fs.mkdirSync(dest, { recursive: true })
 // Helvetica without embedding it and the device has none of the local fonts
 // it tries first (Helvetica, Arial, Liberation Sans, DejaVu Sans and others).
 // On such a device the text is drawn in the browser's generic sans-serif.
-const NOT_SHIPPED = /^(LiberationSans-.*\.ttf|LICENSE_LIBERATION)$/
+//
+// QuickJS is left behind too. PDF.js uses it only to run JavaScript inside PDF
+// forms, through a sandbox file this app does not copy, so nothing could ever
+// load it; it was 475 KB served for nothing.
+const NOT_SHIPPED = /^(LiberationSans-.*\.ttf|LICENSE_LIBERATION|quickjs-eval\..*|LICENSE_QUICKJS|LICENSE_PDFJS_QUICKJS)$/
 
 function copyFile(from, to) {
   fs.copyFileSync(path.join(pkgRoot, from), path.join(dest, to))
@@ -45,6 +49,7 @@ function copyDir(from, to) {
 // cpSync adds and overwrites but never deletes, so a copy made before a file
 // was excluded would stay in public/ and keep shipping from this machine.
 fs.rmSync(path.join(dest, 'standard_fonts'), { recursive: true, force: true })
+fs.rmSync(path.join(dest, 'wasm'), { recursive: true, force: true })
 
 copyFile('build/pdf.worker.min.mjs', 'pdf.worker.min.mjs')
 copyDir('standard_fonts', 'standard_fonts')
