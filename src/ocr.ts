@@ -94,11 +94,11 @@ const MAX_SCANNED_PAGES = 5
 // A page read with less confidence than this (0-100, averaged over its
 // letters) is read again: first from a copy with dotted print joined into
 // strokes, then, if that is not clearly better, from a straightened,
-// enlarged and de-grained copy (ocrPrep.ts). On 60 degraded synthetic
-// receipts the second copy took merchants from 50 right to 58, dates from 51
-// to 57 and totals from 47 to 58, and on 60 more made after the rules were
-// fixed from 53 to 57, 53 to 54 and 52 to 57; nothing changed on clean,
-// European or real receipts.
+// enlarged and de-grained copy (ocrPrep.ts). In Chrome, on 60 degraded
+// synthetic receipts that copy took merchants from 50 right to 58, dates
+// from 51 to 58 and totals from 47 to 57, and on 60 more made after the
+// rules were fixed from 53 to 57, 53 to 56 and 52 to 57; clean, European,
+// dot-matrix and real receipts read the same as before.
 //
 // The second reading is used when it reads at least MORE_READ times as many
 // letters with confidence SURE_WORD or more. Not the average: on a photo of

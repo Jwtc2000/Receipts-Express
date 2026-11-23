@@ -19,11 +19,18 @@ merge to `main` that changes app behavior gets a version bump and a tag.
   filled from the first reading, so no field the scan used to find is lost.
 - In Chrome, on 60 degraded synthetic receipts (blur, noise, small text,
   tilt), merchants went from 50 right to 58, dates from 51 to 58 and totals
-  from 47 to 58; on 60 more generated after the rules were set, from 53 to
+  from 47 to 57; on 60 more generated after the rules were set, from 53 to
   57, 53 to 56 and 52 to 57. Clean, European, dot-matrix and real receipts
   gave the same results as before. The further reading costs about 2
   seconds more on desktop for a large photo the engine is unsure of (2 of
   14 real receipts), and much less for small images.
+- The straightened copy is sized to the rotated image, so a tilted long
+  receipt does not lose its corners.
+- The Terms and privacy pages are fetched from the network whenever there is
+  one, and from the offline copy only without a connection. Served from the
+  offline copy first, someone returning after an amendment could open the
+  earlier text from the acceptance prompt while "I Agree" recorded the new
+  version.
 - The Privacy Policy lists the straightened copy alongside the other
   in-memory copies. It and the Terms are dated "23 November 2026 (revision
   4)", and existing users are asked to accept again once.

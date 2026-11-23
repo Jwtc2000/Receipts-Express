@@ -79,6 +79,13 @@ describe('cleaning up a photo for a second reading', () => {
     const t = inkThreshold(page(0))
     expect(t).toBeGreaterThanOrEqual(30)
     expect(t).toBeLessThan(235)
+    // A dark photo: ink and paper both below the middle grey. A threshold
+    // fixed anywhere outside 20-99 would call everything paper or ink.
+    const dark = new Uint8ClampedArray(1000).fill(100)
+    dark.fill(20, 0, 200)
+    const d = inkThreshold(dark)
+    expect(d).toBeGreaterThanOrEqual(20)
+    expect(d).toBeLessThan(100)
   })
 
   it('measures how far the text is tilted', () => {

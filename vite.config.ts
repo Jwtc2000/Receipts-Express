@@ -314,6 +314,21 @@ export default defineConfig({
             }
           },
           {
+            // The Terms and the privacy pages come from the network whenever
+            // there is one, and from the stored copy only offline. The
+            // first-run gate links to them and records acceptance of
+            // TERMS_VERSION; with the rule below, someone returning after an
+            // amendment was shown the copy stored on an earlier visit while
+            // "I Agree" recorded the new version. Listed before that rule:
+            // Workbox uses the first route that matches.
+            urlPattern: /\/docs\/(?:terms|privacy|consumer-health-data)\.html(?:[?#]|$)/,
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'legal-pages',
+              expiration: { maxEntries: 4, maxAgeSeconds: 365 * 24 * 60 * 60 }
+            }
+          },
+          {
             // The pages under docs/ are kept out of the precache above on
             // purpose: precaching them would make every unrelated policy or
             // slide-deck edit re-download the whole install for every user.

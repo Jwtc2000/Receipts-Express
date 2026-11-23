@@ -374,9 +374,13 @@ export async function cleanUp(image: Blob): Promise<Blob | null> {
     p.drawImage(canvas, 0, 0, probe.width, probe.height)
     const tilt = tiltOf(grayOf(p, probe.width, probe.height), probe.width, probe.height)
     if (Math.abs(tilt) >= 0.2) {
+      // Sized to the rotated image's bounding box, so no corner is cut off:
+      // on a long receipt a few degrees move its edges well outside the
+      // original frame.
+      const r = (Math.abs(tilt) * Math.PI) / 180
       const turned = document.createElement('canvas')
-      turned.width = canvas.width
-      turned.height = canvas.height
+      turned.width = Math.ceil(canvas.width * Math.cos(r) + canvas.height * Math.sin(r))
+      turned.height = Math.ceil(canvas.width * Math.sin(r) + canvas.height * Math.cos(r))
       const t = turned.getContext('2d', { willReadFrequently: true })!
       t.fillStyle = '#fff'
       t.fillRect(0, 0, turned.width, turned.height)
@@ -387,8 +391,8 @@ export async function cleanUp(image: Blob): Promise<Blob | null> {
       ctx = t
     }
 
-    const page = grayOf(ctx, canvas.width, canvas.height)
-    const scale = enlargement(lineHeightOf(page, canvas.width, canvas.height), canvas.width, canvas.height)
+    let gray = grayOf(ctx, canvas.width, canvas.height)
+    const scale = enlargement(lineHeightOf(gray, canvas.width, canvas.height), canvas.width, canvas.height)
     if (scale > 1.05) {
       const big = document.createElement('canvas')
       big.width = Math.round(canvas.width * scale)
@@ -401,8 +405,8 @@ export async function cleanUp(image: Blob): Promise<Blob | null> {
       b.drawImage(canvas, 0, 0, big.width, big.height)
       canvas = big
       ctx = b
+      gray = grayOf(ctx, canvas.width, canvas.height)
     }
-    const gray = grayOf(ctx, canvas.width, canvas.height)
     return await fromGray(median3(gray, canvas.width, canvas.height), canvas.width, canvas.height)
   } catch {
     return null

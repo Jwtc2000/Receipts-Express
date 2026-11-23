@@ -180,6 +180,21 @@ describe('production build', () => {
     expect(sw).toContain('docs-pages')
   })
 
+  // The first-run gate links to the Terms and the privacy pages and records
+  // acceptance of TERMS_VERSION. Served stale-while-revalidate, a returning
+  // user saw the copy stored before an amendment while agreeing to the new
+  // version. They must come from the network when there is one, and their
+  // route must come before the general docs/ one, which would match first.
+  it('serves the legal pages from the network first, ahead of the other docs/ pages', () => {
+    const sw = readFileSync(join(outDir, 'sw.js'), 'utf-8')
+    const legal = sw.indexOf('legal-pages')
+    expect(legal).toBeGreaterThan(-1)
+    const route = sw.lastIndexOf('registerRoute(', legal)
+    expect(sw.slice(route, legal)).toContain('NetworkFirst')
+    expect(legal).toBeLessThan(sw.indexOf('docs-pages'))
+    for (const page of ['terms', 'privacy', 'consumer-health-data']) expect(sw.slice(route, legal)).toContain(page)
+  })
+
   // With the worker installed, a navigation to one of the shipped licence
   // files was answered with the app shell. They must be left to the network.
   it('does not answer a navigation to the licence and notice files with the app', () => {
