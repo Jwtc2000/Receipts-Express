@@ -1,6 +1,6 @@
 # Third-Party Notices — Receipts Express
 
-Receipts Express 1.15.0. Compiled 2026-11-22 from the packages installed in `node_modules/`
+Receipts Express 1.16.0. Compiled 2026-11-23 from the packages installed in `node_modules/`
 and from the build they produce.
 
 Receipts Express itself is licensed under the Apache License, Version 2.0, Copyright 2026

@@ -8,6 +8,57 @@ user-facing features, and `PATCH` for fixes with no visible feature change. The
 version lives in `package.json` and is shown in the app under Menu → About. Every
 merge to `main` that changes app behavior gets a version bump and a tag.
 
+## [1.16.0] - 2026-11-23
+
+The rest of the project audit's findings, in five pull requests (#81 to #85).
+
+### Added
+- A message with Reload and "Back up now" when a screen fails to render,
+  instead of a blank page.
+- The restore prompt says how many receipt pages the backup file is missing.
+
+### Changed
+- Only the three OCR engine builds the app can load are shipped, and the
+  PDF engine's unused QuickJS is left out: about 33 MB less per deploy.
+- Primary buttons are filled teal by default, so the consent gate's
+  "I Agree" and the update banner's Refresh are visible on white. Form
+  fields have visible borders and the installed app is no longer locked to
+  portrait.
+- The update banner checks for a new version every hour in a long-running
+  session, and is announced to screen readers.
+- Restore keeps only the fields the app knows, and refuses negative
+  amounts, impossible dates, duplicate ids, files from a newer version and
+  files too large to be a backup.
+- Delete prompts say that receipts go too and cannot be recovered.
+- SECURITY.md, the README, the pilot deck and the governance review now
+  match what the code does.
+
+### Fixed
+- OCR: dotted phone and reference numbers, words containing a month name,
+  impossible days and future dates are no longer taken as the receipt date;
+  a "0.00" keyword line is no longer the total; accented and short merchant
+  names (Café, H&M, BP) are kept.
+- A failed second photo pick left the scan spinner stuck.
+- A PDF reader that failed to load was reported as a corrupt PDF.
+- An expense saved with amount 0 reopened with an empty amount.
+- Transparent images were stored on black.
+- Spending exactly the meal allowance could show as over.
+- Restoring a backup could strand or, with shared page ids, remove receipt
+  pages.
+- A failed or dropped database connection broke every later save until a
+  reload.
+- If the share sheet refused a finished export, it failed instead of
+  downloading.
+- Long titles ran into the amount on PDF receipt pages, and notes were cut
+  at three lines without a mark.
+- Drawer edits were lost when the drawer was closed with Escape, and two
+  report settings saved together could undo each other.
+- Refresh in one tab reloaded other tabs past their unsaved-work check, and
+  edits made after agreeing to reload could be lost without a prompt.
+- The error message blamed storage for every failure.
+- With the service worker installed, LICENSE.txt and the notices opened as
+  the app instead of the file.
+
 ## [1.15.0] - 2026-11-22
 
 Everything merged since 1.14.0, which went out over three months without a
