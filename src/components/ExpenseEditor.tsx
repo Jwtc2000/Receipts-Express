@@ -196,8 +196,10 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
   // Warn the browser before it unloads (tab close, refresh, PWA back-gesture, or
   // the service-worker update reload) while there's an unsaved draft — otherwise
   // the typed fields and captured photo are gone with no confirmation.
+  // Also while a picked file is still being processed: it is not in the
+  // draft yet, but a reload would lose it all the same.
   useEffect(() => {
-    if (!dirty) return
+    if (!dirty && !picking) return
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
       if (isDiscardConfirmed()) return
       e.preventDefault()
@@ -205,7 +207,17 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
     }
     window.addEventListener('beforeunload', onBeforeUnload)
     return () => window.removeEventListener('beforeunload', onBeforeUnload)
-  }, [dirty])
+  }, [dirty, picking])
+
+  // Leaving the editor abandons any pick still in flight, so its late result
+  // (or failure) cannot touch the unsaved-work signal another editor now owns.
+  useEffect(
+    () => () => {
+      pickGenRef.current++
+      scanGenRef.current++
+    },
+    [],
+  )
 
   // Mirrors `dirty` into a module-level signal UpdateBanner can check — it's
   // an unrelated sibling with no shared state, and beforeunload above isn't
