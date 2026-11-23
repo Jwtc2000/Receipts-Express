@@ -52,7 +52,15 @@ export default function ReportList({ onOpenReport, onEditExpense }: Props) {
   const [newProject, setNewProject] = useState('')
   const [newReportProject, setNewReportProject] = useState('')
   const restoreInput = useRef<HTMLInputElement>(null)
-  const menuRef = useModal<HTMLElement>(menuOpen, () => setMenuOpen(false))
+  // Fields in the drawer save when they lose focus. Closing it with Escape,
+  // the backdrop or the close button used to remove the field without it
+  // ever losing focus, so the edit was dropped. Blur it first.
+  const closeMenu = () => {
+    const active = document.activeElement
+    if (active instanceof HTMLElement && menuRef.current?.contains(active)) active.blur()
+    setMenuOpen(false)
+  }
+  const menuRef = useModal<HTMLElement>(menuOpen, () => closeMenu())
 
   const setProfileField = (patch: Partial<Profile>) => setProfile((p) => ({ ...p, ...patch }))
   const persistProfile = () => saveProfile(profile)
@@ -151,7 +159,7 @@ export default function ReportList({ onOpenReport, onEditExpense }: Props) {
     setBackupNote(null)
     try {
       const plan = await validateBackup(file)
-      const { reports, expenses, overwrites } = plan.counts
+      const { reports, expenses, overwrites, missingImages } = plan.counts
       const exported = plan.exportedAt ? new Date(plan.exportedAt) : null
       const taken =
         exported && !Number.isNaN(exported.getTime())
@@ -164,6 +172,9 @@ export default function ReportList({ onOpenReport, onEditExpense }: Props) {
         overwrites > 0
           ? `${overwrites} record${overwrites === 1 ? '' : 's'} already on this device will be replaced by the copy in the backup, even where this device's copy is newer. That can't be undone.`
           : 'No report or expense already on this device will be replaced.',
+        ...(missingImages > 0
+          ? ['', `${missingImages} receipt page${missingImages === 1 ? '' : 's'} the expenses refer to ${missingImages === 1 ? 'is' : 'are'} not in this file, so ${missingImages === 1 ? 'it' : 'they'} will be missing after the restore.`]
+          : []),
         // The profile is not one of those records: it has no id to match on,
         // and the backup's copy simply takes the place of this device's.
         ...(plan.profile
@@ -207,7 +218,12 @@ export default function ReportList({ onOpenReport, onEditExpense }: Props) {
   }
 
   const removeReport = async (id: string, name: string) => {
-    if (!window.confirm(`Delete report "${name}" and all its expenses?`)) return
+    if (
+      !window.confirm(
+        `Delete report "${name}" with all its expenses and receipts? This can't be undone. If you might need it later, back up or export it first.`,
+      )
+    )
+      return
     await deleteReport(id)
     await refresh()
   }
@@ -262,7 +278,7 @@ export default function ReportList({ onOpenReport, onEditExpense }: Props) {
       )}
 
       {menuOpen && (
-        <div className="drawer-backdrop" onClick={() => setMenuOpen(false)}>
+        <div className="drawer-backdrop" onClick={closeMenu}>
           <aside
             ref={menuRef}
             className="drawer"
@@ -273,7 +289,7 @@ export default function ReportList({ onOpenReport, onEditExpense }: Props) {
           >
             <div className="drawer-header">
               <h2 id="home-menu-title">Menu</h2>
-              <button className="icon-btn" aria-label="Close menu" onClick={() => setMenuOpen(false)}>
+              <button className="icon-btn" aria-label="Close menu" onClick={closeMenu}>
                 <Icon name="close" />
               </button>
             </div>

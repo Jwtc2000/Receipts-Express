@@ -6,6 +6,7 @@ import StorageWarning from './components/StorageWarning'
 import GlobalErrorToast from './components/GlobalErrorToast'
 import FirstRunNotice from './components/FirstRunNotice'
 import ErrorBoundary from './components/ErrorBoundary'
+import { DB_VERSION_CHANGE_EVENT } from './db'
 import './styles.css'
 
 // StorageWarning requests durable storage (navigator.storage.persist) on mount
@@ -31,6 +32,19 @@ function Root() {
   useEffect(() => {
     behindRef.current?.toggleAttribute('inert', gateOpen)
   }, [gateOpen])
+
+  // A newer copy of the app in another tab needs this tab to let go of the
+  // database before it can upgrade it. db.ts has already closed it; this tab
+  // cannot keep working without reloading onto the new version.
+  useEffect(() => {
+    const onVersionChange = () => {
+      if (window.confirm('Receipts Express was updated in another tab. Reload this tab to keep using it?')) {
+        window.location.reload()
+      }
+    }
+    window.addEventListener(DB_VERSION_CHANGE_EVENT, onVersionChange)
+    return () => window.removeEventListener(DB_VERSION_CHANGE_EVENT, onVersionChange)
+  }, [])
 
   return (
     <>
