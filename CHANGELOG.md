@@ -8,6 +8,26 @@ user-facing features, and `PATCH` for fixes with no visible feature change. The
 version lives in `package.json` and is shown in the app under Menu → About. Every
 merge to `main` that changes app behavior gets a version bump and a tag.
 
+## [1.22.0] - 2026-11-23
+
+### Changed
+- A page text recognition is unsure of, and that the dot-joined copy does
+  not read clearly better, is read once more from a straightened, enlarged
+  (text lines to about 30 pixels, at most 4 times and 6 megapixels) and
+  de-grained copy, and that reading is used if it reads at least half as
+  much again with confidence. A field the reading used leaves empty is
+  filled from the first reading, so no field the scan used to find is lost.
+- In Chrome, on 60 degraded synthetic receipts (blur, noise, small text,
+  tilt), merchants went from 50 right to 58, dates from 51 to 58 and totals
+  from 47 to 58; on 60 more generated after the rules were set, from 53 to
+  57, 53 to 56 and 52 to 57. Clean, European, dot-matrix and real receipts
+  gave the same results as before. The further reading costs about 2
+  seconds more on desktop for a large photo the engine is unsure of (2 of
+  14 real receipts), and much less for small images.
+- The Privacy Policy lists the straightened copy alongside the other
+  in-memory copies. It and the Terms are dated "23 November 2026 (revision
+  4)", and existing users are asked to accept again once.
+
 ## [1.21.0] - 2026-11-23
 
 ### Changed

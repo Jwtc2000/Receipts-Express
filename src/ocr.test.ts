@@ -487,13 +487,18 @@ describe('extractReceipt second reading for dotted print', () => {
     },
   })
   const joined = new Blob(['joined'])
+  const cleaned = new Blob(['cleaned'])
+  // Each test sets whether a cleaned-up copy can be made.
+  const cleanUp = vi.fn<() => Promise<Blob | null>>()
 
   beforeEach(() => {
     vi.resetModules()
     createWorker.mockReset()
+    cleanUp.mockReset().mockResolvedValue(null)
     vi.doMock('./ocrPrep', () => ({
       invertDarkBands: (image: Blob) => Promise.resolve(image),
       joinDots: () => Promise.resolve(joined),
+      cleanUp,
     }))
   })
   afterEach(() => vi.doUnmock('./ocrPrep'))
@@ -553,6 +558,47 @@ describe('extractReceipt second reading for dotted print', () => {
     createWorker.mockResolvedValue({ recognize })
     const { extractReceipt } = await import('./ocr')
     await expect(extractReceipt(new Blob(['receipt']))).rejects.toThrow('worker crashed')
+  })
+
+  it('reads a cleaned-up copy when the dot-joined one is no clearer, and keeps it when it is', async () => {
+    cleanUp.mockResolvedValue(cleaned)
+    const recognize = vi
+      .fn()
+      .mockResolvedValueOnce(read([[['Comer', 50], ['Bakey', 50]], [['Tota', 40], ['9.7S', 30]]]))
+      .mockResolvedValueOnce(read([[['C0mer', 45]], [['T0ta', 40]]]))
+      .mockResolvedValueOnce(read([[['Corner', 92], ['Bakery', 92]], [['Total', 95], ['9.75', 95]]]))
+    createWorker.mockResolvedValue({ recognize })
+    const { extractReceipt } = await import('./ocr')
+    const got = await extractReceipt(new Blob(['receipt']))
+    expect(recognize).toHaveBeenCalledTimes(3)
+    expect(recognize.mock.calls[2][0]).toBe(cleaned)
+    expect(got).toMatchObject({ merchant: 'Corner Bakery', total: 9.75 })
+  })
+
+  it('does not read the cleaned-up copy when the dot-joined one already won', async () => {
+    cleanUp.mockResolvedValue(cleaned)
+    const recognize = vi
+      .fn()
+      .mockResolvedValueOnce(read([[['VRN', 30], ['Q', 20], ['LT', 25]], [['Total', 40], ['3O.0O', 30]]]))
+      .mockResolvedValueOnce(read([[['FUELMART', 85]], [['Total', 90], ['30.00', 88]]]))
+    createWorker.mockResolvedValue({ recognize })
+    const { extractReceipt } = await import('./ocr')
+    await extractReceipt(new Blob(['receipt']))
+    expect(recognize).toHaveBeenCalledTimes(2)
+    expect(cleanUp).not.toHaveBeenCalled()
+  })
+
+  it('fills a field the clearer reading left empty from the first reading', async () => {
+    cleanUp.mockResolvedValue(cleaned)
+    const recognize = vi
+      .fn()
+      // The first reading has the date; the clearer one loses it.
+      .mockResolvedValueOnce(read([[['Comer', 50], ['Bakey', 50]], [['2026-03-14', 60]], [['Tota', 40], ['9.7S', 30]]]))
+      .mockResolvedValueOnce(read([[['C0mer', 45]]]))
+      .mockResolvedValueOnce(read([[['Corner', 92], ['Bakery', 92]], [['Total', 95], ['9.75', 95]]]))
+    createWorker.mockResolvedValue({ recognize })
+    const { extractReceipt } = await import('./ocr')
+    expect(await extractReceipt(new Blob(['receipt']))).toMatchObject({ merchant: 'Corner Bakery', date: '2026-03-14', total: 9.75 })
   })
 
   it('reads a confident page only once', async () => {
