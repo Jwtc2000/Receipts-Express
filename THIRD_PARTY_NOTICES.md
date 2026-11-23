@@ -14,6 +14,12 @@ downloads from the deployed site: the JavaScript under `assets/`, the OCR engine
 `tesseract/`, the PDF.js engine under `pdfjs/`, the webfonts under `fonts/`, and the service
 worker.
 
+The two engine directories each hold one subdirectory, named for the installed package
+versions: `pdfjs/6.5.438/` and `tesseract/7.0.0-7.0.0-1.0.0/` in this build. Paths below are
+written without it, so `pdfjs/wasm/LICENSE_QCMS` is served as `pdfjs/6.5.438/wasm/LICENSE_QCMS`.
+The version is in the path so that an upgrade changes every engine URL, which the service
+worker's cache needs.
+
 Every version below is the version **as installed**, read from that package's own
 `package.json`. Every copyright line is quoted **verbatim** from that package's own licence
 file. Nothing here is written from memory. Where a package ships a licence file with no
