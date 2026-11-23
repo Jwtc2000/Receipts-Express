@@ -463,6 +463,24 @@ describe('extractReceipt second reading for dotted print', () => {
     expect(recognize).toHaveBeenCalledTimes(2)
   })
 
+  it('keeps the first reading when the second one fails', async () => {
+    const recognize = vi
+      .fn()
+      .mockResolvedValueOnce(read([[['Corner', 66], ['Bakery', 66]], [['Total', 66], ['9.75', 66]]]))
+      .mockRejectedValueOnce(new Error('worker crashed'))
+    createWorker.mockResolvedValue({ recognize })
+    const { extractReceipt } = await import('./ocr')
+    await expect(extractReceipt(new Blob(['receipt']))).resolves.toMatchObject({ merchant: 'Corner Bakery', total: 9.75 })
+    expect(recognize).toHaveBeenCalledTimes(2)
+  })
+
+  it('still fails when the first reading fails', async () => {
+    const recognize = vi.fn().mockRejectedValueOnce(new Error('worker crashed'))
+    createWorker.mockResolvedValue({ recognize })
+    const { extractReceipt } = await import('./ocr')
+    await expect(extractReceipt(new Blob(['receipt']))).rejects.toThrow('worker crashed')
+  })
+
   it('reads a confident page only once', async () => {
     const recognize = vi.fn().mockResolvedValueOnce(read([[['Corner', 95], ['Bakery', 95]], [['Total', 96], ['9.75', 96]]]))
     createWorker.mockResolvedValue({ recognize })

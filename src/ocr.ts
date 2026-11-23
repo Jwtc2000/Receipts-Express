@@ -154,6 +154,9 @@ export async function extractReceipt(
               result = second
               pageLines = secondLines
             }
+          } catch {
+            // The second reading is optional: if it fails, the first one
+            // stands, as it would have before this step existed.
           } finally {
             secondReading = false
           }
