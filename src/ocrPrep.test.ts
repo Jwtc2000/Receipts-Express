@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { darkBandRows } from './ocrPrep'
+import { darkBandRows, joinDotsGray } from './ocrPrep'
 
 const W = 100
 const H = 60
@@ -42,5 +42,18 @@ describe('darkBandRows', () => {
   it('leaves a page that is dark nearly throughout to the engine', () => {
     const g = image((_x, y) => (y >= 4 ? 20 : undefined))
     expect(darkBandRows(g, W, H)).toEqual([])
+  })
+})
+
+describe('joinDotsGray', () => {
+  it('joins a row of separate dots into a solid stroke', () => {
+    // Paper at 230, with a horizontal line printed as 1-pixel dots every 4 pixels.
+    const g = new Uint8ClampedArray(W * H).fill(230)
+    for (let x = 10; x < 90; x += 4) g[30 * W + x] = 40
+    const out = joinDotsGray(g, W, H)
+    // Every pixel along the line, including the gaps between dots, is now dark.
+    for (let x = 12; x < 86; x++) expect(out[30 * W + x], `x=${x}`).toBeLessThan(128)
+    // Paper away from the line stays light.
+    expect(out[10 * W + 50]).toBeGreaterThan(200)
   })
 })

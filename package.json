@@ -1,7 +1,7 @@
 {
   "name": "receipts-express",
   "private": true,
-  "version": "1.19.0",
+  "version": "1.20.0",
   "description": "Scan receipts, organize expense reports, export polished PDFs.",
   "license": "Apache-2.0",
   "type": "module",
