@@ -13,24 +13,36 @@ export interface FoodBalance {
   remaining: number
   over: boolean
   currency: string
+  /** The day's meals are in more than one currency, so no figure is given. */
+  mixed: boolean
 }
 
 /**
  * How much of a day's Meals-category spending (after excluding personal
- * portions) counts against the daily allowance, and what's left. Assumes a
- * single currency per trip, matching the allowance itself (a plain number
- * with no currency of its own).
+ * portions) counts against the daily allowance, and what's left. The
+ * allowance is a plain number with no currency of its own, so it is read as
+ * being in whatever currency that day's meals are in.
+ *
+ * That only works when they are all in one. A USD 12 breakfast and a EUR 40
+ * dinner used to be added as 52 and printed as "$52.00 used", in the app and
+ * in the exported PDF. A day like that is now marked `mixed` and no figure is
+ * given, because any figure would be wrong.
  */
 export function foodBalanceForDate(expenses: Expense[], date: string, allowance: number): FoodBalance {
   const mealExpenses = expenses.filter((e) => e.date === date && e.category === 'Meals')
   const used = mealExpenses.reduce((sum, e) => sum + businessAmount(e), 0)
+  const currencies = new Set(mealExpenses.map((e) => e.currency.trim().toUpperCase()))
   const currency = mealExpenses[0]?.currency.trim().toUpperCase() || 'USD'
+  if (currencies.size > 1) {
+    return { used: 0, allowance, remaining: allowance, over: false, currency, mixed: true }
+  }
   const remaining = allowance - used
-  return { used, allowance, remaining, over: remaining < 0, currency }
+  return { used, allowance, remaining, over: remaining < 0, currency, mixed: false }
 }
 
 /** "Food $45.00 used · $5.00 left" or, over budget, "Food $60.00 used · $10.00 over". */
 export function formatFoodBalance(balance: FoodBalance): string {
+  if (balance.mixed) return 'Food not totalled · meals in more than one currency'
   const used = formatMoney(balance.used, balance.currency)
   const rest = formatMoney(Math.abs(balance.remaining), balance.currency)
   return balance.over ? `Food ${used} used · ${rest} over` : `Food ${used} used · ${rest} left`

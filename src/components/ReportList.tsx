@@ -11,6 +11,7 @@ import {
   dismissBackupWarning,
   shouldShowBackupWarning,
   MAX_STRING_LENGTH,
+  BackupTooLargeError,
 } from '../backup'
 import { addProject, getProfile, removeProject, saveProfile, type Profile } from '../profile'
 import { expenseMatches } from '../search'
@@ -129,8 +130,10 @@ export default function ReportList({ onOpenReport, onEditExpense }: Props) {
       // shareOrDownloadFile in share.ts). Saying "saved" would tell the user
       // they have a copy that may not exist.
       if (done) setBackupNote('Backup file created — check it saved')
-    } catch {
-      setBackupNote('Backup failed — try again')
+    } catch (err) {
+      // A library too large for the file format says so in its own words;
+      // "try again" would be advice that cannot work.
+      setBackupNote(err instanceof BackupTooLargeError ? err.message : 'Backup failed — try again')
     } finally {
       setBackupBusy(false)
       setBackupTick((t) => t + 1)
@@ -160,7 +163,12 @@ export default function ReportList({ onOpenReport, onEditExpense }: Props) {
         `It holds ${reports} report${reports === 1 ? '' : 's'} and ${expenses} expense${expenses === 1 ? '' : 's'}.`,
         overwrites > 0
           ? `${overwrites} record${overwrites === 1 ? '' : 's'} already on this device will be replaced by the copy in the backup, even where this device's copy is newer. That can't be undone.`
-          : 'Nothing already on this device will be replaced.',
+          : 'No report or expense already on this device will be replaced.',
+        // The profile is not one of those records: it has no id to match on,
+        // and the backup's copy simply takes the place of this device's.
+        ...(plan.profile
+          ? ['', 'The name, employee ID, cost center and project numbers saved on this device will be replaced by the ones in the backup.']
+          : []),
       ].join('\n')
       if (!window.confirm(message)) {
         setBackupNote('Restore cancelled — nothing was changed')

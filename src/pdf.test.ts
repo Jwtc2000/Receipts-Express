@@ -98,6 +98,22 @@ afterEach(() => {
 })
 
 describe('exportReportPdf', () => {
+  // The built-in font encodes Windows-1252 only. Anything else used to go
+  // into the page as raw UTF-16: a NUL byte before every later character.
+  it('draws a rupee amount and a non-Latin title without corrupting the page', async () => {
+    const { exportReportPdf } = await import('./pdf')
+    const { shareOrDownloadFile } = await import('./share')
+
+    await exportReportPdf(makeReport({ name: '東京 trip' }), [
+      makeExpense({ imageId: undefined, currency: 'INR', amount: 1234.5, title: 'Обед' }),
+    ])
+
+    const calls = (shareOrDownloadFile as ReturnType<typeof vi.fn>).mock.calls
+    const text = await pdfText(calls[calls.length - 1][0] as File)
+    expect(text).not.toContain('\u0000')
+    expect(text).toMatch(/INR\s*1,234\.50/)
+  })
+
   it('produces one summary page plus one receipt page for a single no-image expense', async () => {
     const { exportReportPdf } = await import('./pdf')
     const { shareOrDownloadFile } = await import('./share')

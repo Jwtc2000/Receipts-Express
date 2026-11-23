@@ -468,6 +468,35 @@ describe('the profile in a backup', () => {
     expect(getProfile()).toMatchObject({ name: 'Jordan', projects: ['PRJ-1'] })
   })
 
+  // A second tab can save an expense into a report the first tab has just
+  // deleted. The app shows no such expense, and validateBackup rejects a whole
+  // file over one, so exporting it would make every backup unrestorable.
+  it('leaves out an expense whose report no longer exists, so the file still restores', async () => {
+    const db = await import('./db')
+    const { exportBackup, validateBackup } = await import('./backup')
+    await db.saveReport({ id: 'r1', name: 'Trip', createdAt: 1 })
+    const [expense] = validBackup().expenses
+    await db.saveExpense({ ...expense, id: 'kept', reportId: 'r1' })
+    await db.saveExpense({ ...expense, id: 'orphan', reportId: 'deleted-report' })
+
+    expect(await exportBackup()).toBe(true)
+    const exported = shareOrDownloadFile.mock.calls[0][0] as File
+
+    const plan = await validateBackup(exported)
+    expect(plan.expenses.map((e) => e.id)).toEqual(['kept'])
+  })
+
+  it('refuses to write a backup larger than the format can hold, and says so', async () => {
+    const db = await import('./db')
+    const backup = await import('./backup')
+    await db.saveReport({ id: 'r1', name: 'Trip', createdAt: 1 })
+    const huge = { size: backup.MAX_EXPORT_IMAGE_BYTES + 1 } as Blob
+    vi.spyOn(db, 'listAllImages').mockResolvedValueOnce([{ id: 'i1', blob: huge }])
+
+    await expect(backup.exportBackup()).rejects.toThrow(backup.BackupTooLargeError)
+    expect(shareOrDownloadFile).not.toHaveBeenCalled()
+  })
+
   // An entirely empty profile is left out of the file rather than written as
   // blanks, which is what makes the no-profile case above reachable for anyone
   // who exports before filling the profile in.

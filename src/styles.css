@@ -1379,7 +1379,11 @@ body {
 .update-banner {
   position: fixed;
   left: 50%;
-  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  /* Clear of the floating "+ New Report" / "+ Add Expense" button, which
+     sits at the bottom centre. At 16px the banner covered it completely on
+     a phone, with Refresh directly over the button's centre. */
+  bottom: calc(92px + env(safe-area-inset-bottom, 0px));
+  max-width: calc(100vw - 24px);
   transform: translateX(-50%);
   z-index: 50;
   display: flex;
@@ -1408,14 +1412,16 @@ body {
 /* ---- Storage (eviction) warning banner ---- */
 
 .storage-warning {
-  position: sticky;
-  top: 0;
+  /* In normal flow at the top of the page. It used to be sticky, which did
+     nothing for it while it was mounted below a full-height app, and would
+     now fight the topbar for the same spot. */
+  position: relative;
   z-index: 40;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px 16px;
+  padding: calc(12px + env(safe-area-inset-top, 0px)) 16px 12px;
   background: var(--orange-light);
   border-bottom: 1px solid var(--orange);
   color: var(--text);

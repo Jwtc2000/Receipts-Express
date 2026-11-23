@@ -8,6 +8,9 @@ import { hasUnsavedWork } from '../unsavedWork'
 export default function UpdateBanner() {
   const [needsRefresh, setNeedsRefresh] = useState(false)
   const [reloading, setReloading] = useState(false)
+  // "Later" hides the banner for this session only. The new version is
+  // still waiting, and the banner comes back the next time the app loads.
+  const [later, setLater] = useState(false)
   const updateRef = useRef<((reload?: boolean) => Promise<void>) | null>(null)
 
   useEffect(() => {
@@ -17,7 +20,7 @@ export default function UpdateBanner() {
     })
   }, [])
 
-  if (!needsRefresh) return null
+  if (!needsRefresh || later) return null
 
   const onRefresh = () => {
     // beforeunload (ExpenseEditor's own unsaved-draft guard) doesn't
@@ -36,10 +39,13 @@ export default function UpdateBanner() {
   }
 
   return (
-    <div className="update-banner">
+    <div className="update-banner" role="status">
       <span>A new version is ready.</span>
       <button type="button" className="btn primary small" disabled={reloading} onClick={onRefresh}>
         {reloading ? 'Updating…' : 'Refresh'}
+      </button>
+      <button type="button" className="btn ghost small" disabled={reloading} onClick={() => setLater(true)}>
+        Later
       </button>
     </div>
   )

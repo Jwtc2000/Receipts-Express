@@ -34,6 +34,26 @@ const MAX_IMAGE_BYTES = 15 * 1024 * 1024 // generous ceiling for one receipt pho
 const MAX_IMAGES = 5000
 const MAX_TOTAL_IMAGE_BYTES = 500 * 1024 * 1024
 
+// The backup is one JSON document, built and read back as a single string.
+// Chromium caps a string at about 512 million characters, and base64 turns
+// every three image bytes into four, so past roughly 380 MB of receipt images
+// the export threw a bare RangeError and the user saw only "Backup failed".
+// The check below refuses a little earlier and says why. It is a ceiling on
+// what this file format can hold, not a fix for it: holding more needs a
+// format that is not one string.
+export const MAX_EXPORT_IMAGE_BYTES = 350 * 1024 * 1024
+
+/** A backup that cannot be written, with a message meant for the user. */
+export class BackupTooLargeError extends Error {
+  constructor(totalBytes: number) {
+    super(
+      `Your receipts add up to about ${Math.round(totalBytes / (1024 * 1024))} MB, which is more than one backup file can hold. ` +
+        'Export the reports you no longer need as PDFs, delete them here, and back up again.',
+    )
+    this.name = 'BackupTooLargeError'
+  }
+}
+
 // Record and text ceilings. Without them a corrupt or hostile file can hold
 // millions of records, or a handful of records carrying megabyte-long
 // strings, and the restore exhausts the origin's storage quota (or wedges
@@ -206,8 +226,18 @@ export interface BackupPlan {
  */
 export async function validateBackup(file: File): Promise<BackupPlan> {
   let parsed: unknown
+  // Reading and parsing fail differently and mean different things. A file
+  // too large for the browser to hold as one string fails at the read, and
+  // used to be reported as "isn't valid JSON", which sent the owner of a
+  // perfectly good backup looking for the wrong problem.
+  let text: string
   try {
-    parsed = JSON.parse(await file.text())
+    text = await file.text()
+  } catch {
+    throw new Error('That file is too large for this browser to read, or could not be opened')
+  }
+  try {
+    parsed = JSON.parse(text)
   } catch {
     throw new Error("That file isn't valid JSON, so it isn't a Receipts Express backup")
   }
@@ -379,11 +409,22 @@ export function shouldShowBackupWarning(): boolean {
 }
 
 async function buildBackupBlob(): Promise<Blob> {
-  const [reports, expenses, images] = await Promise.all([
+  const [reports, allExpenses, images] = await Promise.all([
     listReports(),
     listAllExpenses(),
     listAllImages(),
   ])
+  // An expense whose report is gone can exist: a second tab, or the installed
+  // app beside a browser tab, can save one into a report the other just
+  // deleted. Nothing in the app shows it. validateBackup rejects a whole file
+  // over a single such record, so writing it out would make every backup from
+  // this device one that cannot be restored, discovered only on the day it is
+  // needed. It is left out, which loses nothing the app could display.
+  const reportIds = new Set(reports.map((r) => r.id))
+  const expenses = allExpenses.filter((e) => reportIds.has(e.reportId))
+
+  const totalImageBytes = images.reduce((sum, img) => sum + img.blob.size, 0)
+  if (totalImageBytes > MAX_EXPORT_IMAGE_BYTES) throw new BackupTooLargeError(totalImageBytes)
   // The profile is part of the backup — a restore that brought back every
   // receipt but dropped the user's name and project numbers would be a
   // restore that quietly lost data. An entirely empty profile is left out
