@@ -13,7 +13,9 @@ merge to `main` that changes app behavior gets a version bump and a tag.
 ### Changed
 - The PDF.js worker is started from a `blob:` wrapper, so it runs under the
   app's Content-Security-Policy instead of with none; a request to another
-  origin from inside it is now refused. Nothing visible changes.
+  origin from inside it is now refused. If a browser cannot start it that
+  way, the app falls back to starting it as before, without the policy.
+  Nothing visible changes.
 - The app's policy adds `object-src 'none'` and `frame-src 'none'`. The
   policy for the standalone pages under `docs/` drops the grants only the app
   needs: WebAssembly, workers, and `blob:`/`data:` images.

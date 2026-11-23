@@ -152,7 +152,10 @@ describe('production build', () => {
     expect(d['base-uri']).toEqual(["'self'"])
     // Nothing the app needs and a page of text does not: no WebAssembly, no
     // workers, no plugin content, no frames, no blob: or data: images.
-    expect(d['script-src']).not.toContain("'wasm-unsafe-eval'")
+    expect(d['script-src'][0]).toBe("'self'")
+    // Nothing after 'self' but hashes of the page's own inline scripts: no
+    // 'wasm-unsafe-eval', and no 'unsafe-eval' either, which also allows it.
+    for (const source of d['script-src'].slice(1)) expect(source).toMatch(/^'sha256-[A-Za-z0-9+/]+={0,2}'$/)
     expect(d['worker-src']).toEqual(["'none'"])
     expect(d['img-src']).toEqual(["'self'"])
     expect(d['object-src']).toEqual(["'none'"])

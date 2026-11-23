@@ -16,24 +16,50 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = WORKER_URL
  * Policy from that script's HTTP headers, and GitHub Pages sends none, so the
  * PDF.js worker used to run with no policy at all. A blob: worker inherits the
  * policy of the page that made it, which is the app's <meta> CSP: the worker
- * now gets the same limits as the page, including connect-src 'self'.
+ * gets the same limits as the page, including connect-src 'self'.
  *
- * If a browser cannot start it this way, PDF.js falls back to workerSrc above
- * and works as before.
+ * PDF.js does no error handling of its own for a worker it is handed, so the
+ * wrapper is only handed over once the worker has said it is running (the
+ * PDF.js worker posts a "ready" message as soon as it has loaded). If it fails
+ * to load, or says nothing in time, it is terminated and PDF.js starts the
+ * worker itself from workerSrc, as before 1.16.1 — outside the CSP, but working.
  */
-function startWorker(): Worker | null {
-  if (typeof Worker === 'undefined' || typeof URL.createObjectURL !== 'function') return null
-  try {
-    const absolute = new URL(WORKER_URL, window.location.href).href
-    const wrapper = new Blob([`import ${JSON.stringify(absolute)}`], { type: 'text/javascript' })
-    return new Worker(URL.createObjectURL(wrapper), { type: 'module' })
-  } catch {
-    return null
-  }
+export function startWorker(timeoutMs = 15_000): Promise<Worker | null> {
+  if (typeof Worker === 'undefined' || typeof URL.createObjectURL !== 'function') return Promise.resolve(null)
+  return new Promise((resolve) => {
+    let worker: Worker
+    let blobUrl: string
+    try {
+      const absolute = new URL(WORKER_URL, window.location.href).href
+      blobUrl = URL.createObjectURL(new Blob([`import ${JSON.stringify(absolute)}`], { type: 'text/javascript' }))
+      worker = new Worker(blobUrl, { type: 'module' })
+    } catch {
+      resolve(null)
+      return
+    }
+    const finish = (ok: boolean) => {
+      clearTimeout(timer)
+      worker.removeEventListener('message', onMessage)
+      worker.removeEventListener('error', onError)
+      URL.revokeObjectURL(blobUrl)
+      if (!ok) worker.terminate()
+      resolve(ok ? worker : null)
+    }
+    const onMessage = () => finish(true)
+    const onError = () => finish(false)
+    worker.addEventListener('message', onMessage)
+    worker.addEventListener('error', onError)
+    const timer = setTimeout(() => finish(false), timeoutMs)
+  })
 }
 
-const worker = startWorker()
-if (worker) pdfjsLib.GlobalWorkerOptions.workerPort = worker
+let workerSetup: Promise<void> | null = null
+function ensureWorker(): Promise<void> {
+  workerSetup ??= startWorker().then((worker) => {
+    if (worker) pdfjsLib.GlobalWorkerOptions.workerPort = worker
+  })
+  return workerSetup
+}
 
 const MAX_RENDER_DIM = 1800
 // A real receipt/invoice is a handful of pages; a much larger PDF is almost
@@ -49,6 +75,7 @@ const MAX_PAGES = 25
  */
 export async function renderPdfPages(file: Blob): Promise<Blob[]> {
   const data = await file.arrayBuffer()
+  await ensureWorker()
   const loadingTask = pdfjsLib.getDocument({
     data,
     cMapUrl: `${ASSET_BASE}/cmaps/`,
@@ -92,6 +119,12 @@ export async function renderPdfPages(file: Blob): Promise<Blob[]> {
     }
     return pages
   } finally {
-    void loadingTask.destroy()
+    // Awaited: the worker is shared between imports, and PDF.js refuses to
+    // reuse it while a previous document on it is still being torn down.
+    try {
+      await loadingTask.destroy()
+    } catch {
+      // Teardown failing does not make the pages already rendered wrong.
+    }
   }
 }

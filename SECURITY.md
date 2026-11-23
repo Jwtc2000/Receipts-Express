@@ -59,13 +59,16 @@ shell and cache the OCR and PDF engines from this app's own origin — but that
 is a property of the code as written, not something the browser enforces.
 Closing this needs a host that sets response headers.
 
-Both other workers are covered. tesseract.js starts the OCR worker from a
-`blob:` URL, and `src/pdfReceipt.ts` starts the PDF.js worker the same way, as
-a `blob:` module that imports the real worker script. A `blob:` worker inherits
-the policy of the page that made it, so both run under the app's `<meta>` CSP:
-in the built app, a request to another origin from inside either worker is
-refused. Until 1.16.1 the PDF worker was started from its own URL and so ran with
-no policy.
+The other two workers are normally covered. tesseract.js starts the OCR
+worker from a `blob:` URL, and `src/pdfReceipt.ts` starts the PDF.js worker the
+same way, as a `blob:` module that imports the real worker script. A `blob:`
+worker inherits the policy of the page that made it, so both run under the
+app's `<meta>` CSP: in the built app, a request to another origin from inside
+either worker is refused. One exception: if a browser cannot start the PDF
+worker that way (no module workers, or the wrapper fails to load or report in
+time), PDF.js starts it from its own URL instead, and that worker runs with no
+policy, as every PDF worker did before 1.16.1. PDF import keeps working either
+way.
 
 **Known limitation: WebRTC is outside the CSP.** `connect-src` does not
 govern `RTCPeerConnection`, and the meta policy sets nothing that does.
