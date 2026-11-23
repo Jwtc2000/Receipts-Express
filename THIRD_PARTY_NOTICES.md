@@ -1011,7 +1011,8 @@ compiled in:
 
 That notice asks that materials accompanying a distribution acknowledge the origin of the code,
 so, in its terms: the LZW code in libtiff was developed by the University of California,
-Berkeley.
+Berkeley. The same acknowledgement is made in `README.md` and in both copies of the pilot deck,
+which are the other materials that describe the OCR feature.
 
 **libpng.** The whole of `LICENSE`.
 
