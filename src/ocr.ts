@@ -280,6 +280,157 @@ function parseMoney(raw: string): number {
 const TOTAL_KEYWORDS = ['grand total', 'amount due', 'balance due', 'total due', 'total']
 const SKIP_KEYWORDS = ['subtotal', 'sub-total', 'sub total', 'total savings', 'total discount', 'total tax']
 
+// Lines the total is checked against. OCR often reads "SUBTOTAL" with a 0
+// for the O and a 1 for the L.
+const SUBTOTAL_LINE = /\bsu[bp8]\s*-?\s*t[o0]ta[l1i]/i
+// "Tax", "Taxes", "Tax8.25%" as OCR runs it together, but not "Taxable".
+const TAX_LINE = /\btax(?:es)?(?![a-z])/i
+// "TOTAL" as OCR misreads it: T0TAL, TOTAI, TOTA1, TOTAS.
+const TOTAL_MISREAD = /\bt[o0]ta[l1is|]\b/i
+const CARD_LINE = /\b(?:visa|master\s*card|amex|discover|debit|credit|card)\b|\*{3,}/i
+// Money handed over or handed back, and a tip written in: never the total
+// on their own, so not the fallback either.
+const NOT_TOTAL_LINE = /\b(?:cash|change|tender(?:ed)?|tip|gratuity)\b/i
+
+/** The amounts on a line, leaving out percentages ("Tax 8.25%"). */
+function amountsOf(line: string): number[] {
+  return [...line.replace(/\d+[.,]\d+\s*%/g, ' ').matchAll(MONEY_RE)].map((m) => parseMoney(m[1]))
+}
+
+const cents = (n: number) => Math.round(n * 100)
+
+/**
+ * The amounts a labelled line may have been printed with, as read first.
+ * OCR loses decimal points ("TOTAL 20238" for 202.38) and reads a "$" as a
+ * digit ("49.91" for $9.91, "85893" for $58.93). Only the first reading is
+ * trusted alone; the others are used when they agree with another line.
+ */
+function readingsOf(line: string): number[] {
+  const out: number[] = []
+  const withoutFirstDigit = (c: number) => {
+    const digits = String(c)
+    if (digits.length >= 4) out.push(Number(digits.slice(1)) / 100)
+  }
+  for (const a of amountsOf(line)) {
+    out.push(a)
+    withoutFirstDigit(cents(a))
+  }
+  if (out.length === 0) {
+    // A run of digits at the end of the line, with the point lost.
+    const m = line.replace(/\d+[.,]\d+\s*%/g, ' ').match(/(?:^|[^\d.,])\$?(\d{3,7})\s*\S?\s*$/)
+    if (m) {
+      out.push(Number(m[1]) / 100)
+      withoutFirstDigit(Number(m[1]))
+    }
+  }
+  // Zero stays: a tax of 0.00 still checks a total. Totals leave it out.
+  return out.filter((n) => n >= 0)
+}
+
+/**
+ * The total, and whether it came from a line labelled as one (a guess
+ * otherwise: see extractReceipt, which reads on to the next page of a scan
+ * for a labelled one).
+ *
+ * In order: a total as read that agrees with subtotal plus tax or with the
+ * card payment; a total line read another way (point lost, "$" read as a
+ * digit) that agrees; the largest total as read; the card payment; subtotal
+ * plus tax; a total line with its point lost; the largest amount on a line
+ * that is not cash, change or a tip.
+ */
+function pickTotal(lines: string[]): { total?: number; totalIsLabelled: boolean } {
+  // Each with the index of its line, to tell a total printed after a tip
+  // from the one before it.
+  const totals: { value: number; at: number }[] = []
+  const totalReadings: { readings: number[]; at: number }[] = []
+  const subtotals: number[] = []
+  const taxParts: { value: number; line: string }[] = []
+  let taxTotal: number | undefined
+  const paid: number[] = []
+  let fallbackMax = 0
+  lines.forEach((line, at) => {
+    const lower = line.toLowerCase()
+    const amounts = amountsOf(line)
+    const lineMax = amounts.length ? Math.max(...amounts) : 0
+    if (lineMax > fallbackMax && lineMax < 100000 && !NOT_TOTAL_LINE.test(line)) fallbackMax = lineMax
+    // Subtotal and tax lines count by their main reading only. With the
+    // other readings on both sides, sums agree with a misread total by
+    // accident: 106.95 read without its "first digit" plus 8.82 is 15.77,
+    // which is what a total of 115.77 that lost a digit and its point reads as.
+    if (SUBTOTAL_LINE.test(line)) {
+      const r = readingsOf(line)
+      if (r.length) subtotals.push(r[0])
+      return
+    }
+    if (SKIP_KEYWORDS.some((k) => lower.includes(k))) {
+      if (lower.includes('total tax')) {
+        const r = readingsOf(line)
+        if (r.length) taxTotal = r[0]
+      }
+      return
+    }
+    const isTotal = TOTAL_KEYWORDS.some((k) => lower.includes(k)) || TOTAL_MISREAD.test(line)
+    if (!isTotal && TAX_LINE.test(line)) {
+      const r = readingsOf(line)
+      if (r.length) taxParts.push({ value: r[0], line: line.replace(/\s+/g, ' ').trim().toLowerCase() })
+      return
+    }
+    if (!isTotal && CARD_LINE.test(line)) {
+      // The amount charged, read with its point: a card number's last four
+      // digits never are.
+      const a = amounts.filter((x) => x > 0)
+      if (a.length) paid.push(a[a.length - 1])
+      return
+    }
+    if (!isTotal) return
+    // A keyword line reading 0.00 ("Balance due 0.00" on a paid receipt) is
+    // not the total of anything.
+    const asRead = amounts.filter((x) => x > 0)
+    if (asRead.length) totals.push({ value: Math.max(...asRead), at })
+    const r = readingsOf(line).filter((x) => x > 0)
+    if (r.length) totalReadings.push({ readings: r, at })
+  })
+
+  const near = (a: number, b: number) => Math.abs(cents(a) - cents(b)) <= 1
+  // The tax is a "Total Tax" line when there is one, otherwise all the tax
+  // lines added up ("State Tax", "Local Tax"). A tax line printed twice, word
+  // for word (in the body and again in the summary), is also checked once:
+  // adding both copies would double it. Other lines, even of equal amounts
+  // ("State Tax 4.00", "Local Tax 4.00"), are only ever checked together, or
+  // subtotal plus one of them could agree with a misread total.
+  const tax = taxTotal ?? (taxParts.length ? taxParts.reduce((sum, t) => (cents(sum) + cents(t.value)) / 100, 0) : undefined)
+  const sums = tax === undefined ? [] : subtotals.map((s) => (cents(s) + cents(tax)) / 100)
+  const repeated = taxParts.filter((t, i) => taxParts.findIndex((u) => u.line === t.line) !== i).map((t) => t.value)
+  const checks = [...sums, ...subtotals.flatMap((s) => repeated.map((t) => (cents(s) + cents(t)) / 100)), ...paid]
+  const agrees = (n: number) => checks.some((c) => near(n, c))
+  // A larger total printed after the one that agrees is the total once a tip
+  // or a fee was added ("Total 32.40", "Tip 6.00", "Grand Total 38.40").
+  const final = (value: number, at: number) => {
+    const later = totals.filter((t) => t.at > at && cents(t.value) > cents(value)).map((t) => t.value)
+    return { total: later.length ? Math.max(...later) : value, totalIsLabelled: true }
+  }
+
+  for (const t of totals) if (agrees(t.value)) return final(t.value, t.at)
+  for (const t of totalReadings) for (const r of t.readings) if (agrees(r)) return final(r, t.at)
+  if (totals.length) return { total: Math.max(...totals.map((t) => t.value)), totalIsLabelled: true }
+  if (paid.length) return { total: Math.max(...paid), totalIsLabelled: false }
+  // A total line with its point lost, before subtotal plus tax: the total is
+  // usually printed bolder than the lines above it, and reads better.
+  // Only one of four digits or more ("TOTAL 7825"): three are as often the
+  // tail of noise read as digits ("TOTAL ... i900").
+  const pointLost = totalReadings.find((t) => cents(t.readings[0]) >= 1000)
+  if (pointLost) return { total: pointLost.readings[0], totalIsLabelled: false }
+  if (sums.length) {
+    // No total line at all. The largest amount is the total when its label
+    // was unreadable, and may exceed subtotal plus tax by a fee or a tip;
+    // below the sum, it is the subtotal, and far above it, a misreading.
+    const sum = sums[0]
+    if (fallbackMax >= sum && fallbackMax <= sum * 1.25) return { total: fallbackMax, totalIsLabelled: false }
+    return { total: sum, totalIsLabelled: false }
+  }
+  return { total: fallbackMax > 0 ? fallbackMax : undefined, totalIsLabelled: false }
+}
+
 // Every numeric pattern below is fenced on both sides: it may not start
 // right after a digit or a separator, and may not run on into another one.
 // Without that, a dotted phone number such as "01.23.45.67.89" was read as a
@@ -364,24 +515,7 @@ function parseReceipt(
     .filter(Boolean)
 
   // --- Total ---
-  let total: number | undefined
-  let fallbackMax = 0
-  for (const line of lines) {
-    const lower = line.toLowerCase()
-    const amounts = [...line.matchAll(MONEY_RE)].map((m) => parseMoney(m[1]))
-    if (amounts.length === 0) continue
-    const lineMax = Math.max(...amounts)
-    if (lineMax > fallbackMax && lineMax < 100000) fallbackMax = lineMax
-    if (SKIP_KEYWORDS.some((k) => lower.includes(k))) continue
-    // A keyword line reading 0.00 ("Balance due 0.00" on a paid receipt) is
-    // not the total of anything.
-    if (lineMax > 0 && TOTAL_KEYWORDS.some((k) => lower.includes(k))) {
-      // Keep the largest keyword-matched amount (handles "Total ... Tip ... Total")
-      if (total === undefined || lineMax > total) total = lineMax
-    }
-  }
-  const totalIsLabelled = total !== undefined
-  if (total === undefined && fallbackMax > 0) total = fallbackMax
+  const { total, totalIsLabelled } = pickTotal(lines)
 
   // --- Date: the earliest one on the receipt ---
   // A hotel folio or rental invoice prints the day it was printed at the top

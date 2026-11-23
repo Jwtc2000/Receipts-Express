@@ -308,6 +308,80 @@ describe('parseReceiptText', () => {
   })
 })
 
+describe('parseReceiptText total, checked against the other lines', () => {
+  const total = (lines: string[]) => parseReceiptText(lines.join('\n')).total
+
+  it('restores a decimal point OCR lost when the result agrees with subtotal plus tax', () => {
+    // A larger printed total earlier on does not outweigh the reading that agrees.
+    expect(total(['Corner Bakery', 'Total 300.00', 'Subtotal 186.96', 'Tax 15.42', 'TOTAL 20238'])).toBe(202.38)
+  })
+
+  it('reads a "$" taken for a digit off the total when that agrees with subtotal plus tax', () => {
+    expect(total(['Corner Bakery', 'SUBTOTAL 9.26', 'TAX 0.65', 'TOTAL 49.91'])).toBe(9.91)
+  })
+
+  it('checks a total against the card payment', () => {
+    expect(total(['Corner Bakery', 'Total 300.00', 'TOTAL $22233', 'VISA ****1234 $222.33'])).toBe(222.33)
+  })
+
+  it('keeps the printed total when a tip makes it more than subtotal plus tax', () => {
+    expect(total(['Corner Bakery', 'Subtotal 30.00', 'Tax 2.40', 'Tip 6.00', 'Total 38.40'])).toBe(38.4)
+  })
+
+  it('keeps a total printed after a tip over the one before it that agrees', () => {
+    const lines = ['Corner Bakery', 'Subtotal 30.00', 'Tax 2.40', 'Total 32.40', 'Tip 6.00', 'Grand Total 38.40']
+    expect(total(lines)).toBe(38.4)
+  })
+
+  it('adds up several tax lines, or uses the total tax line when there is one', () => {
+    expect(total(['Corner Bakery', 'Subtotal 100.00', 'State Tax 6.00', 'Local Tax 2.00'])).toBe(108)
+    // The total tax line wins over adding up the lines: these add up to 16.
+    expect(total(['Corner Bakery', 'Subtotal 100.00', 'Tax 8.00', 'Tax 8.00', 'Total Tax 8.00'])).toBe(108)
+    expect(total(['Corner Bakery', 'Subtotal 100.00', 'Taxable amount 100.00', 'Tax 8.00'])).toBe(108)
+  })
+
+  it('checks distinct tax lines only together', () => {
+    // 100 + 6 agrees with the first total; only 100 + 6 + 2 is the tax.
+    const lines = ['Corner Bakery', 'Total 106.00', 'Subtotal 100.00', 'State Tax 6.00', 'Local Tax 2.00', 'TOTAL 10800']
+    expect(total(lines)).toBe(108)
+  })
+
+  it('does not take two different taxes of the same amount for one printed twice', () => {
+    const lines = ['Corner Bakery', 'Total 104.00', 'Subtotal 100.00', 'State Tax 4.00', 'Local Tax 4.00', 'TOTAL 10800']
+    expect(total(lines)).toBe(108)
+  })
+
+  it('checks a tax line printed twice, word for word, once', () => {
+    // 100 + 8 + 8 agrees with nothing; 100 + 8 agrees with the total.
+    expect(total(['Corner Bakery', 'Subtotal 100.00', 'Tax 8.00', 'Tax 8.00', 'Total 300.00', 'TOTAL 10800'])).toBe(108)
+  })
+
+  it('checks a total against a tax of 0.00', () => {
+    expect(total(['Corner Bakery', 'Subtotal 9.91', 'Tax 0.00', 'TOTAL 49.91'])).toBe(9.91)
+  })
+
+  it('never takes a tax rate for money', () => {
+    expect(total(['Corner Bakery', 'Subtotal 20.00', 'Tax 8.25% 1.65', 'Total 21.65'])).toBe(21.65)
+    expect(total(['Corner Bakery', 'Tax 8.25%'])).toBeUndefined()
+  })
+
+  it('does not take cash handed over or change for the total', () => {
+    expect(total(['Corner Bakery', 'Coffee 4.50', 'CASH 20.00', 'CHANGE 15.50'])).toBe(4.5)
+  })
+
+  it('adds subtotal and tax when no total line was read', () => {
+    expect(total(['Corner Bakery', 'Subtotal 106.95', 'Tax 8.82'])).toBe(115.77)
+  })
+
+  it('reads "TOTAL" as OCR misspells it', () => {
+    expect(total(['Corner Bakery', 'SUBTOTAL $131.34', 'TAX $9.10', 'TOTAS $140.53'])).toBe(140.53)
+  })
+
+  it('does not repair three digits of noise at the end of a total line', () => {
+    expect(total(['Corner Bakery', 'Paper 50.16', 'Total Ti aad i900'])).toBe(50.16)
+  })
+})
+
 describe('receiptFromText', () => {
   const invoice = ['Acme Car Rental', 'Invoice Date: 03/05/2026', 'Rental charges 150.00', 'Tax 12.00', 'Total Amount Due 162.00'].join('\n')
 
