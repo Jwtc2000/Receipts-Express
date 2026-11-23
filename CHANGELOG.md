@@ -8,6 +8,30 @@ user-facing features, and `PATCH` for fixes with no visible feature change. The
 version lives in `package.json` and is shown in the app under Menu → About. Every
 merge to `main` that changes app behavior gets a version bump and a tag.
 
+## [1.23.0] - 2026-11-23
+
+### Added
+- A holiday look, on by the device's date with no setting, and gone again
+  after 6 January. From 15 to 30 November a harvest palette: rust and
+  cranberry header, leaves, acorns and pumpkins drifting across it, and
+  "Happy Thanksgiving" at the top of the reports screen. From 1 December to
+  6 January a winter one: evergreen header, snow falling behind trees,
+  gifts, stars and ornaments, and "Happy holidays". Both hang a string of
+  lights along the header and recolour buttons, amounts, day banners and
+  the background. All drawings are original. Every colour pairing is held
+  to WCAG AA by a test that reads styles.css. Exported PDFs keep the
+  everyday colours, and the decorations are hidden under reduced motion.
+
+### Changed
+- Wider than a phone, the header, the search bar and a report's summary
+  bar run the full width of the window, with their contents in line with
+  the column, instead of a 640px header floating on an empty page.
+- Delete buttons are grey until pointed at or focused, when they turn red.
+  Red trash cans beside every amount made the riskiest control the loudest
+  thing on the screen; every delete still asks first.
+- Receipt thumbnails have an edge, so a white receipt shows on a white
+  card, and the search field's focus ring is rounded like the others.
+
 ## [1.22.0] - 2026-11-23
 
 ### Changed

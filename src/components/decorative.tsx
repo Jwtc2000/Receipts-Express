@@ -1,4 +1,5 @@
 import Icon from './icons'
+import { currentSeason, type Season } from '../season'
 
 // A rightward-arrow section divider, built from the app's own express-arrow
 // glyph — used to break up multi-section drawer menus.
@@ -67,9 +68,77 @@ const TRAVEL_GLYPHS = {
   ),
 }
 
-type TravelGlyph = keyof typeof TRAVEL_GLYPHS
+/*
+ * Holiday glyphs, drawn on the same terms as the travel ones, for the
+ * seasons in src/season.ts. Also original drawings.
+ */
+const HOLIDAY_GLYPHS = {
+  // A simple leaf on a short stem: autumn.
+  leaf: (
+    <>
+      <path d="M5 19C5 10.5 10 5 19 5c0 9-5.5 14-14 14z" />
+      <path d="M5 19l8-8" />
+    </>
+  ),
+  // An acorn: a domed cap with a stalk over the nut.
+  acorn: (
+    <>
+      <path d="M5.5 10.5c0-3.1 2.9-5 6.5-5s6.5 1.9 6.5 5z" />
+      <path d="M12 5.5V3" />
+      <path d="M7 10.5c0 4.6 2.2 8.5 5 9.5 2.8-1 5-4.9 5-9.5" />
+    </>
+  ),
+  // A pumpkin with its ribs and a curled stalk.
+  pumpkin: (
+    <>
+      <path d="M12 7.5c-4.4 0-7.5 2.8-7.5 6.3S7.6 20 12 20s7.5-2.7 7.5-6.2S16.4 7.5 12 7.5z" />
+      <path d="M12 7.5c-1.8 1.4-2.6 3.7-2.6 6.3S10.2 18.6 12 20M12 7.5c1.8 1.4 2.6 3.7 2.6 6.3S13.8 18.6 12 20" />
+      <path d="M12 7.5V5c0-.9.7-1.6 1.8-1.9" />
+    </>
+  ),
+  // A six-armed snowflake.
+  snowflake: (
+    <>
+      <path d="M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9" />
+      <path d="M9.8 4.4L12 6l2.2-1.6M9.8 19.6L12 18l2.2 1.6" />
+      <path d="M4.3 10.2l2.5-.6.4-2.6M19.7 13.8l-2.5.6-.4 2.6M4.3 13.8l2.5.6.4 2.6M19.7 10.2l-2.5-.6-.4-2.6" />
+    </>
+  ),
+  // A fir tree in three tiers, on a trunk.
+  tree: (
+    <>
+      <path d="M12 3l4.5 5.5h-2.7l3.7 4.8h-2.8l4.3 5.2H5l4.3-5.2H6.5l3.7-4.8H7.5z" />
+      <path d="M12 18.5V21" />
+    </>
+  ),
+  // A wrapped box with a bow.
+  gift: (
+    <>
+      <rect x="4" y="10" width="16" height="10" rx="1" />
+      <rect x="3" y="7" width="18" height="3" rx="1" />
+      <path d="M12 7v13" />
+      <path d="M12 7c-1.4-2.8-4.8-3-4.4-.7.2 1 2.4.7 4.4.7zM12 7c1.4-2.8 4.8-3 4.4-.7-.2 1-2.4.7-4.4.7z" />
+    </>
+  ),
+  // A five-pointed star.
+  star: <path d="M12 3.2l2.6 5.5 6 .8-4.4 4.1 1.1 6L12 16.7l-5.3 2.9 1.1-6-4.4-4.1 6-.8z" />,
+  // A bauble on its cap and hook.
+  ornament: (
+    <>
+      <circle cx="12" cy="14.5" r="6" />
+      <path d="M10.2 6h3.6v2.6h-3.6z" />
+      <path d="M12 6V4.6c0-.8.6-1.4 1.4-1.4" />
+      <path d="M6.3 13c3.6 1.4 7.8 1.4 11.4 0" />
+    </>
+  ),
+}
 
-function Glyph({ name }: { name: TravelGlyph }) {
+type TravelGlyph = keyof typeof TRAVEL_GLYPHS
+type GlyphName = TravelGlyph | keyof typeof HOLIDAY_GLYPHS
+
+const GLYPHS: Record<GlyphName, React.ReactNode> = { ...TRAVEL_GLYPHS, ...HOLIDAY_GLYPHS }
+
+function Glyph({ name }: { name: GlyphName }) {
   return (
     <svg
       viewBox="0 0 24 24"
@@ -81,14 +150,14 @@ function Glyph({ name }: { name: TravelGlyph }) {
       aria-hidden="true"
       focusable="false"
     >
-      {TRAVEL_GLYPHS[name]}
+      {GLYPHS[name]}
     </svg>
   )
 }
 
 // Which glyph flies on which of the eight paths in styles.css
 // (.topbar-plane-a to -h). Same kind never shares a row with itself.
-const FLIGHTS: [string, TravelGlyph][] = [
+const FLIGHTS: [string, GlyphName][] = [
   ['a', 'plane'],
   ['b', 'coffee'],
   ['c', 'fuel'],
@@ -99,16 +168,67 @@ const FLIGHTS: [string, TravelGlyph][] = [
   ['h', 'car'],
 ]
 
-// Travel-expense glyphs drifting across the gradient header, behind its
-// title and buttons. Purely decorative, and hidden for reduced motion.
-export function HeaderPlanes() {
+// In season, the same eight paths carry the season's glyphs, with a plane or
+// two still among them: it is a travel app. Path a turns its glyph a quarter
+// turn (it was drawn for a nose-up plane) and path d mirrors it, so those two
+// carry shapes that look right either way: a leaf, a snowflake, a star.
+const SEASON_FLIGHTS: Record<NonNullable<Season>, [string, GlyphName][]> = {
+  harvest: [
+    ['a', 'leaf'],
+    ['b', 'pumpkin'],
+    ['c', 'plane'],
+    ['d', 'leaf'],
+    ['e', 'acorn'],
+    ['f', 'leaf'],
+    ['g', 'pumpkin'],
+    ['h', 'acorn'],
+  ],
+  winter: [
+    ['a', 'snowflake'],
+    ['b', 'tree'],
+    ['c', 'gift'],
+    ['d', 'star'],
+    ['e', 'ornament'],
+    ['f', 'plane'],
+    ['g', 'snowflake'],
+    ['h', 'tree'],
+  ],
+}
+
+// Glyphs drifting across the gradient header, behind its title and buttons:
+// travel expenses most of the year, the season's own around the holidays,
+// with snow falling behind them in winter. Purely decorative, and hidden for
+// reduced motion.
+export function HeaderPlanes({ season = currentSeason() }: { season?: Season }) {
+  const flights = season ? SEASON_FLIGHTS[season] : FLIGHTS
   return (
     <div className="topbar-planes" aria-hidden="true">
-      {FLIGHTS.map(([path, glyph]) => (
-        <span key={path} className={`topbar-plane topbar-plane-${path}`}>
+      {season === 'winter' && <span className="topbar-snow" />}
+      {flights.map(([path, glyph]) => (
+        <span key={path} className={`topbar-plane topbar-plane-${path}`} data-glyph={glyph}>
           <Glyph name={glyph} />
         </span>
       ))}
     </div>
+  )
+}
+
+const GREETINGS: Record<NonNullable<Season>, { glyph: GlyphName; text: string }> = {
+  harvest: { glyph: 'leaf', text: 'Happy Thanksgiving, and safe travels this holiday.' },
+  winter: { glyph: 'star', text: 'Happy holidays, and safe travels into the new year.' },
+}
+
+// A one-line seasonal note at the top of the reports screen. Nothing outside
+// the season.
+export function SeasonGreeting({ season = currentSeason() }: { season?: Season }) {
+  if (!season) return null
+  const { glyph, text } = GREETINGS[season]
+  return (
+    <p className="season-greeting">
+      <span className="season-greeting-glyph" aria-hidden="true">
+        <Glyph name={glyph} />
+      </span>
+      {text}
+    </p>
   )
 }

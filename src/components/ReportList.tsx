@@ -19,7 +19,7 @@ import { useModal } from '../hooks/useModal'
 import Icon from './icons'
 import DrawerSection from './DrawerSection'
 import ProjectSelect from './ProjectSelect'
-import { ArrowDivider, HeaderPlanes } from './decorative'
+import { ArrowDivider, HeaderPlanes, SeasonGreeting } from './decorative'
 import { LogoTitle } from './LogoTitle'
 
 interface ReportSummary {
@@ -478,6 +478,7 @@ export default function ReportList({ onOpenReport, onEditExpense }: Props) {
       )}
 
       <main className="content">
+        {!query && <SeasonGreeting />}
         {query ? (
           searchResults.length === 0 ? (
             <div className="empty-state">
