@@ -473,11 +473,19 @@ describe('legal pages', () => {
         'January', 'February', 'March', 'April', 'May', 'June',
         'July', 'August', 'September', 'October', 'November', 'December',
       ]
-      const [year, month, day] = TERMS_VERSION.split('-').map(Number)
-      expect(months[month - 1], `TERMS_VERSION is not an ISO date: ${TERMS_VERSION}`).toBeDefined()
-      const written = `${day} ${months[month - 1]} ${year}`
+      // An ISO date, then ".N" for the Nth revision published that day.
+      const parts = TERMS_VERSION.match(/^(\d{4})-(\d{2})-(\d{2})(?:\.(\d+))?$/)
+      expect(parts, `TERMS_VERSION is not an ISO date: ${TERMS_VERSION}`).not.toBeNull()
+      const [, year, month, day, revision] = parts!
+      expect(months[Number(month) - 1], `TERMS_VERSION is not an ISO date: ${TERMS_VERSION}`).toBeDefined()
+      const written = `${Number(day)} ${months[Number(month) - 1]} ${year}${revision ? ` (revision ${revision})` : ''}`
 
-      expect(readProse(page)).toContain(`Last updated ${written}`)
+      // The date line under the title, whole: a sentence elsewhere on the
+      // page that happened to give the right date would not do.
+      const dates = readProse(page).match(/<p class="dates">([^<]*)<\/p>/)
+      expect(dates, `${page} has no <p class="dates"> line`).not.toBeNull()
+      expect(dates![1].trim()).toMatch(/^Effective \d{1,2} [A-Z][a-z]+ \d{4} · Last updated /)
+      expect(dates![1].trim().endsWith(`Last updated ${written}`)).toBe(true)
     },
   )
 })

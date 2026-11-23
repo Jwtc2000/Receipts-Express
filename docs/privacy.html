@@ -261,7 +261,7 @@
   <header class="page-header">
     <p class="eyebrow">Receipts Express</p>
     <h1>Privacy Policy</h1>
-    <p class="dates">Effective 8 August 2026 · Last updated 23 November 2026</p>
+    <p class="dates">Effective 8 August 2026 · Last updated 23 November 2026 (revision 2)</p>
     <p class="header-return"><a class="back-to-app" href="../">← Back to Receipts Express</a></p>
   </header>
 
@@ -369,7 +369,8 @@
 
       <h3>Text recognition language database</h3>
       <p>
-        The first time you scan a receipt, the text recognition engine fetches its English
+        The first time a receipt needs text recognition (a photo, or a PDF without text of its
+        own), the text recognition engine fetches its English
         language data from this app's own address, unpacks it, and stores it in a third
         IndexedDB database so that later scans do not have to fetch it again. The stored copy
         is roughly 5&nbsp;MB and sits under a single entry whose key ends in
@@ -378,8 +379,8 @@
         library and takes that library's default names rather than anything this app chose, so
         the database is called <code>keyval-store</code> and its one collection
         <code>keyval</code>. It holds the recognition model and nothing else: no receipt data,
-        no transcribed text, and nothing about you. It does not exist until your first scan,
-        which is why a fresh install shows only the other two.
+        no transcribed text, and nothing about you. It does not exist until text recognition
+        first runs, which is why a fresh install shows only the other two.
       </p>
     </section>
 
@@ -393,7 +394,7 @@
         <li><strong>No tracking identifiers.</strong> No device ID, advertising ID, session ID, or fingerprinting. Records get random IDs purely so the local database can reference them.</li>
         <li><strong>No location data.</strong> The app never requests geolocation.</li>
         <li><strong>No payments.</strong> There is no purchase, subscription, or billing of any kind.</li>
-        <li><strong>No full receipt transcript.</strong> Text recognition reads the whole receipt in order to find the merchant, date, and total, but only those three values are passed to the form for you to review. The full transcribed text is discarded as soon as recognition finishes and is never saved.</li>
+        <li><strong>No full receipt transcript.</strong> The app reads the whole receipt, with text recognition or from the text a PDF already carries, in order to find the merchant, date, and total, but only those three values are passed to the form for you to review. The full text is discarded as soon as they are found and is never saved.</li>
       </ul>
     </section>
 
@@ -422,10 +423,14 @@
     <section>
       <h2><span class="num">5.</span>Text recognition and PDF reading happen on your device</h2>
       <p>
-        Receipts are read by Tesseract.js, and PDF receipts are converted to images by
-        PDF.js. Both engines run inside your browser, and both are served from this app's own
-        address — the app does not load code from external CDNs, and your receipts are
-        never uploaded to a cloud recognition service.
+        PDF receipts are opened by PDF.js, which turns each page into an image and reads the
+        text the PDF carries, if any. A PDF with text of its own, such as an emailed invoice, is
+        read from that text. Photos, and PDFs that are only pictures of pages, are read by
+        Tesseract.js. Before recognition the app may make an adjusted copy of a receipt image
+        (light text on a dark band is inverted so that it can be read); the copy exists only in
+        memory for that scan and is never saved. Both engines run inside your browser, and
+        both are served from this app's own address — the app does not load code from external
+        CDNs, and your receipts are never uploaded to a cloud recognition service.
       </p>
       <p class="muted">
         This is the single most common place other receipt apps send your data. Here, the

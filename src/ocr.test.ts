@@ -91,6 +91,23 @@ describe('parseReceiptText dates', () => {
   it('does not accept a date in the future', () => {
     expect(parseReceiptText('Trans 04-12-0033\n2026-07-18').date).toBe('2026-07-18')
   })
+
+  it('takes the earliest date, which on a folio is the arrival rather than the printing', () => {
+    const text = ['Lakeside Inn', 'Date: 03/09/26', 'Arrival Date: 03/02/26', 'Departure Date: 03/05/26', 'Total 312.40']
+    expect(parseReceiptText(text.join('\n')).date).toBe('2026-03-02')
+  })
+
+  it('ignores a date far earlier than the rest, as a misread year', () => {
+    expect(parseReceiptText('Store\n2026-07-18\nPrinted 2025-07-18').date).toBe('2026-07-18')
+  })
+
+  it('reads a month name with no space before the day, as OCR sometimes gives it', () => {
+    expect(parseReceiptText('Mar14,2026, 10:25AM Receipt #10000001').date).toBe('2026-03-14')
+  })
+
+  it('reads a day written with an ordinal', () => {
+    expect(parseReceiptText('Departing: Mar 2nd, 2026 06:00AM').date).toBe('2026-03-02')
+  })
 })
 
 describe('parseReceiptText merchant', () => {
@@ -168,15 +185,98 @@ describe('parseReceiptText', () => {
     expect(parseReceiptText(text).merchant).toBe('Corner Bakery')
   })
 
-  it('lets a promotional header line steal the merchant slot from the real store name below it (documents current behavior)', () => {
-    // The merchant heuristic picks the first short, non-numeric line among
-    // the first 6 — it has no way to distinguish a promo/greeting header
-    // from the actual store name. Asserted here so a future change to the
-    // heuristic is a deliberate decision, not a silent regression; the
-    // misparse is a reviewable inconvenience since all fields stay editable
-    // before save.
+  it('passes over a greeting line to the store name below it', () => {
+    // Until 1.19.0 the first short line won, and this read "Welcome".
     const text = ['*** WELCOME ***', 'Starbucks', '123 Main St', 'Total 5.00'].join('\n')
-    expect(parseReceiptText(text).merchant).toBe('Welcome')
+    expect(parseReceiptText(text).merchant).toBe('Starbucks')
+  })
+
+  it('takes the name from "receipt for ..." over the app name above it', () => {
+    const text = ['Mar 3, 2026', 'Food Courier 2:15 PM', "Here's your receipt for Taco Palace (12 Elm St).", 'Total $21.40']
+    expect(parseReceiptText(text.join('\n')).merchant).toBe('Taco Palace')
+  })
+
+  it("takes an emailed receipt's sender name, without the mailbox word", () => {
+    const text = [
+      'eTicket Itinerary and Receipt for Confirmation ABC123',
+      'From: Coastal Air Receipts <receipts@coastal.example>',
+      'Date: Wed, Mar 4, 2026, 9:10 AM',
+      'Total 35.00',
+    ]
+    expect(parseReceiptText(text.join('\n')).merchant).toBe('Coastal Air')
+  })
+
+  it('does not take the customer an order is for as the merchant', () => {
+    expect(parseReceiptText('Corner Bakery\nOrder for Jane Doe\nTotal 9.75').merchant).toBe('Corner Bakery')
+    expect(parseReceiptText('Your order from Taco Palace\nTotal 9.75').merchant).toBe('Taco Palace')
+  })
+
+  it('takes the name from "Thank you for choosing ..."', () => {
+    expect(parseReceiptText('Thank you for choosing Coastal Air.\nTotal 20.00').merchant).toBe('Coastal Air')
+  })
+
+  it('cuts a field label off the end of the name line', () => {
+    expect(parseReceiptText('ACME CAR RENTAL CORPORATION Rental Agreement No: 1234567\nTotal 10.00').merchant).toBe(
+      'Acme Car Rental Corporation',
+    )
+    expect(parseReceiptText('Lakeside Inn & Suites Account: 1234567890\nTotal 10.00').merchant).toBe(
+      'Lakeside Inn & Suites',
+    )
+  })
+
+  it('drops a lone digit read in front of the name', () => {
+    expect(parseReceiptText('4 Lakeside Inn & Suites\nTotal 10.00').merchant).toBe('Lakeside Inn & Suites')
+  })
+
+  it('leaves the merchant empty rather than take an address, a date or a till field', () => {
+    const text = ['Receipt', 'Mar 3, 2026', '100 Main Avenue, Ste A', 'Millbrook, ST 12345', 'Server: Pat', 'Check #6 Table B4', 'Total 41.10']
+    expect(parseReceiptText(text.join('\n')).merchant).toBeUndefined()
+  })
+
+  it('stops at the first priced line instead of taking an item', () => {
+    const text = ['Receipt', 'Blueberry Muffin $4.50', 'Orange Juice', 'Total 9.75']
+    expect(parseReceiptText(text.join('\n')).merchant).toBeUndefined()
+  })
+
+  it('does not take the town the store is in for its name', () => {
+    const text = ['Millbrook | #100', '10 Oak Dr', 'Millbrook, ST 12345', 'Total 30.00']
+    expect(parseReceiptText(text.join('\n')).merchant).toBeUndefined()
+  })
+
+  it('knows the town line even when OCR misreads a digit of the ZIP', () => {
+    const text = ['Millbrook | #100', '10 Oak Dr', 'Millbrook, ST B2345', 'Total 30.00']
+    expect(parseReceiptText(text.join('\n')).merchant).toBeUndefined()
+  })
+
+  it('accepts a one-word name read with little confidence, but not a line of fragments', () => {
+    const line = (words: [string, number][]) => ({ text: words.map(([w]) => w).join(' '), words: words.map(([text, confidence]) => ({ text, confidence })) })
+    const fragments = [line([['MAE', 45], ['RIK', 47], ['ZO', 44]]), line([['Total', 96], ['9.10', 96]])]
+    expect(parseReceiptText(fragments.map((l) => l.text).join('\n'), fragments).merchant).toBeUndefined()
+    const logo = [line([['FUELMART', 47]]), line([['Total', 96], ['9.10', 96]])]
+    expect(parseReceiptText(logo.map((l) => l.text).join('\n'), logo).merchant).toBe('Fuelmart')
+  })
+
+  it('finds a name given only in the footer, above the street address', () => {
+    const text = [
+      'Pickup order #12AB confirmed!',
+      'Order Summary',
+      '1 Burger $12.00',
+      'Total $14.20',
+      'Taco Palace Co. Taco Palace Co.',
+      '10 Oak St. Suite 2, Millbrook, ST 12345',
+    ]
+    expect(parseReceiptText(text.join('\n')).merchant).toBe('Taco Palace Co.')
+  })
+
+  it("uses OCR confidence to skip a photo's background and trim it off a line's edges", () => {
+    const line = (words: [string, number][]) => ({ text: words.map(([w]) => w).join(' '), words: words.map(([text, confidence]) => ({ text, confidence })) })
+    const lines = [
+      line([['Vrn', 20], ['Ka', 10], ['Tt', 15], ['OQX', 30]]),
+      line([['ae', 30], ['Millbrook', 90], ['Corner', 90], ['Diner', 90], ['j', 5]]),
+      line([['Total', 96], ['9.10', 96]]),
+    ]
+    const text = lines.map((l) => l.text).join('\n')
+    expect(parseReceiptText(text, lines).merchant).toBe('Millbrook Corner Diner')
   })
 
   it('parses a comma-decimal, currency-symbol total (European format)', () => {
@@ -187,5 +287,95 @@ describe('parseReceiptText', () => {
   it('parses a pound-sterling total', () => {
     const text = ['Corner Shop', 'Total £7.99'].join('\n')
     expect(parseReceiptText(text).total).toBe(7.99)
+  })
+})
+
+describe('receiptFromText', () => {
+  const invoice = ['Acme Car Rental', 'Invoice Date: 03/05/2026', 'Rental charges 150.00', 'Tax 12.00', 'Total Amount Due 162.00'].join('\n')
+
+  it('reads a receipt from a PDF text layer', async () => {
+    const { receiptFromText } = await import('./ocr')
+    expect(receiptFromText(invoice)).toMatchObject({ merchant: 'Acme Car Rental', date: '2026-03-05', total: 162 })
+  })
+
+  it('refuses text too short to be a receipt, such as a stamped page number', async () => {
+    const { receiptFromText } = await import('./ocr')
+    expect(receiptFromText('Page 1 of 1  1.00')).toBeNull()
+  })
+
+  it('refuses text with no amount, so OCR can still look at the picture', async () => {
+    const { receiptFromText } = await import('./ocr')
+    expect(receiptFromText('Scanned with the office copier on the third floor')).toBeNull()
+  })
+
+  it('refuses text from a font with no Unicode map', async () => {
+    const { receiptFromText } = await import('./ocr')
+    // Private-use code points, as such fonts produce, mixed into real text.
+    expect(receiptFromText(`${invoice}\n\ue001\ue002\ue003`)).toBeNull()
+    expect(receiptFromText(invoice.replace(/[a-z]/g, '\ufffd'))).toBeNull()
+  })
+
+  it('refuses text that is mostly symbols', async () => {
+    const { receiptFromText } = await import('./ocr')
+    expect(receiptFromText(`${invoice}\n${'¤¦§¨©ª«¬®¯°±²³'.repeat(6)}`)).toBeNull()
+  })
+})
+
+describe('extractReceipt', () => {
+  const page = (text: string) => ({ data: { text, blocks: null } })
+
+  beforeEach(() => {
+    vi.resetModules()
+    createWorker.mockReset()
+  })
+
+  it('asks the engine for word confidences as well as the text', async () => {
+    const recognize = vi.fn().mockResolvedValue(page('Store\nTotal 5.00'))
+    createWorker.mockResolvedValue({ recognize })
+    const { extractReceipt } = await import('./ocr')
+    await extractReceipt(new Blob(['receipt']))
+    expect(recognize.mock.calls[0][2]).toEqual({ text: true, blocks: true })
+  })
+
+  it('reads further pages of a scan only until it finds a total', async () => {
+    const recognize = vi
+      .fn()
+      .mockResolvedValueOnce(page('Coastal Air\nItinerary, Mar 2, 2026'))
+      .mockResolvedValueOnce(page('Bag fee\nTotal 35.00'))
+      .mockResolvedValueOnce(page('Conditions of carriage'))
+    createWorker.mockResolvedValue({ recognize })
+    const { extractReceipt } = await import('./ocr')
+    const got = await extractReceipt([new Blob(['1']), new Blob(['2']), new Blob(['3'])])
+    expect(recognize).toHaveBeenCalledTimes(2)
+    expect(got).toMatchObject({ merchant: 'Coastal Air', date: '2026-03-02', total: 35 })
+  })
+
+  it('does not stop at a page whose only amount is the largest number on it', async () => {
+    const recognize = vi
+      .fn()
+      .mockResolvedValueOnce(page('Coastal Air\nFare 100.00\nTax 12.00'))
+      .mockResolvedValueOnce(page('Total 112.00'))
+    createWorker.mockResolvedValue({ recognize })
+    const { extractReceipt } = await import('./ocr')
+    const got = await extractReceipt([new Blob(['1']), new Blob(['2'])])
+    expect(recognize).toHaveBeenCalledTimes(2)
+    expect(got.total).toBe(112)
+  })
+
+  it('falls back to the largest amount when no page has a total line', async () => {
+    const recognize = vi.fn().mockResolvedValueOnce(page('Coastal Air\nFare 100.00')).mockResolvedValueOnce(page('Conditions'))
+    createWorker.mockResolvedValue({ recognize })
+    const { extractReceipt } = await import('./ocr')
+    const got = await extractReceipt([new Blob(['1']), new Blob(['2'])])
+    expect(recognize).toHaveBeenCalledTimes(2)
+    expect(got.total).toBe(100)
+  })
+
+  it('reads at most five pages', async () => {
+    const recognize = vi.fn().mockResolvedValue(page('Terms and conditions'))
+    createWorker.mockResolvedValue({ recognize })
+    const { extractReceipt } = await import('./ocr')
+    await extractReceipt(Array.from({ length: 8 }, () => new Blob(['page'])))
+    expect(recognize).toHaveBeenCalledTimes(5)
   })
 })

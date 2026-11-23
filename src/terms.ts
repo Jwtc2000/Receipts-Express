@@ -6,7 +6,13 @@ const ACCEPTED_KEY = 'br.termsAccepted'
  * should not re-prompt everyone. The stored value is compared against it, so
  * a bump asks every existing user to acknowledge again.
  */
-export const TERMS_VERSION = '2026-11-23'
+//
+// The value is the date the pages give as "Last updated" (legalPages.test.ts
+// holds them together). A second change published on the same day adds
+// ".2", ".3" ..., shown on the pages as "(revision 2)": the day cannot move,
+// and a version that stayed the same would never re-prompt the people who
+// accepted that morning's text.
+export const TERMS_VERSION = '2026-11-23.2'
 
 interface Acceptance {
   version: string
