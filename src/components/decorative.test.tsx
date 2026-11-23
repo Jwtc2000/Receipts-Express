@@ -58,6 +58,25 @@ describe('HeaderPlanes', () => {
     }
   })
 
+  // The drawing each glyph name stands for, recorded in
+  // __snapshots__/decorative.test.tsx.snap. The checks above catch a missing
+  // drawing and one drawing used for every name; this catches two names'
+  // drawings swapped. A deliberate redraw updates it with `vitest -u`.
+  it('draws the recorded artwork for each glyph name', () => {
+    const drawings: Record<string, string> = {}
+    for (const season of [null, 'harvest', 'winter'] as const) {
+      const { container } = render(<HeaderPlanes season={season} />)
+      for (const el of container.querySelectorAll<HTMLElement>('.topbar-plane')) {
+        drawings[el.dataset.glyph!] = el.querySelector('svg')!.innerHTML
+      }
+      cleanup()
+    }
+    expect(Object.keys(drawings).sort()).toEqual(
+      ['acorn', 'bed', 'car', 'coffee', 'fuel', 'gift', 'leaf', 'ornament', 'plane', 'pumpkin', 'snowflake', 'star', 'tree'],
+    )
+    expect(Object.fromEntries(Object.entries(drawings).sort(([a], [b]) => a.localeCompare(b)))).toMatchSnapshot()
+  })
+
   it('is hidden from assistive technology', () => {
     const { container } = render(<HeaderPlanes season="winter" />)
     expect(container.querySelector('.topbar-planes')!.getAttribute('aria-hidden')).toBe('true')
