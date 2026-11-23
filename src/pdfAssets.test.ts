@@ -78,6 +78,10 @@ describe('PDF.js asset copy', () => {
     }
   })
 
+  it('leaves out QuickJS, which nothing in this app can load', () => {
+    expect(allFiles(dest).filter((f) => /quickjs/i.test(f))).toEqual([])
+  })
+
   it('still copies the worker and the other licence files', () => {
     for (const file of [
       'pdf.worker.min.mjs',
@@ -86,7 +90,6 @@ describe('PDF.js asset copy', () => {
       'wasm/LICENSE_JBIG2',
       'wasm/LICENSE_OPENJPEG',
       'wasm/LICENSE_QCMS',
-      'wasm/LICENSE_QUICKJS',
     ]) {
       expect(existsSync(join(dest, file)), `${file} should be copied`).toBe(true)
     }

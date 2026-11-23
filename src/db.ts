@@ -18,6 +18,15 @@ interface BestReceiptsDB extends DBSchema {
   }
 }
 
+/**
+ * A request inside a transaction whose outcome is reported by `tx.done`. If
+ * the transaction aborts, every request in it rejects as well; left
+ * unhandled, each of those surfaced a second time as a stray rejection.
+ */
+function quiet(request: Promise<unknown>): void {
+  request.catch(() => {})
+}
+
 let dbPromise: Promise<IDBPDatabase<BestReceiptsDB>> | null = null
 
 /**
@@ -93,10 +102,10 @@ export async function deleteReport(id: string): Promise<void> {
   const expenses = await db.getAllFromIndex('expenses', 'by-report', id)
   const tx = db.transaction(['reports', 'expenses', 'images'], 'readwrite')
   for (const expense of expenses) {
-    void tx.objectStore('expenses').delete(expense.id)
-    for (const imageId of expenseImageIds(expense)) void tx.objectStore('images').delete(imageId)
+    quiet(tx.objectStore('expenses').delete(expense.id))
+    for (const imageId of expenseImageIds(expense)) quiet(tx.objectStore('images').delete(imageId))
   }
-  void tx.objectStore('reports').delete(id)
+  quiet(tx.objectStore('reports').delete(id))
   await tx.done
 }
 
@@ -133,16 +142,16 @@ export async function saveExpenseWithImage(
 ): Promise<void> {
   const db = await getDB()
   const tx = db.transaction(['expenses', 'images'], 'readwrite')
-  for (const image of newImages) void tx.objectStore('images').put(image)
-  void tx.objectStore('expenses').put(expense)
-  for (const id of staleImageIds) void tx.objectStore('images').delete(id)
+  for (const image of newImages) quiet(tx.objectStore('images').put(image))
+  quiet(tx.objectStore('expenses').put(expense))
+  for (const id of staleImageIds) quiet(tx.objectStore('images').delete(id))
   await tx.done
 }
 
 export async function saveExpenses(expenses: Expense[]): Promise<void> {
   const db = await getDB()
   const tx = db.transaction('expenses', 'readwrite')
-  for (const expense of expenses) void tx.store.put(expense)
+  for (const expense of expenses) quiet(tx.store.put(expense))
   await tx.done
 }
 
@@ -150,8 +159,8 @@ export async function deleteExpense(id: string): Promise<void> {
   const db = await getDB()
   const expense = await db.get('expenses', id)
   const tx = db.transaction(['expenses', 'images'], 'readwrite')
-  void tx.objectStore('expenses').delete(id)
-  if (expense) for (const imageId of expenseImageIds(expense)) void tx.objectStore('images').delete(imageId)
+  quiet(tx.objectStore('expenses').delete(id))
+  if (expense) for (const imageId of expenseImageIds(expense)) quiet(tx.objectStore('images').delete(imageId))
   await tx.done
 }
 

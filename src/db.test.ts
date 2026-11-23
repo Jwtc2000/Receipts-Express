@@ -105,12 +105,24 @@ describe('saveExpenseWithImage', () => {
     await db.saveImage(oldImage)
     await db.saveExpense(makeExpense({ imageId: oldImage.id }))
 
-    // Simulates e.g. a QuotaExceededError on the first write in the
-    // transaction (the new image put) — asserts the doc comment's atomicity
-    // claim: nothing downstream (the expense update, the old-image delete)
-    // takes effect, and the pre-existing state survives untouched.
-    const putSpy = vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementationOnce(() => {
-      throw new Error('simulated write failure')
+    // The transaction is aborted after the new image's write has already
+    // been queued, as a QuotaExceededError on a later write would abort it.
+    // A synchronous throw on the first write (what this used to simulate)
+    // happens before anything is queued, so it passed just as well against
+    // an implementation with no shared transaction at all.
+    const realPut = IDBObjectStore.prototype.put
+    let puts = 0
+    const putSpy = vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementation(function (
+      this: IDBObjectStore,
+      ...args: Parameters<IDBObjectStore['put']>
+    ) {
+      const request = realPut.apply(this, args)
+      // After every write has been queued, as a quota failure would be.
+      if (++puts === 2) {
+        const tx = this.transaction
+        queueMicrotask(() => tx.abort())
+      }
+      return request
     })
     try {
       const newImage = { id: 'image-new', blob: new Blob(['new']) }

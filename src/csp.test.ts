@@ -1,8 +1,9 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { build } from 'vite'
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { NAVIGATION_DENYLIST } from './navigationDenylist'
 
 // The four standalone pages copied out of docs/ by copyStaticDocsPlugin.
@@ -27,24 +28,92 @@ function cspMeta(html: string): string | null {
   return tag ? tag[1].replace(/&#39;/g, "'") : null
 }
 
+// One file in each directory the precache must leave out.
+const ENGINE_STAND_INS = [
+  'tesseract/0.0.0/worker.min.js',
+  'tesseract/0.0.0/tesseract-core-lstm.wasm.js',
+  'pdfjs/0.0.0/wasm/openjpeg_nowasm_fallback.js',
+  'fonts/stand-in.woff2',
+]
+
+/** A policy split into its directives: { 'connect-src': ["'self'"], ... }. */
+function directives(csp: string): Record<string, string[]> {
+  const out: Record<string, string[]> = {}
+  for (const part of csp.split(';')) {
+    const [name, ...sources] = part.trim().split(/\s+/)
+    if (!name) continue
+    // A browser keeps the first of two same-named directives and ignores the
+    // rest, so a loose one placed first would hide behind a strict one.
+    if (name in out) throw new Error(`CSP repeats the ${name} directive`)
+    out[name] = sources
+  }
+  return out
+}
+
 // One production build shared by every assertion below — a Vite build is slow
 // enough that a second one per test would dominate the suite's runtime.
 describe('production build', () => {
   let outDir = ''
 
+  let publicDir = ''
+
   beforeAll(async () => {
     outDir = mkdtempSync(join(tmpdir(), 'csp-build-'))
-    await build({ logLevel: 'silent', build: { outDir, emptyOutDir: true } })
+    // The build's own public/ folder, plus a stand-in file for each engine
+    // and font directory. Those directories only exist after the asset
+    // copies have run, which a fresh checkout and CI have not done, so the
+    // precache test below was checking nothing there. It now always does.
+    publicDir = mkdtempSync(join(tmpdir(), 'csp-public-'))
+    const realPublic = fileURLToPath(new URL('../public', import.meta.url))
+    if (existsSync(realPublic)) {
+      cpSync(realPublic, publicDir, {
+        recursive: true,
+        filter: (src) => !/[/\\](tesseract|pdfjs|fonts)([/\\]|$)/.test(src.slice(realPublic.length)),
+      })
+    }
+    for (const stand of ENGINE_STAND_INS) {
+      mkdirSync(join(publicDir, stand, '..'), { recursive: true })
+      writeFileSync(join(publicDir, stand), 'stand-in')
+    }
+    // Vitest runs with NODE_ENV=test, and Vite keeps whatever NODE_ENV it is
+    // given, so this build used to bundle development React and an
+    // unminified worker: not what is deployed.
+    vi.stubEnv('NODE_ENV', 'production')
+    try {
+      await build({ logLevel: 'silent', publicDir, build: { outDir, emptyOutDir: true } })
+    } finally {
+      vi.unstubAllEnvs()
+    }
   }, 60_000)
 
   afterAll(() => {
     rmSync(outDir, { recursive: true, force: true })
+    rmSync(publicDir, { recursive: true, force: true })
   })
 
-  it('injects a CSP with connect-src \'self\'', () => {
-    const html = readFileSync(join(outDir, 'index.html'), 'utf-8').replace(/&#39;/g, "'")
-    expect(html).toMatch(/<meta\s+http-equiv="Content-Security-Policy"/)
-    expect(html).toMatch(/connect-src 'self'/)
+  it('is built for production, as deployed', () => {
+    const main = readdirSync(join(outDir, 'assets')).find((f) => /^index-.*\.js$/.test(f))!
+    const js = readFileSync(join(outDir, 'assets', main), 'utf-8')
+    expect(js).toContain('react-dom-client.production.js')
+    expect(js).not.toContain('.development.js')
+  })
+
+  // The exact policy, directive by directive. Checking only that
+  // "connect-src 'self'" appeared somewhere let a policy be loosened, or an
+  // origin added, with the suite still green.
+  it('injects exactly the expected CSP into index.html', () => {
+    const csp = cspMeta(readFileSync(join(outDir, 'index.html'), 'utf-8'))
+    expect(csp).not.toBeNull()
+    expect(directives(csp!)).toEqual({
+      'default-src': ["'self'"],
+      'connect-src': ["'self'"],
+      'img-src': ["'self'", 'blob:', 'data:'],
+      'script-src': ["'self'", "'wasm-unsafe-eval'"],
+      'style-src': ["'self'"],
+      'worker-src': ["'self'", 'blob:'],
+      'base-uri': ["'self'"],
+      'form-action': ["'self'"],
+    })
   })
 
   // The standalone pages under docs/ are linked from the app's About drawer
@@ -74,10 +143,11 @@ describe('production build', () => {
   it.each(DOC_PAGES)('injects a CSP into the copy of docs/%s', (page) => {
     const csp = cspMeta(readFileSync(join(outDir, 'docs', page), 'utf-8'))
     expect(csp, `docs/${page} shipped without a Content-Security-Policy`).not.toBeNull()
-    expect(csp).toContain("default-src 'self'")
-    expect(csp).toContain("connect-src 'self'")
-    expect(csp).toContain("form-action 'self'")
-    expect(csp).toContain("base-uri 'self'")
+    const d = directives(csp!)
+    expect(d['default-src']).toEqual(["'self'"])
+    expect(d['connect-src']).toEqual(["'self'"])
+    expect(d['form-action']).toEqual(["'self'"])
+    expect(d['base-uri']).toEqual(["'self'"])
   })
 
   // The docs/ pages are excluded from the install-time precache, so without a
@@ -140,6 +210,9 @@ describe('production build', () => {
     // test that scans nothing passes every time.
     const urls = [...sw.matchAll(/"?url"?\s*:\s*"([^"]+)"/g)].map((m) => m[1])
     expect(urls.length).toBeGreaterThan(0)
+    // The stand-ins are in the build, so leaving them out of the precache is
+    // a real result and not an empty directory.
+    for (const stand of ENGINE_STAND_INS) expect(existsSync(join(outDir, stand)), stand).toBe(true)
 
     for (const url of urls) {
       expect(url, `${url} must not be precached`).not.toMatch(

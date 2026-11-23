@@ -9,8 +9,11 @@ import { TESSERACT_DIR, root } from './engine-dirs.mjs'
 // scripts/engine-dirs.mjs for why). Everything already under public/tesseract
 // is removed first: a directory left over from a previous version would
 // otherwise be copied into the build and served, 60 MB at a time.
-const dest = path.join(root, 'public', TESSERACT_DIR)
-fs.rmSync(path.join(root, 'public', 'tesseract'), { recursive: true, force: true })
+//
+// A destination can be given as an argument, so a test can run this exact
+// copy into a scratch directory (src/tesseractAssets.test.ts).
+const dest = process.argv[2] ? path.resolve(process.argv[2]) : path.join(root, 'public', TESSERACT_DIR)
+if (!process.argv[2]) fs.rmSync(path.join(root, 'public', 'tesseract'), { recursive: true, force: true })
 fs.mkdirSync(dest, { recursive: true })
 
 const copies = [
@@ -34,7 +37,7 @@ const copies = [
   ['node_modules/tesseract.js-core/LICENSE', 'LICENSE-tesseract-core.txt'],
   ['node_modules/@tesseract.js-data/eng/4.0.0/eng.traineddata.gz', 'eng.traineddata.gz'],
 ]
-// Every WASM core the package ships, discovered rather than listed.
+// The LSTM-only WASM cores the package ships, discovered rather than listed.
 //
 // tesseract.js picks a core at runtime from what the browser supports, and the
 // set of variants grows between majors: v5 shipped four, v7 added the two
@@ -49,7 +52,15 @@ const copies = [
 // restructure, and it should stop the build rather than quietly ship an app
 // whose scanning does nothing.
 const coreDir = path.join(root, 'node_modules/tesseract.js-core')
-const cores = fs.readdirSync(coreDir).filter((f) => /^tesseract-core.*\.wasm(\.js)?$/.test(f))
+//
+// Only the LSTM-only builds, and only their .wasm.js scripts. src/ocr.ts asks
+// for OEM 1 (LSTM only), so tesseract.js picks one of the three -lstm cores
+// by what the browser supports and never asks for the others; and each
+// .wasm.js carries its WebAssembly embedded, so the separate .wasm files are
+// never fetched either. Copying everything shipped about 33 MB that nothing
+// could load. src/tesseractAssets.test.ts reads the names tesseract.js can
+// ask for out of its own source and checks each one is here.
+const cores = fs.readdirSync(coreDir).filter((f) => /^tesseract-core.*-lstm\.wasm\.js$/.test(f))
 if (cores.length === 0) {
   throw new Error(
     `No tesseract-core*.wasm files found in ${coreDir} — the package layout changed. ` +
@@ -63,4 +74,4 @@ for (const file of cores) {
 for (const [from, to] of copies) {
   fs.copyFileSync(path.join(root, from), path.join(dest, to))
 }
-console.log(`Copied ${copies.length} Tesseract assets to public/${TESSERACT_DIR}/`)
+console.log(`Copied ${copies.length} Tesseract assets to ${path.relative(root, dest)}/`)

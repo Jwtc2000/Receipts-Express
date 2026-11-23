@@ -25,6 +25,9 @@ function makeExpense(overrides: Partial<Expense> = {}): Expense {
   }
 }
 
+// Formatted the way the app formats, so the tests pass in any locale.
+const usd = (n: number) => new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(n)
+
 describe('businessAmount', () => {
   it('equals the full amount when nothing is marked personal', () => {
     expect(businessAmount(makeExpense({ amount: 20 }))).toBe(20)
@@ -122,12 +125,12 @@ describe('a day with meals in more than one currency', () => {
 describe('formatFoodBalance', () => {
   it('formats an under-budget day', () => {
     const balance = foodBalanceForDate([makeExpense({ amount: 20 })], '2026-07-18', 50)
-    expect(formatFoodBalance(balance)).toBe('Food $20.00 used · $30.00 left')
+    expect(formatFoodBalance(balance)).toBe(`Food ${usd(20)} used · ${usd(30)} left`)
   })
 
   it('formats an over-budget day', () => {
     const balance = foodBalanceForDate([makeExpense({ amount: 60 })], '2026-07-18', 50)
-    expect(formatFoodBalance(balance)).toBe('Food $60.00 used · $10.00 over')
+    expect(formatFoodBalance(balance)).toBe(`Food ${usd(60)} used · ${usd(10)} over`)
   })
 })
 
