@@ -19,6 +19,10 @@ merge to `main` that changes app behavior gets a version bump and a tag.
 - The stored model's key now includes the engine version, so a future model
   is fetched instead of the stored copy being reused, and old copies are
   deleted after the first scan.
+- The Privacy Policy describes the smaller stored model, and its "Last
+  updated" date moves to 23 November 2026, as its section 13 promises for
+  any change in data handling. The Terms carry the same date, since both are
+  accepted together. Existing users are asked to accept again once.
 
 ## [1.16.0] - 2026-11-23
 
