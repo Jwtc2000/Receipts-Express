@@ -29,10 +29,17 @@ import { fileURLToPath } from 'node:url'
  */
 const FORBIDDEN: { pattern: RegExp; label: string }[] = [
   { pattern: /\bfetch\s*\(/, label: 'fetch(' },
+  // `fetch` passed around as a value rather than called: `const get = fetch`
+  // or `fetch.bind(window)` used to pass. `.fetch` (a method on something
+  // else) is not matched, nor the word in running text.
+  { pattern: /(?<![.\w])fetch\s*(?=[),;\]}.]|$)/m, label: 'fetch as a value' },
   { pattern: /\bXMLHttpRequest\b/, label: 'XMLHttpRequest' },
   { pattern: /\bsendBeacon\b/, label: 'sendBeacon' },
   { pattern: /\bWebSocket\b/, label: 'WebSocket' },
   { pattern: /\bEventSource\b/, label: 'EventSource' },
+  // Not covered by the CSP's connect-src, so this test is the only check.
+  { pattern: /\bRTCPeerConnection\b/, label: 'RTCPeerConnection' },
+  { pattern: /\bWebTransport\b/, label: 'WebTransport' },
 ]
 
 const SRC_DIR = fileURLToPath(new URL('.', import.meta.url))
@@ -181,6 +188,15 @@ describe('the app opens no network connection of its own', () => {
     it('keeps line numbers aligned with the file after removing a block comment', () => {
       const source = ['/*', ' * a block comment', ' */', 'const r = fetch(u)'].join('\n')
       expect(findNetworkCalls(source)).toEqual(['line 4 (fetch(): const r = fetch(u)'])
+    })
+
+    it('catches fetch passed around as a value', () => {
+      expect(findNetworkCalls('const get = fetch;')).toHaveLength(1)
+      expect(findNetworkCalls('const get = fetch.bind(window)')).toHaveLength(1)
+    })
+
+    it('leaves the word alone in running text', () => {
+      expect(findNetworkCalls('const note = "no live rate to fetch automatically"')).toEqual([])
     })
 
     it('leaves import() alone — loading the app is not sending data', () => {

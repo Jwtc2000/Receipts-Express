@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { TERMS_VERSION } from './terms'
 
@@ -37,6 +38,38 @@ function readProse(page: string): string {
 
 function readRepoProse(path: string): string {
   return readRepo(path).replace(/\s+/g, ' ')
+}
+
+
+/**
+ * Every localStorage key the app uses: the 'br.' string constants in its
+ * non-test source. A localStorage call whose key is not such a constant
+ * fails the test instead, so a key cannot reach storage unlisted.
+ */
+function storageKeysInSource(): string[] {
+  const srcDir = fileURLToPath(new URL('.', import.meta.url))
+  const files: string[] = []
+  const walk = (dir: string) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = join(dir, entry.name)
+      if (entry.isDirectory()) {
+        if (entry.name !== 'test') walk(full)
+      } else if (/\.tsx?$/.test(entry.name) && !/\.test\.tsx?$/.test(entry.name)) {
+        files.push(full)
+      }
+    }
+  }
+  walk(srcDir)
+  const keys = new Set<string>()
+  for (const file of files) {
+    const code = readFileSync(file, 'utf-8')
+    for (const m of code.matchAll(/['"`](br\.[A-Za-z]+)['"`]/g)) keys.add(m[1])
+    for (const m of code.matchAll(/localStorage\.(?:get|set|remove)Item\(\s*([^,)]+)/g)) {
+      const arg = m[1].trim()
+      if (!/^[A-Z_]+_KEY$/.test(arg)) throw new Error(`${file}: localStorage key ${arg} is not a named br.* constant`)
+    }
+  }
+  return [...keys].sort()
 }
 
 describe('legal pages', () => {
@@ -103,16 +136,16 @@ describe('legal pages', () => {
     expect(prose).toMatch(/connect-src 'self'/)
   })
 
-  // The policy enumerates the localStorage keys by name, so a new key that
-  // isn't documented makes the page inaccurate. Keep this list in step with
-  // the app: br.termsAccepted is written by src/terms.ts.
-  it.each([
-    'br.profile',
-    'br.lastBackupAt',
-    'br.backupWarningDismissedAt',
-    'br.storageWarningDismissedAt',
-    'br.termsAccepted',
-  ])('the privacy policy documents the %s localStorage key', (key) => {
+  // The policy enumerates the localStorage keys by name, so a key that isn't
+  // documented makes the page inaccurate. The keys are read out of the source,
+  // not listed here: a list kept by hand stays green when the code changes.
+  const APP_KEYS = storageKeysInSource()
+
+  it('finds the localStorage keys in the source', () => {
+    expect(APP_KEYS.length).toBeGreaterThan(0)
+  })
+
+  it.each(APP_KEYS)('the privacy policy documents the %s localStorage key', (key) => {
     expect(read('privacy.html')).toContain(key)
   })
 

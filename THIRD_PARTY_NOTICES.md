@@ -326,8 +326,8 @@ The two Tesseract rows were marked **UNDETERMINED** until the upstream repositor
 (2026-11-22). They say no more than the installed packages do: the placeholder is unfilled at
 the `v7.0.0` tag of both, so there is no holder of record to name and none is invented here.
 The engine inside the core is a different matter. `tesseract.js-core` 7.0.0 builds it from
-`Balearica/tesseract` at commit `2a9c1c49`, and `strings -a` over the shipped
-`tesseract-core.wasm` gives the matching `5.1.0-288-g2a9c1`. That tree's `LICENSE` is again
+`Balearica/tesseract` at commit `2a9c1c49`, and `strings -a` over each shipped core gives the
+matching `5.1.0-288-g2a9c1`. That tree's `LICENSE` is again
 the bare Apache-2.0 text and it has no `NOTICE` file, but its source files carry their own
 headers, in the forms `(C) Copyright <year>, Google Inc.` and `(C) Copyright <year>,
 Hewlett-Packard Ltd.` (also `Hewlett-Packard Company.`). Those headers are in the source and
@@ -466,8 +466,12 @@ accept or not.
 
 ### 5.3 The WASM cores statically link C libraries
 
-The six cores in `tesseract/` are compiled binaries with several permissively licensed C
-libraries linked in, each carrying its own binary-redistribution condition.
+The three cores in `tesseract/` are compiled binaries with several permissively licensed C
+libraries linked in, each carrying its own binary-redistribution condition. They are the three
+LSTM-only builds (`tesseract-core-lstm`, `-simd-lstm` and `-relaxedsimd-lstm`), the only ones
+the app can request, each a `.wasm.js` file with its WebAssembly embedded. The package ships
+nine more files, the other three cores and the separate `.wasm` copies, which nothing in the
+app can load, and they are not copied.
 `node_modules/tesseract.js-core/` holds exactly one licence artifact, the bare Apache-2.0
 text, which covers the Tesseract code and says nothing about anything linked into it. That
 text ships as `tesseract/LICENSE-tesseract-core.txt`.
@@ -480,7 +484,8 @@ commit, and the licence texts in §11.7 were fetched from upstream at exactly th
 the table says so. What this does not prove is that the maintainers compiled from an unmodified
 checkout of those pins; the binaries say nothing that contradicts it.
 
-Evidence is from `strings -a` over the shipped `tesseract-core.wasm`.
+Evidence is from `strings -a` over the WebAssembly embedded in each of the three shipped cores;
+every string in the table is in all three.
 
 | Library | Evidence in the shipped binary | Pinned source | Licence and copyright |
 |---|---|---|---|
@@ -512,7 +517,8 @@ covered.
 `scripts/copy-pdfjs-assets.mjs` copies the `standard_fonts`, `cmaps`, `wasm` and `iccs`
 directories recursively, so **PDF.js's own licence files travel with the assets they cover**.
 One thing in those directories is left behind on purpose: the Liberation Sans fonts and their
-licence file, for the reason given below the table. Eleven licence files ship under `pdfjs/`,
+licence file, for the reason given below the table, and QuickJS, which nothing in this app can
+load (see below the table). Nine licence files ship under `pdfjs/`,
 each byte-identical to the one in `node_modules/pdfjs-dist/`. This table is a map and the
 shipped file is authoritative.
 
@@ -527,8 +533,6 @@ shipped file is authoritative.
 | PDF.js JBIG2 wrapper | `Copyright 2026 Mozilla Foundation` | `pdfjs/wasm/LICENSE_PDFJS_JBIG2` |
 | PDF.js OpenJPEG wrapper | `Copyright (c) 2024, Mozilla Foundation` | `pdfjs/wasm/LICENSE_PDFJS_OPENJPEG` |
 | PDF.js QCMS wrapper | `pdfjs/wasm/LICENSE_PDFJS_QCMS` opens `MIT License` and contains **no copyright line**. There is no notice to reproduce. | `pdfjs/wasm/LICENSE_PDFJS_QCMS` |
-| QuickJS engine — `pdfjs/wasm/quickjs-eval.wasm` (469,105 bytes) and `quickjs-eval.js` | `Copyright (c) 2017-2021 Fabrice Bellard` / `Copyright (c) 2017-2021 Charlie Gordon` — MIT | `pdfjs/wasm/LICENSE_QUICKJS` |
-| PDF.js QuickJS wrapper | `Copyright (c) 2026 Mozilla Foundation` — MIT | `pdfjs/wasm/LICENSE_PDFJS_QUICKJS` |
 
 Three rows read differently from the last edition of this file and one row is gone, and in
 each case it is a licence file that changed, between `pdfjs-dist` 6.2.108 and 6.5.438.
@@ -537,8 +541,9 @@ each case it is a licence file that changed, between `pdfjs-dist` 6.2.108 and 6.
 it vendored except QuickJS, the largest of them, and the binary carries no copyright string of
 its own, so the row was marked UNDETERMINED and listed in §9. 6.5.438 ships
 `LICENSE_QUICKJS`, headed `QuickJS Javascript Engine` and naming Fabrice Bellard and Charlie
-Gordon, and `LICENSE_PDFJS_QUICKJS` for Mozilla's wrapper. Both are the MIT text and both
-travel with the binary. The item is off §9.
+Gordon, and `LICENSE_PDFJS_QUICKJS` for Mozilla's wrapper, both the MIT text. The item is off
+§9. QuickJS itself has since been taken out of the build, below, so its rows are gone from the
+table too.
 
 **The QCMS wrapper file lost its copyright line.** It carried `Copyright (c) 2025, Mozilla
 Foundation` in 6.2.108. In 6.5.438 it is the MIT text under the heading `MIT License` with no
@@ -575,12 +580,12 @@ among them. On such a device the request for the font file now fails, PDF.js log
 system font` and carries on, and the text is drawn in the browser's generic `sans-serif`. The
 Foxit fonts beside them are unaffected.
 
-QuickJS ships because `scripts/copy-pdfjs-assets.mjs` copies `wasm/` recursively, and it is
-reached by nothing. Its only loader inside `pdfjs-dist` is `build/pdf.sandbox.mjs`, the PDF
-form-field JavaScript sandbox; that file is not copied into the build, and `grep -c quickjs`
-returns 0 on both the shipped `pdfjs/pdf.worker.min.mjs` and `assets/pdfReceipt-*.js`. Like the
-`.html()` chunks in §2.3, it is attributed here because it is served, not because any code path
-reaches it.
+**QuickJS is no longer shipped.** It used to be, because `scripts/copy-pdfjs-assets.mjs`
+copies `wasm/` recursively, and it was reached by nothing. Its only loader inside `pdfjs-dist`
+is `build/pdf.sandbox.mjs`, the PDF form-field JavaScript sandbox; that file is not copied into
+the build, and `grep -c quickjs` returns 0 on both the shipped `pdfjs/pdf.worker.min.mjs` and
+`assets/pdfReceipt-*.js`. The copy script now leaves `quickjs-eval.*` and its two licence files
+behind, and they are in §10.
 
 PDF.js carries its Mozilla copyright in an `@licstart` comment, a LibreJS convention the
 bundler does not treat as a legal comment — it has no `@license` or `@preserve` in it and does
@@ -723,11 +728,15 @@ listed above despite the label: the two `@fontsource-variable` packages (§7), w
 files are served to every reader, and `vite-plugin-pwa`, whose generated Workbox runtime
 ships as the service worker (§2.5).
 
-Two more that are installed but do not reach users:
+Four more that are installed but do not reach users:
 
 - **`@napi-rs/canvas`**, an optional dependency of `pdfjs-dist`. The browser bundle contains
   only the module specifier inside a Node-only code path; the native module is never bundled
   or served.
+- **QuickJS** inside `pdfjs-dist`: `wasm/quickjs-eval.wasm`, `wasm/quickjs-eval.js`,
+  `LICENSE_QUICKJS` and `LICENSE_PDFJS_QUICKJS`. Nothing in this app can load it (§6).
+- **The unused Tesseract cores** inside `tesseract.js-core`: the three cores that are not
+  LSTM-only and every separate `.wasm` file, which an LSTM-only worker never requests (§5.3).
 - **The Liberation Sans fonts** inside `pdfjs-dist`: four `LiberationSans-*.ttf` files and
   `LICENSE_LIBERATION`, in `node_modules/pdfjs-dist/standard_fonts/`.
   `scripts/copy-pdfjs-assets.mjs` copies everything else in that directory and leaves these
