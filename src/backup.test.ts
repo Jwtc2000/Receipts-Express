@@ -491,10 +491,24 @@ describe('the profile in a backup', () => {
     const backup = await import('./backup')
     await db.saveReport({ id: 'r1', name: 'Trip', createdAt: 1 })
     const huge = { size: backup.MAX_EXPORT_IMAGE_BYTES + 1 } as Blob
+    const [expense] = validBackup().expenses
+    await db.saveExpense({ ...expense, imageId: 'i1' })
     vi.spyOn(db, 'listAllImages').mockResolvedValueOnce([{ id: 'i1', blob: huge }])
 
     await expect(backup.exportBackup()).rejects.toThrow(backup.BackupTooLargeError)
     expect(shareOrDownloadFile).not.toHaveBeenCalled()
+  })
+
+  it('does not count or export an image that no kept expense references', async () => {
+    const db = await import('./db')
+    const backup = await import('./backup')
+    await db.saveReport({ id: 'r1', name: 'Trip', createdAt: 1 })
+    const huge = { size: backup.MAX_EXPORT_IMAGE_BYTES + 1 } as Blob
+    vi.spyOn(db, 'listAllImages').mockResolvedValueOnce([{ id: 'stranded', blob: huge }])
+
+    expect(await backup.exportBackup()).toBe(true)
+    const exported = shareOrDownloadFile.mock.calls[0][0] as File
+    expect(JSON.parse(await exported.text()).images).toEqual([])
   })
 
   // An entirely empty profile is left out of the file rather than written as

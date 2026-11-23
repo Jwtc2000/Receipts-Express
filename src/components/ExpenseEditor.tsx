@@ -262,12 +262,15 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
       // field is empty: replacing the photo on a saved expense must not
       // replace the amount and date that were saved with it.
       const typed = typedRef.current
+      // `expenseId`, not `existing`: this handler closed over `existing` when
+      // the file was picked, which can be before the saved expense finished
+      // loading, and would then treat a saved expense as a new one.
       const mayFill = (key: keyof Draft, current: string) =>
-        !typed.has(key) && (existing ? current === '' : true)
+        !typed.has(key) && (expenseId ? current === '' : true)
       setDraft((d) => ({
         ...d,
         merchant: extracted.merchant && mayFill('merchant', d.merchant) ? extracted.merchant : d.merchant,
-        title: d.title || extracted.merchant || '',
+        title: d.title || (!typed.has('title') && extracted.merchant) || '',
         amount:
           extracted.total !== undefined && mayFill('amount', d.amount) ? extracted.total.toFixed(2) : d.amount,
         date: extracted.date && mayFill('date', d.date) ? extracted.date : d.date,

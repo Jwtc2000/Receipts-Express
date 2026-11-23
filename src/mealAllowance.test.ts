@@ -93,6 +93,11 @@ describe('a day with meals in more than one currency', () => {
     expect(text).not.toMatch(/\d/)
   })
 
+  it('reads a blank currency as USD, as the rest of the app does', () => {
+    const balance = foodBalanceForDate([day[0], makeExpense({ id: 'c', amount: 8, currency: '' })], '2026-07-18', 30)
+    expect(balance.mixed).toBe(false)
+  })
+
   it('still totals a day whose meals share one currency', () => {
     const balance = foodBalanceForDate([day[0], makeExpense({ id: 'c', amount: 8 })], '2026-07-18', 30)
     expect(balance.mixed).toBe(false)

@@ -409,7 +409,7 @@ export function shouldShowBackupWarning(): boolean {
 }
 
 async function buildBackupBlob(): Promise<Blob> {
-  const [reports, allExpenses, images] = await Promise.all([
+  const [reports, allExpenses, allImages] = await Promise.all([
     listReports(),
     listAllExpenses(),
     listAllImages(),
@@ -423,6 +423,14 @@ async function buildBackupBlob(): Promise<Blob> {
   const reportIds = new Set(reports.map((r) => r.id))
   const expenses = allExpenses.filter((e) => reportIds.has(e.reportId))
 
+  // Only the images a kept expense points at. An image that nothing
+  // references cannot be shown or deleted in the app; exporting it would let
+  // receipts nobody can see count against the size limit, and could make a
+  // library fail to back up with every visible report already deleted.
+  const referenced = new Set(
+    expenses.flatMap((e) => [e.imageId, ...(e.extraImageIds ?? [])]).filter((id): id is string => !!id),
+  )
+  const images = allImages.filter((img) => referenced.has(img.id))
   const totalImageBytes = images.reduce((sum, img) => sum + img.blob.size, 0)
   if (totalImageBytes > MAX_EXPORT_IMAGE_BYTES) throw new BackupTooLargeError(totalImageBytes)
   // The profile is part of the backup — a restore that brought back every

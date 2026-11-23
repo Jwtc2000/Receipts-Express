@@ -31,7 +31,7 @@ export interface FoodBalance {
 export function foodBalanceForDate(expenses: Expense[], date: string, allowance: number): FoodBalance {
   const mealExpenses = expenses.filter((e) => e.date === date && e.category === 'Meals')
   const used = mealExpenses.reduce((sum, e) => sum + businessAmount(e), 0)
-  const currencies = new Set(mealExpenses.map((e) => e.currency.trim().toUpperCase()))
+  const currencies = new Set(mealExpenses.map((e) => e.currency.trim().toUpperCase() || 'USD'))
   const currency = mealExpenses[0]?.currency.trim().toUpperCase() || 'USD'
   if (currencies.size > 1) {
     return { used: 0, allowance, remaining: allowance, over: false, currency, mixed: true }
