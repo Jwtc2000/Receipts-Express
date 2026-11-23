@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { shareOrDownloadFile } from './share'
+import { safeFileName, shareOrDownloadFile } from './share'
 
 function makeFile(): File {
   return new File(['x'], 'test.txt', { type: 'text/plain' })
@@ -45,14 +45,19 @@ describe('shareOrDownloadFile', () => {
     await expect(shareOrDownloadFile(makeFile(), 'My Title')).resolves.toBe(false)
   })
 
-  it('rethrows a non-AbortError share failure instead of reporting false success', async () => {
+  // The usual cause is NotAllowedError: the share sheet needs a recent tap,
+  // and a large export can outlast it. The file is already built, so it is
+  // downloaded rather than reported as a failure that a retry would repeat.
+  it('falls back to a download when the share sheet refuses for any reason other than cancel', async () => {
     Object.defineProperty(navigator, 'canShare', { value: () => true, configurable: true })
     Object.defineProperty(navigator, 'share', {
-      value: vi.fn().mockRejectedValue(new Error('share sheet crashed')),
+      value: vi.fn().mockRejectedValue(new DOMException('no recent tap', 'NotAllowedError')),
       configurable: true,
     })
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
 
-    await expect(shareOrDownloadFile(makeFile(), 'My Title')).rejects.toThrow('share sheet crashed')
+    await expect(shareOrDownloadFile(makeFile(), 'My Title')).resolves.toBe(true)
+    expect(click).toHaveBeenCalled()
   })
 
   it('falls back to a download link and returns true when canShare is unavailable', async () => {
@@ -78,5 +83,19 @@ describe('shareOrDownloadFile', () => {
     // The failed download's object URL is revoked immediately rather than
     // leaking, unlike the success path's deferred revoke.
     expect(revokeSpy).toHaveBeenCalledWith('blob:mock-url')
+  })
+})
+
+describe('safeFileName', () => {
+  it('keeps letters in any script', () => {
+    expect(safeFileName('東京 出張', 'x')).toBe('東京_出張')
+  })
+
+  it('replaces characters no file system allows', () => {
+    expect(safeFileName('Q3: NYC/Boston?', 'x')).toBe('Q3_NYC_Boston')
+  })
+
+  it('falls back when nothing usable is left', () => {
+    expect(safeFileName('???', 'expense_report')).toBe('expense_report')
   })
 })
