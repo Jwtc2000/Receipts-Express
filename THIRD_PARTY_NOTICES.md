@@ -1,6 +1,6 @@
 # Third-Party Notices — Receipts Express
 
-Receipts Express 1.14.0. Compiled 2026-11-21 from the packages installed in `node_modules/`
+Receipts Express 1.15.0. Compiled 2026-11-22 from the packages installed in `node_modules/`
 and from the build they produce.
 
 Receipts Express itself is licensed under the Apache License, Version 2.0, Copyright 2026
@@ -489,17 +489,23 @@ Evidence is from `strings -a` over the shipped `tesseract-core.wasm`.
 | libtiff | `libtiff does not allow writing more than 2147483647 bytes in a tag` | `libtiff/libtiff` (GitLab) at `b51bb157`, version 4.3.0 | libtiff licence. `Copyright (c) 1988-1997 Sam Leffler` / `Copyright (c) 1991-1997 Silicon Graphics, Inc.` Its LZW codec carries a separate University of California notice. Both in §11.7 |
 | libpng | `Application built with libpng-`, `libpng error: %s`, `1.6.38.git` | `glennrp/libpng` at `a37d4836` | PNG Reference Library License version 2. `Copyright (c) 1995-2020 The PNG Reference Library Authors.` and four further lines. Text in §11.7 |
 | zlib | `1.2.12` | `madler/zlib` at `21767c65`, version 1.2.12 | zlib licence. `Copyright (C) 1995-2022 Jean-loup Gailly and Mark Adler` Text in §11.7 |
+| giflib | `failed to create GIF image handle` (Leptonica's message; it is Leptonica's GIF library) | `mirrorer/giflib` at `fa376720` | MIT. `The GIFLIB distribution is Copyright (c) 1997  Eric S. Raymond` Text in §11.7 |
+| libwebp | `invalid WebP file` (Leptonica's message; it is Leptonica's WebP library) | `webmproject/libwebp` at `20ef03ee` | Three-clause BSD. `Copyright (c) 2010, Google Inc. All rights reserved.` It comes with a separate patent grant. Both in §11.7 |
+| openlibm | none found; linked by the engine's build file | `JuliaMath/openlibm` at `ae2d9169` | A mix: MIT, ISC, two-clause BSD and the FDLIBM notice, by part. Upstream's `LICENSE.md` in §11.7 |
 
 **The IJG licence prescribes wording for a distribution like this one**, and here it is, in the
 form the licence asks for: this software is based in part on the work of the Independent JPEG
 Group.
 
-**Three more libraries are built into the cores and are not accounted for.** The build script
-at that tag also builds `giflib`, `libwebp` and `openlibm`, and passes the first two to
-Leptonica's build as its GIF and WebP libraries. The binary bears that out for those two:
-`strings` finds `failed to create GIF image handle` and `invalid WebP file` in it. Whether
-`openlibm` ends up in the final binary was not established. None of the three has a row above
-or a text in §11, because none has been read from upstream yet. They are items 2 to 4 in §9.
+**The last three rows were missing until this edition.** The build script at that tag builds
+`giflib`, `libwebp` and `openlibm` beside the five libraries above, and the engine's
+`CMakeLists.txt` (`Balearica/tesseract` at `2a9c1c49`) names `libgif.a`, `libwebp.a`,
+`libwebpdecoder.a` and `libopenlibm.a` in the WebAssembly target's link line. For the first
+two the binary bears it out with Leptonica's own messages. `openlibm` is a maths library and
+leaves no string of its own that was found, so its row rests on the link line alone; a static
+link takes only the functions that are used, and which those are was not established. Its
+whole `LICENSE.md` is reproduced, since that is the only way to be sure the parts used are
+covered.
 
 ## 6. PDF.js bundled sub-components
 
@@ -672,9 +678,6 @@ consciously accepted.**
 | # | Component | What is missing | Where to look |
 |---|---|---|---|
 | 1 | @tesseract.js-data/eng 1.0.0 | Nothing that further reading can supply. Upstream declares Apache-2.0 for the data but names no copyright holder, and the declaration is the repository's, not the trainer's (§5.2). To be accepted or not | `tesseract-ocr/tessdata` |
-| 2 | giflib (in WASM) | Licence and copyright line; built into the cores and linked through Leptonica (§5.3) | `mirrorer/giflib` at `fa376720`, the commit `tesseract.js-core` 7.0.0 pins |
-| 3 | libwebp (in WASM) | Licence, copyright line and any patent grant file; built into the cores and linked through Leptonica (§5.3) | `webmproject/libwebp` at `20ef03ee` |
-| 4 | openlibm (possibly in WASM) | Whether it is in the final binary at all, then its licences and copyright lines (§5.3) | `JuliaMath/openlibm` at `ae2d9169` |
 
 Seven items came off this list on 2026-11-22, when each was read from its upstream source at
 the version this build ships: the IJG wording for libjpeg, and the texts for Leptonica,
@@ -683,8 +686,9 @@ libtiff, libpng and zlib (§5.3, §11.7); ieee754's own BSD-3-Clause text (§11.
 tesseract.js-core names a copyright holder at any tag (§4). Feather's copyright line was
 confirmed and its glyph comparisons re-checked (§8).
 
-The same reading added three. The cores' build script builds giflib, libwebp and openlibm
-beside the five libraries this file already listed, and nobody had looked.
+The same reading found three libraries this file had never listed: the cores' build also
+links giflib, libwebp and openlibm. They were read from upstream the same way the day after
+and are in §5.3 and §11.7.
 
 Two items that were on this list earlier are off it because the answer was sitting in
 `node_modules/` the whole time. `idb-keyval` 6.3.0 was recorded as shipping no licence file; it
@@ -870,7 +874,8 @@ headers, all in §2.6. §11 is not a complete inventory on its own; §2.6 is par
 ### 11.7 Libraries linked into the Tesseract cores
 
 Each text below was fetched from upstream on 2026-11-22 at the commit `tesseract.js-core` 7.0.0
-pins (§5.3) and pasted from the fetched file, not retyped.
+pins (§5.3), or the day after for giflib, libwebp and openlibm, and pasted from the fetched
+file, not retyped.
 
 **libjpeg.** The `LEGAL ISSUES` section of the `README` of IJG release 9a, as far as the end of
 the licence terms. Condition (2) is the one that applies to a binary-only distribution, and
@@ -1178,7 +1183,213 @@ be appreciated.
   Jean-loup Gailly        Mark Adler
 ```
 
+**giflib.** The whole of `COPYING`.
+
+```
+The GIFLIB distribution is Copyright (c) 1997  Eric S. Raymond
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+```
+
+**libwebp.** The whole of `COPYING`, then the whole of `PATENTS`, which is a grant to the
+recipient and asks nothing of a redistributor.
+
+```
+Copyright (c) 2010, Google Inc. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are
+met:
+
+  * Redistributions of source code must retain the above copyright
+    notice, this list of conditions and the following disclaimer.
+
+  * Redistributions in binary form must reproduce the above copyright
+    notice, this list of conditions and the following disclaimer in
+    the documentation and/or other materials provided with the
+    distribution.
+
+  * Neither the name of Google nor the names of its contributors may
+    be used to endorse or promote products derived from this software
+    without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+```
+
+```
+Additional IP Rights Grant (Patents)
+------------------------------------
+
+"These implementations" means the copyrightable works that implement the WebM
+codecs distributed by Google as part of the WebM Project.
+
+Google hereby grants to you a perpetual, worldwide, non-exclusive, no-charge,
+royalty-free, irrevocable (except as stated in this section) patent license to
+make, have made, use, offer to sell, sell, import, transfer, and otherwise
+run, modify and propagate the contents of these implementations of WebM, where
+such license applies only to those patent claims, both currently owned by
+Google and acquired in the future, licensable by Google that are necessarily
+infringed by these implementations of WebM. This grant does not include claims
+that would be infringed only as a consequence of further modification of these
+implementations. If you or your agent or exclusive licensee institute or order
+or agree to the institution of patent litigation or any other patent
+enforcement activity against any entity (including a cross-claim or
+counterclaim in a lawsuit) alleging that any of these implementations of WebM
+or any code incorporated within any of these implementations of WebM
+constitute direct or contributory patent infringement, or inducement of
+patent infringement, then any patent rights granted to you under this License
+for these implementations of WebM shall terminate as of the date such
+litigation is filed.
+```
+
+**openlibm.** The whole of `LICENSE.md`. Its last part concerns test files under the LGPL,
+which are not part of the library and are not linked.
+
+```
+## OpenLibm
+
+OpenLibm contains code that is covered by various licenses.
+
+The OpenLibm code derives from the FreeBSD msun and OpenBSD libm
+implementations, which in turn derives from FDLIBM 5.3. As a result, it
+has a number of fixes and updates that have accumulated over the years
+in msun, and also optimized assembly versions of many functions. These
+improvements are provided under the BSD and ISC licenses. The msun
+library also includes work placed under the public domain, which is
+noted in the individual files. Further work on making a standalone
+OpenLibm library from msun, as part of the Julia project is covered
+under the MIT license. The test files, test-double.c and test-float.c
+are under the LGPL.
+
+## Parts copyrighted by the Julia project (MIT License)
+
+>       Copyright (c) 2011-14 The Julia Project.
+>       https://github.com/JuliaMath/openlibm/graphs/contributors
+>
+>       Permission is hereby granted, free of charge, to any person obtaining
+>       a copy of this software and associated documentation files (the
+>       "Software"), to deal in the Software without restriction, including
+>       without limitation the rights to use, copy, modify, merge, publish,
+>       distribute, sublicense, and/or sell copies of the Software, and to
+>       permit persons to whom the Software is furnished to do so, subject to
+>       the following conditions:
+>
+>       The above copyright notice and this permission notice shall be
+>       included in all copies or substantial portions of the Software.
+>
+>       THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+>       EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+>       MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+>       NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+>       LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+>       OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+>       WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+## Parts copyrighted by Stephen L. Moshier (ISC License)
+
+> Copyright (c) 2008 Stephen L. Moshier <steve@moshier.net>
+>
+> Permission to use, copy, modify, and distribute this software for any
+> purpose with or without fee is hereby granted, provided that the above
+> copyright notice and this permission notice appear in all copies.
+>
+> THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+> WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+> MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+> ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+> WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+> ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+> OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+## FREEBSD MSUN (FreeBSD/2-clause BSD/Simplified BSD License)
+
+>       Copyright 1992-2011 The FreeBSD Project. All rights reserved.
+>
+>       Redistribution and use in source and binary forms, with or without
+>       modification, are permitted provided that the following conditions are
+>       met:
+>
+>       1. Redistributions of source code must retain the above copyright
+>       notice, this list of conditions and the following disclaimer.
+>
+>       2. Redistributions in binary form must reproduce the above copyright
+>       notice, this list of conditions and the following disclaimer in the
+>       documentation and/or other materials provided with the distribution.
+>       THIS SOFTWARE IS PROVIDED BY THE FREEBSD PROJECT ``AS IS'' AND ANY
+>       EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+>       IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+>       PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE FREEBSD PROJECT OR
+>       CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+>       EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+>       PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+>       PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+>       LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+>       NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+>       SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+>
+>       The views and conclusions contained in the software and documentation
+>       are those of the authors and should not be interpreted as representing
+>       official policies, either expressed or implied, of the FreeBSD
+>       Project.
+
+## FDLIBM
+
+>      Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+>
+>      Developed at SunPro, a Sun Microsystems, Inc. business.
+>      Permission to use, copy, modify, and distribute this
+>      software is freely granted, provided that this notice
+>      is preserved.
+
+## Tests
+
+>   Copyright (C) 1997, 1999 Free Software Foundation, Inc.
+>   This file is part of the GNU C Library.
+>   Contributed by Andreas Jaeger <aj@suse.de>, 1997.
+>
+>   The GNU C Library is free software; you can redistribute it and/or
+>   modify it under the terms of the GNU Lesser General Public
+>   License as published by the Free Software Foundation; either
+>   version 2.1 of the License, or (at your option) any later version.
+>
+>   The GNU C Library is distributed in the hope that it will be useful,
+>   but WITHOUT ANY WARRANTY; without even the implied warranty of
+>   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+>   Lesser General Public License for more details.
+>
+>   You should have received a copy of the GNU Lesser General Public
+>   License along with the GNU C Library; if not, write to the Free
+>   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
+>   02111-1307 USA.
+```
+
 ---
 
-*Four items in §9 remain unresolved. Do not describe this file as a finished attribution
-record until each is resolved or consciously accepted.*
+*One item in §9 remains unresolved. Do not describe this file as a finished attribution
+record until it is resolved or consciously accepted.*
