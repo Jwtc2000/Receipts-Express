@@ -7,6 +7,18 @@ updates:
     cooldown:
       default-days: 7
 
+  # The CI agent image. Its base is pinned by tag and digest in
+  # ci/agent/Dockerfile, which stops it moving but also stops it being
+  # patched: without this entry nothing ever proposes a newer one. The scan
+  # tool versions in that file are ARG values, which Dependabot does not
+  # read; those are still bumped by hand.
+  - package-ecosystem: "docker"
+    directory: "/ci/agent"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+
   # Without this, npm advisories only surfaced when the Jenkins Supply
   # chain stage (osv-scanner) went red on an unrelated PR — as six of
   # them did on #51.

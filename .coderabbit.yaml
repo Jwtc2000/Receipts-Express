@@ -1,0 +1,65 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+language: en-GB
+tone_instructions: "Terse and specific. One issue per comment, with a concrete fix. No praise and no restating what the code does. Say so when you are unsure."
+reviews:
+  profile: chill
+  high_level_summary: false
+  collapse_walkthrough: true
+  sequence_diagrams: false
+  in_progress_fortune: false
+  poem: false
+  suggested_labels: false
+  suggested_reviewers: false
+  estimate_code_review_effort: false
+  auto_review:
+    enabled: true
+    drafts: false
+  path_filters:
+    - "!package-lock.json"
+    - "!LICENSE"
+    - "!.gitleaksignore"
+    - "!assets/**/*.jpg"
+    - "!public/icons/*.png"
+  path_instructions:
+    - path: "THIRD_PARTY_NOTICES.md"
+      instructions: >-
+        Written in British English: 'licence' is the noun, 'licensed' the verb. 'License' and 'LICENSE' appear only in proper names, file names and verbatim quotations; do not flag either spelling. Copyright lines and licence texts are quoted verbatim from the installed packages and are legal text: never suggest rewording, re-wrapping or correcting them. Do flag: a version that disagrees with package.json or package-lock.json in the same PR, a dependency added or removed without a matching row, a cross-reference or item count that no longer matches, and any claim about what ships that the build scripts or tests contradict.
+    - path: "src/**/*.test.*"
+      instructions: >-
+        Tests here deliberately assert against real artefacts: a real vite build into a temp directory (csp.test.ts, version.test.ts) or the real copy script run into a scratch directory (pdfAssets.test.ts). Do not suggest mocking the build, asserting on config instead, or splitting for speed. Do flag a test that would still pass if the behaviour it guards were removed: an assertion satisfied by an empty starting state, a whole-page string match that prose could satisfy, or a hard-coded list that upstream can silently outgrow.
+    - path: "src/**"
+      instructions: >-
+        Client-only app with no server. Flag any new network path: fetch, XMLHttpRequest, WebSocket, EventSource, sendBeacon, or a URL on another origin (src/noNetwork.test.ts and the CSP in vite.config.ts enforce this and the published privacy policy depends on it). User data lives only in IndexedDB: flag changes to src/db.ts or src/backup.ts that could drop or rewrite stored records without a migration, and any destructive action without confirmation. A change to app behaviour needs a version bump in package.json and a CHANGELOG.md entry in the same PR.
+    - path: "package.json"
+      instructions: >-
+        A changed or added runtime dependency needs a matching change to THIRD_PARTY_NOTICES.md in the same PR. A new entry under overrides needs a stated reason in the PR description. version must match the newest heading in CHANGELOG.md.
+    - path: ".github/**"
+      instructions: >-
+        Actions are pinned to a full commit SHA with the version in a trailing comment. Workflow-level permissions stay at contents: read and a job gains only what it needs. build and deploy run only for main. Flag anything that loosens these, and any pull_request_target trigger.
+    - path: "docs/*.html"
+      instructions: >-
+        Standalone legal pages and the pilot deck. They must stay self-contained: no external fonts, scripts, styles or images (src/legalPages.test.ts). Do not suggest stylistic rewording of legal text or spelling changes. Do flag a statement about the app's behaviour that the code in this PR makes untrue.
+    - path: "ci/**"
+      instructions: >-
+        Public repository. Flag any text that says where or how the CI is hosted: machine names, host names, addresses, network names, user names or local paths. Never suggest adding such detail.
+    - path: "Jenkinsfile"
+      instructions: >-
+        Public repository. Flag any text that says where or how the CI is hosted. Never suggest adding such detail.
+  finishing_touches:
+    unit_tests:
+      enabled: false
+    autofix:
+      enabled: false
+    fix_ci:
+      enabled: false
+    resolve_merge_conflict:
+      enabled: false
+  tools:
+    languagetool:
+      enabled: false
+chat:
+  art: false
+  allow_non_org_members: false
+knowledge_base:
+  code_guidelines:
+    filePatterns: ["CONTRIBUTING.md", "ci/README.md"]

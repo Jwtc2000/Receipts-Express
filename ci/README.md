@@ -5,27 +5,28 @@
 | System | Owns |
 |---|---|
 | GitHub Actions (`.github/workflows/deploy.yml`) | typecheck, tests, `npm audit` (blocking at `high`), GitHub Pages deploy |
-| Jenkins (`Jenkinsfile`) | secrets scanning, SAST, workflow auditing, Dockerfile linting, supply-chain scanning, and (main-branch-only) full-history secrets scanning + SBOM generation |
+| Jenkins (`Jenkinsfile`) | commit-identity check, secrets scanning (working tree and history), SAST, workflow auditing, Dockerfile linting, supply-chain scanning, and (main-branch-only) SBOM generation |
 
-Neither pipeline duplicates the other's stages.
+The two overlap in one place, on purpose: `npm audit` in GitHub Actions and osv-scanner in Jenkins both check the lockfile for known vulnerabilities, against different databases. GitHub Actions also runs `test` once a day on a schedule, so a new advisory against a dependency already on `main` is noticed without a push.
 
 ## Pipeline stages
 
-Every stage below runs on every Jenkins build of a branch unless marked **main-only** — the `Jenkinsfile` gates those two with `when { branch 'main' }`.
+Every stage below runs on every Jenkins build unless marked **PR-only** or **main-only**.
 
-A build is not triggered by the push; it starts when the multibranch job scans the repository, which is why **Scan Repository Now** is a step in the working rhythm below.
+Builds start on their own shortly after a push. A build is limited to 20 minutes, a newer push to the same branch cancels the build of the older one, and the workspace is deleted afterwards.
 
 | Stage | Tool | Version | What it checks |
 |---|---|---|---|
+| Commit identity — **PR-only** | git | — | Every commit the pull request adds has GitHub no-reply author and committer addresses. Fails without printing the address |
 | Secrets scan | [gitleaks](https://github.com/gitleaks/gitleaks) | 8.30.1 | Working tree, against `.gitleaks.toml` (default ruleset + this repo's custom privacy rules — see below) |
 | SAST | [semgrep](https://semgrep.dev/) | 1.170.0 | `p/default`, `p/typescript`, `p/react`, `p/owasp-top-ten` rulesets, metrics off |
 | Workflow audit | [zizmor](https://github.com/zizmorcore/zizmor) | 1.27.0 | `.github/workflows/` for Actions supply-chain/permissions issues |
 | Dockerfile lint | [hadolint](https://github.com/hadolint/hadolint) | 2.14.0 | `ci/agent/Dockerfile` |
 | Supply chain | [osv-scanner](https://github.com/google/osv-scanner) | 2.4.0 | `package-lock.json` against the OSV vulnerability database |
-| Secrets scan (full history) — **main-only** | gitleaks | 8.30.1 | Every commit ever pushed to `main` (`gitleaks git . --redact`), not just the working tree |
+| Secrets scan (history) | gitleaks | 8.30.1 | Every commit reachable in the checkout (`gitleaks git . --redact`), not just the working tree. On a pull request that includes the commits it adds |
 | SBOM — **main-only** | [syft](https://github.com/anchore/syft) | 1.48.0 | Generates a CycloneDX SBOM (`sbom.json`) for the repo, archived as a Jenkins build artifact |
 
-The full-history secrets scan and SBOM generation are main-only because both are about the state of `main` as a whole (and are slower) rather than about vetting an individual change before merge — the working-tree secrets scan on every PR already catches new leaks before they land.
+SBOM generation is main-only because it describes the state of `main` as a whole. The history scan used to be main-only too. It now runs on every build, because the working-tree scan cannot see a secret that one commit of a pull request adds and a later one removes: squash-merging keeps those commits out of `main`, so a main-only history scan never saw them either, while they stay public through the pull request.
 
 ### Gitleaks configuration
 
@@ -45,9 +46,8 @@ The full-history secrets scan and SBOM generation are main-only because both are
 ## Working rhythm
 
 1. Push branch, open PR
-2. In Jenkins: **Scan Repository Now**
-3. Review both required checks on the PR
-4. Merge on green
+2. Review both required checks on the PR
+3. Merge on green
 
 ## Branch protection facts
 
@@ -56,7 +56,7 @@ The full-history secrets scan and SBOM generation are main-only because both are
 - `test` — GitHub Actions app (`app_id: 15368`)
 - `continuous-integration/jenkins/pr-merge` — classic Status API (no app binding)
 
-`build` and `deploy` are **not** required — they `skip` on PRs by design (deploy-only-on-`main`-push gate), and requiring them would deadlock every merge. The two main-only Jenkins stages (full-history secrets scan, SBOM) are likewise not required on PRs, for the same reason — they only ever run on `main` pushes/rescans, never on a PR build.
+`build` and `deploy` are **not** required — they `skip` on PRs by design (deploy-only-on-`main`-push gate), and requiring them would deadlock every merge. The main-only SBOM stage is likewise not part of what a PR build proves.
 
 ## First-catch note
 
