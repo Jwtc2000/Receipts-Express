@@ -91,6 +91,20 @@ export async function forgetOldModelCopies(currentKey: string): Promise<void> {
 // needs more than a few pages to reach it. A page with amounts but no total
 // line does not stop the scan, since its largest amount is only a guess.
 const MAX_SCANNED_PAGES = 5
+// A page read with less confidence than this (0-100, averaged over its
+// letters) gets a second reading with dotted print joined into strokes.
+//
+// The second reading is used when it reads at least MORE_READ times as many
+// letters with confidence SURE_WORD or more. Not the average: on a photo of
+// a receipt on a textured table, joining turns the table into dark shapes
+// the engine skips, so the average rises while the receipt itself reads
+// worse. Measured in Chrome on 40 synthetic dot-matrix receipts and 142
+// receipts with solid print: dot-matrix pages read at least 1.69 times as
+// many sure letters the second time, the table photo 1.22 times, and the
+// solid-print pages fewer, or the same.
+const DOTTED_PRINT_CONFIDENCE = 70
+const SURE_WORD = 80
+const MORE_READ = 1.5
 
 /**
  * Run on-device OCR on a receipt and heuristically extract the merchant name,
@@ -109,8 +123,13 @@ export async function extractReceipt(
   // A wrapper of its own, so two scans passing the same function (the editor
   // always passes the same setter) are still told apart below.
   let pageIndex = 0
+  // The second reading of a page keeps the bar where the first left it,
+  // rather than sending it back to the start of the page.
+  let secondReading = false
   const mine = onProgress
-    ? (pct: number) => onProgress(Math.round((pageIndex * 100 + pct) / pages.length))
+    ? (pct: number) => {
+        if (!secondReading) onProgress(Math.round((pageIndex * 100 + pct) / pages.length))
+      }
     : null
   progressCallback = mine
   try {
@@ -118,11 +137,30 @@ export async function extractReceipt(
     const lines: OcrLine[] = []
     let parsed: Omit<ExtractedReceipt, 'rawText'> = {}
     for (; pageIndex < pages.length; pageIndex++) {
-      const { invertDarkBands } = await import('./ocrPrep')
+      const { invertDarkBands, joinDots } = await import('./ocrPrep')
       const input = await invertDarkBands(pages[pageIndex])
-      const result = await worker.recognize(input, {}, { text: true, blocks: true })
+      let result = await worker.recognize(input, {}, { text: true, blocks: true })
+      let pageLines = linesOf(result.data.blocks)
+      if (readingConfidence(pageLines) < DOTTED_PRINT_CONFIDENCE) {
+        const joined = await joinDots(input)
+        if (joined) {
+          secondReading = true
+          try {
+            const second = await worker.recognize(joined, {}, { text: true, blocks: true })
+            const secondLines = linesOf(second.data.blocks)
+            const before = sureLetters(pageLines)
+            const after = sureLetters(secondLines)
+            if (after > 0 && after >= before * MORE_READ) {
+              result = second
+              pageLines = secondLines
+            }
+          } finally {
+            secondReading = false
+          }
+        }
+      }
       texts.push(result.data.text)
-      lines.push(...linesOf(result.data.blocks))
+      lines.push(...pageLines)
       const { totalIsLabelled, ...found } = parseReceipt(texts.join('\n'), lines)
       parsed = found
       if (totalIsLabelled) break
@@ -134,6 +172,35 @@ export async function extractReceipt(
     // the second scan's progress bar frozen.
     if (progressCallback === mine) progressCallback = null
   }
+}
+
+/**
+ * How sure the engine was of a page, 0-100: its words' confidences averaged
+ * over their letters and digits, so a long word counts for more than a stray
+ * mark. A page with nothing read scores 0.
+ */
+export function readingConfidence(lines: OcrLine[]): number {
+  let sum = 0
+  let letters = 0
+  for (const line of lines) {
+    for (const word of line.words) {
+      const n = word.text.replace(/[^\p{L}\p{N}]/gu, '').length
+      sum += word.confidence * n
+      letters += n
+    }
+  }
+  return letters ? sum / letters : 0
+}
+
+/** How many letters and digits a page has in words read with confidence SURE_WORD or more. */
+export function sureLetters(lines: OcrLine[]): number {
+  let letters = 0
+  for (const line of lines) {
+    for (const word of line.words) {
+      if (word.confidence >= SURE_WORD) letters += word.text.replace(/[^\p{L}\p{N}]/gu, '').length
+    }
+  }
+  return letters
 }
 
 /** Every recognised line, in reading order, with its words' confidences. */
@@ -382,6 +449,13 @@ const STREET =
 // "ST 12345", also as OCR misreads it ("ST B2345"): five characters that are
 // digits or letters OCR swaps for them, at least three of them digits.
 const STATE_ZIP = /\b[A-Z]{2}\s+(?=(?:[OBSIlZ]*\d){3})[\dOBSIlZ]{5}(?:-\d{4})?\b/
+// A city line by its shape alone, for when OCR has mangled the state and
+// ZIP past STATE_ZIP ("Granites Walla, &T 24425"): it ends in a comma, a
+// short code and a token of mostly digits.
+const CITY_TAIL = /,\s*\S{1,3}\s+(?=[^\s.,]*\d[^\s.,]*\d[^\s.,]*\d)[^\s.,]{4,7}\s*$/
+// "Millbrook | #4410": the town and store number a chain prints under its
+// name, not the name.
+const STORE_LINE = /\|\s*\S*\d/
 const PHONE = /\(?\d{3}\)?[\s.-]?\d{3}[\s.-]\d{4}\b/
 const WEB = /www\.|https?:|\.(?:com|net|org)\b|@/i
 const PO_BOX = /\bp\.?\s*o\.?\s*box\b/i
@@ -416,7 +490,7 @@ function pickMerchant(lines: string[], ocrLines?: OcrLine[]): string | undefined
   // ("Millbrook" over "Millbrook, ST 12345") is the store's location, not its name.
   const places = new Set<string>()
   for (const line of lines) {
-    const zip = line.match(STATE_ZIP)
+    const zip = line.match(STATE_ZIP) ?? line.match(CITY_TAIL)
     if (!zip || zip.index === undefined) continue
     for (const w of line.slice(0, zip.index).toLowerCase().split(/[^\p{L}]+/u)) if (w) places.add(w)
   }
@@ -460,9 +534,16 @@ function headerName(line: OcrLine, places: Set<string>): string | undefined {
   // The same name printed twice on one line: "Taco Palace Co. Taco Palace Co."
   const half = s.length / 2
   if (Number.isInteger(half - 0.5) && s.slice(0, half - 0.5) === s.slice(half + 0.5)) s = s.slice(0, half - 0.5)
-  if (WEB.test(s) || PHONE.test(s) || STATE_ZIP.test(s) || PO_BOX.test(s)) return undefined
-  // "100 Main Avenue, Ste A", "25 Elm Court"
-  if (/^\d/.test(s) && STREET.test(s)) return undefined
+  // Looked for in the line as read as well as once trimmed: trimming can
+  // take "| #4410" or ", ST 12345" off the end, or the house number off the
+  // front of "12 Oak St", as noise.
+  for (const text of [s, line.text]) {
+    if (WEB.test(text) || PHONE.test(text) || STATE_ZIP.test(text) || CITY_TAIL.test(text) || PO_BOX.test(text) || STORE_LINE.test(text)) {
+      return undefined
+    }
+    // "100 Main Avenue, Ste A", "25 Elm Court"
+    if (/^\W*\d/.test(text) && STREET.test(text)) return undefined
+  }
   for (const { re } of DATE_PATTERNS) s = s.replace(re, ' ')
   s = s.replace(TIME, ' ').replace(WEEKDAY, ' ')
   const colon = s.indexOf(':')
@@ -475,9 +556,11 @@ function headerName(line: OcrLine, places: Set<string>): string | undefined {
   }
   s = s.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}.)'’]+$/gu, '').replace(/\s+/g, ' ').trim()
   if (FIELD_START.test(s) || !isNameLike(s)) return undefined
+  // A store number beside the town ("Millbrook 8521") does not make it a name.
   const named = s
     .toLowerCase()
     .split(' ')
+    .filter((w) => !/[\d#$§]/.test(w))
     .map((w) => w.replace(/[^\p{L}]/gu, ''))
     .filter((w) => w && !GENERIC_WORDS.has(w))
   if (named.every((w) => places.has(w))) return undefined

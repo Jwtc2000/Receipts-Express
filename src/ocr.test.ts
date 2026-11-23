@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { parseReceiptText } from './ocr'
 import { TESSERACT_DIR } from './engineDirs'
 
@@ -250,10 +250,28 @@ describe('parseReceiptText', () => {
 
   it('accepts a one-word name read with little confidence, but not a line of fragments', () => {
     const line = (words: [string, number][]) => ({ text: words.map(([w]) => w).join(' '), words: words.map(([text, confidence]) => ({ text, confidence })) })
-    const fragments = [line([['MAE', 45], ['RIK', 47], ['ZO', 44]]), line([['Total', 96], ['9.10', 96]])]
+    const fragments = [line([['VRN', 45], ['QLT', 47], ['ZO', 44]]), line([['Total', 96], ['9.10', 96]])]
     expect(parseReceiptText(fragments.map((l) => l.text).join('\n'), fragments).merchant).toBeUndefined()
     const logo = [line([['FUELMART', 47]]), line([['Total', 96], ['9.10', 96]])]
     expect(parseReceiptText(logo.map((l) => l.text).join('\n'), logo).merchant).toBe('Fuelmart')
+  })
+
+  it("does not take a chain's town and store number line for its name", () => {
+    expect(parseReceiptText('Millbrook | #4410\n10 Oak Dr\nTotal 30.00').merchant).toBeUndefined()
+  })
+
+  it('knows a city line by its shape when OCR has mangled the state and ZIP', () => {
+    const line = (words: [string, number][]) => ({ text: words.map(([w]) => w).join(' '), words: words.map(([text, confidence]) => ({ text, confidence })) })
+    const lines = [
+      line([['Vrn', 20], ['Ka', 10]]),
+      line([['MILLBROOK', 90]]),
+      line([['12', 30], ['OAK', 90], ['ST', 90]]),
+      line([['Millbrook,', 80], ['&T', 70], ['2Q425', 80]]),
+      line([['Total', 96], ['30.00', 96]]),
+    ]
+    // Not the town above its own city line, not the street with its number
+    // trimmed off as noise, and not the city line itself.
+    expect(parseReceiptText(lines.map((l) => l.text).join('\n'), lines).merchant).toBeUndefined()
   })
 
   it('finds a name given only in the footer, above the street address', () => {
@@ -377,5 +395,97 @@ describe('extractReceipt', () => {
     const { extractReceipt } = await import('./ocr')
     await extractReceipt(Array.from({ length: 8 }, () => new Blob(['page'])))
     expect(recognize).toHaveBeenCalledTimes(5)
+  })
+})
+
+describe('extractReceipt second reading for dotted print', () => {
+  // One block holding the given lines, as tesseract.js reports them.
+  const read = (rows: [string, number][][]) => ({
+    data: {
+      text: rows.map((r) => r.map(([w]) => w).join(' ')).join('\n'),
+      blocks: [
+        {
+          paragraphs: [
+            { lines: rows.map((r) => ({ text: r.map(([w]) => w).join(' '), words: r.map(([text, confidence]) => ({ text, confidence })) })) },
+          ],
+        },
+      ],
+    },
+  })
+  const joined = new Blob(['joined'])
+
+  beforeEach(() => {
+    vi.resetModules()
+    createWorker.mockReset()
+    vi.doMock('./ocrPrep', () => ({
+      invertDarkBands: (image: Blob) => Promise.resolve(image),
+      joinDots: () => Promise.resolve(joined),
+    }))
+  })
+  afterEach(() => vi.doUnmock('./ocrPrep'))
+
+  it('reads an unsure page again with the dots joined, and keeps the clearer reading', async () => {
+    const recognize = vi
+      .fn()
+      .mockResolvedValueOnce(read([[['VRN', 30], ['Q', 20], ['LT', 25]], [['Total', 40], ['3O.0O', 30]]]))
+      .mockResolvedValueOnce(read([[['FUELMART', 85]], [['Total', 90], ['30.00', 88]]]))
+    createWorker.mockResolvedValue({ recognize })
+    const { extractReceipt } = await import('./ocr')
+    const got = await extractReceipt(new Blob(['receipt']))
+    expect(recognize).toHaveBeenCalledTimes(2)
+    expect(recognize.mock.calls[1][0]).toBe(joined)
+    expect(got).toMatchObject({ merchant: 'Fuelmart', total: 30 })
+  })
+
+  it('keeps the first reading when the second reads less with confidence, even if its average is higher', async () => {
+    // A photo on a textured table: the first reading has the name and a lot
+    // of low-confidence noise; the second drops the noise and the name.
+    const recognize = vi
+      .fn()
+      .mockResolvedValueOnce(
+        read([[['ii', 5], ['mm', 6], ['rr', 4]], [['oo', 10], ['ed', 12], ['Taco', 95], ['Palace', 93]], [['fe', 8], ['Total', 95], ['9.75', 95]]]),
+      )
+      .mockResolvedValueOnce(read([[['Tao', 82], ['Pal', 81]], [['Total', 90], ['9.75', 90]]]))
+    createWorker.mockResolvedValue({ recognize })
+    const { extractReceipt } = await import('./ocr')
+    expect((await extractReceipt(new Blob(['receipt']))).merchant).toBe('Taco Palace')
+    expect(recognize).toHaveBeenCalledTimes(2)
+  })
+
+  it('keeps the first reading when neither reads anything with confidence', async () => {
+    const recognize = vi
+      .fn()
+      .mockResolvedValueOnce(read([[['Corner', 66], ['Bakery', 66]], [['Total', 66], ['9.75', 66]]]))
+      .mockResolvedValueOnce(read([[['Comer', 72], ['Bakeny', 72]], [['Total', 72], ['9.75', 72]]]))
+    createWorker.mockResolvedValue({ recognize })
+    const { extractReceipt } = await import('./ocr')
+    expect((await extractReceipt(new Blob(['receipt']))).merchant).toBe('Corner Bakery')
+    expect(recognize).toHaveBeenCalledTimes(2)
+  })
+
+  it('reads a confident page only once', async () => {
+    const recognize = vi.fn().mockResolvedValueOnce(read([[['Corner', 95], ['Bakery', 95]], [['Total', 96], ['9.75', 96]]]))
+    createWorker.mockResolvedValue({ recognize })
+    const { extractReceipt } = await import('./ocr')
+    await extractReceipt(new Blob(['receipt']))
+    expect(recognize).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('sureLetters', () => {
+  it('counts the letters and digits of words read with confidence 80 or more', async () => {
+    const { sureLetters } = await import('./ocr')
+    const words = (pairs: [string, number][]) => [{ text: '', words: pairs.map(([text, confidence]) => ({ text, confidence })) }]
+    expect(sureLetters(words([['Bakery', 90], ['9.75', 80], ['noise', 79]]))).toBe(9)
+  })
+})
+
+describe('readingConfidence', () => {
+  it('weighs each word by its letters and digits, and scores an empty page 0', async () => {
+    const { readingConfidence } = await import('./ocr')
+    const words = (pairs: [string, number][]) => [{ text: '', words: pairs.map(([text, confidence]) => ({ text, confidence })) }]
+    expect(readingConfidence(words([['Bakery', 90], ['|', 0]]))).toBe(90)
+    expect(readingConfidence(words([['ab', 90], ['abcdef', 50]]))).toBe(60)
+    expect(readingConfidence([])).toBe(0)
   })
 })

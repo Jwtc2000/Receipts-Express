@@ -261,7 +261,7 @@
   <header class="page-header">
     <p class="eyebrow">Receipts Express</p>
     <h1>Privacy Policy</h1>
-    <p class="dates">Effective 8 August 2026 · Last updated 23 November 2026 (revision 2)</p>
+    <p class="dates">Effective 8 August 2026 · Last updated 23 November 2026 (revision 3)</p>
     <p class="header-return"><a class="back-to-app" href="../">← Back to Receipts Express</a></p>
   </header>
 
@@ -426,9 +426,11 @@
         PDF receipts are opened by PDF.js, which turns each page into an image and reads the
         text the PDF carries, if any. A PDF with text of its own, such as an emailed invoice, is
         read from that text. Photos, and PDFs that are only pictures of pages, are read by
-        Tesseract.js. Before recognition the app may make an adjusted copy of a receipt image
-        (light text on a dark band is inverted so that it can be read); the copy exists only in
-        memory for that scan and is never saved. Both engines run inside your browser, and
+        Tesseract.js. To help recognition the app may make adjusted copies of a receipt image:
+        light text on a dark band is inverted, and when a page reads poorly, a copy with faint
+        or dotted print (such as a dot-matrix receipt's) thickened into solid strokes is read a
+        second time. These copies exist only in memory for that scan and are never saved. Both
+        engines run inside your browser, and
         both are served from this app's own address — the app does not load code from external
         CDNs, and your receipts are never uploaded to a cloud recognition service.
       </p>

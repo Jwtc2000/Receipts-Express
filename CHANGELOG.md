@@ -8,6 +8,28 @@ user-facing features, and `PATCH` for fixes with no visible feature change. The
 version lives in `package.json` and is shown in the app under Menu → About. Every
 merge to `main` that changes app behavior gets a version bump and a tag.
 
+## [1.20.0] - 2026-11-23
+
+### Changed
+- Dot-matrix receipts, and thermal print too faint to form solid strokes,
+  are read much better. When text recognition is unsure of a page (average
+  confidence under 70), the page is read a second time from a copy with the
+  dots joined into strokes, and that reading is used if it reads at least
+  half as much again with confidence. On 40 synthetic dot-matrix receipts in
+  Chrome, the merchant went from 5 right to 17, the date from 4 to 19 and the
+  total from 4 to 28. On 120 synthetic receipts with solid print nothing
+  changed, and on 14 real receipts the one printed in dots gained its total
+  and nothing else changed. A page read with confidence is not read twice;
+  the rest take one more recognition, about a second.
+- A line giving a chain's town and store number ("Millbrook | #4410"), a
+  city line whose state and ZIP OCR has mangled, and a street line whose
+  house number was trimmed off as noise are no longer taken for the
+  merchant.
+- The Privacy Policy describes the dot-joined copy alongside the dark-band
+  one: both exist only in memory for the scan. It and the Terms are dated
+  "23 November 2026 (revision 3)", and existing users are asked to accept
+  again once.
+
 ## [1.19.0] - 2026-11-23
 
 ### Changed
