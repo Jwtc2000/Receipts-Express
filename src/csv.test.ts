@@ -132,4 +132,9 @@ describe('buildExpenseCsv', () => {
     expect(csv).toContain('Plain Title')
     expect(csv).not.toContain('"Plain Title"')
   })
+  it('neutralises a cell that starts with a tab or carriage return', () => {
+    const csv = buildExpenseCsv([makeExpense({ title: '\t=1+1', notes: '\r=2+2' })])
+    expect(csv).toContain("'\t=1+1")
+    expect(csv).toContain("'\r=2+2")
+  })
 })

@@ -20,15 +20,43 @@ interface BestReceiptsDB extends DBSchema {
 
 let dbPromise: Promise<IDBPDatabase<BestReceiptsDB>> | null = null
 
+/**
+ * Fired when another tab is upgrading the database and needs this tab to let
+ * go of it. main.tsx can listen and ask the user to reload.
+ */
+export const DB_VERSION_CHANGE_EVENT = 'receipts-express:db-version-change'
+
 function getDB() {
   if (!dbPromise) {
-    dbPromise = openDB<BestReceiptsDB>('best-receipts', 1, {
-      upgrade(db) {
-        db.createObjectStore('reports', { keyPath: 'id' })
-        const expenses = db.createObjectStore('expenses', { keyPath: 'id' })
-        expenses.createIndex('by-report', 'reportId')
-        db.createObjectStore('images', { keyPath: 'id' })
+    const opening = openDB<BestReceiptsDB>('best-receipts', 1, {
+      // Written against oldVersion so that a version 2 adds its own step
+      // below this one instead of re-running it.
+      upgrade(db, oldVersion) {
+        if (oldVersion < 1) {
+          db.createObjectStore('reports', { keyPath: 'id' })
+          const expenses = db.createObjectStore('expenses', { keyPath: 'id' })
+          expenses.createIndex('by-report', 'reportId')
+          db.createObjectStore('images', { keyPath: 'id' })
+        }
       },
+      // Another tab wants to upgrade: close this connection so it is not
+      // blocked forever, forget it so the next call reopens, and say so.
+      blocking() {
+        void opening.then((db) => db.close())
+        dbPromise = null
+        window.dispatchEvent(new Event(DB_VERSION_CHANGE_EVENT))
+      },
+      // The browser closed the connection underneath the app. Without this
+      // the dead connection stayed cached and every later read and write
+      // failed until the page was reloaded.
+      terminated() {
+        dbPromise = null
+      },
+    })
+    // A failed open is not cached either: the next call tries again.
+    dbPromise = opening.catch((err) => {
+      dbPromise = null
+      throw err
     })
   }
   return dbPromise
@@ -170,8 +198,21 @@ export async function importBackupData(
 ): Promise<void> {
   const db = await getDB()
   const tx = db.transaction(['reports', 'expenses', 'images'], 'readwrite')
-  for (const image of images) void tx.objectStore('images').put(image)
+  const expenseStore = tx.objectStore('expenses')
+  const imageStore = tx.objectStore('images')
+  // An expense being overwritten may point at receipt pages the backup's
+  // version does not: the photo was replaced, removed or re-paged since the
+  // backup was taken. Nothing would reference those pages afterwards, and
+  // nothing in the app could ever delete them. Read each one inside this
+  // transaction and drop the pages only it pointed at.
+  const incoming = new Set(expenses.flatMap((e) => expenseImageIds(e)))
+  const existing = await Promise.all(expenses.map((e) => expenseStore.get(e.id)))
+  for (const old of existing) {
+    if (!old) continue
+    for (const id of expenseImageIds(old)) if (!incoming.has(id)) void imageStore.delete(id)
+  }
+  for (const image of images) void imageStore.put(image)
   for (const report of reports) void tx.objectStore('reports').put(report)
-  for (const expense of expenses) void tx.objectStore('expenses').put(expense)
+  for (const expense of expenses) void expenseStore.put(expense)
   await tx.done
 }

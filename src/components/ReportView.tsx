@@ -54,7 +54,15 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
   const [exchangeRateDrafts, setExchangeRateDrafts] = useState<Record<string, string>>({})
   const dragIndex = useRef<number | null>(null)
   const thumbsRef = useRef<Map<string, string>>(new Map())
-  const menuRef = useModal<HTMLElement>(menuOpen, () => setMenuOpen(false))
+  // Fields in the drawer save when they lose focus. Closing it with Escape,
+  // the backdrop or the close button used to remove the field without it
+  // ever losing focus, so the edit was dropped. Blur it first.
+  const closeMenu = () => {
+    const active = document.activeElement
+    if (active instanceof HTMLElement && menuRef.current?.contains(active)) active.blur()
+    setMenuOpen(false)
+  }
+  const menuRef = useModal<HTMLElement>(menuOpen, () => closeMenu())
   // modal: false — the export menu is a two-item popover hanging off its own
   // button, not a surface that covers the app. It keeps Escape and the focus
   // move; trapping Tab inside it and freezing the page scroll behind it were
@@ -197,7 +205,7 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
   }
 
   const removeExpense = async (expense: Expense) => {
-    if (!window.confirm(`Delete "${expense.title || 'this expense'}"?`)) return
+    if (!window.confirm(`Delete "${expense.title || 'this expense'}" and its receipt? This can't be undone.`)) return
     await deleteExpense(expense.id)
     await refresh()
   }
@@ -400,7 +408,7 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
       </header>
 
       {menuOpen && (
-        <div className="drawer-backdrop" onClick={() => setMenuOpen(false)}>
+        <div className="drawer-backdrop" onClick={closeMenu}>
           <aside
             ref={menuRef}
             className="drawer"
@@ -411,7 +419,7 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
           >
             <div className="drawer-header">
               <h2 id="report-menu-title">Report Menu</h2>
-              <button className="icon-btn" aria-label="Close menu" onClick={() => setMenuOpen(false)}>
+              <button className="icon-btn" aria-label="Close menu" onClick={closeMenu}>
                 <Icon name="close" />
               </button>
             </div>
@@ -503,11 +511,17 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
                     ? "Which project this report is charged to — it's printed on the PDF summary page."
                     : 'Save project numbers in the home screen menu to charge reports to different projects.'}
                 </p>
-                {profile.projects.length > 0 && (
+                {/* Also when the list is empty but this report still has a
+                    number, so it can be changed or cleared. */}
+                {(profile.projects.length > 0 || !!report.projectNumber) && (
                   <div className="field-grid">
                     <ProjectSelect
                       value={report.projectNumber ?? ''}
-                      projects={profile.projects}
+                      projects={
+                        report.projectNumber && !profile.projects.includes(report.projectNumber)
+                          ? [...profile.projects, report.projectNumber]
+                          : profile.projects
+                      }
                       defaultProject={profile.projectNumber}
                       onChange={(value) => void saveProjectNumber(value)}
                       label="Charge to"

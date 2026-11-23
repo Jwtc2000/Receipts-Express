@@ -6,7 +6,7 @@ import { blobToDataURL, imageDimensions } from './image'
 import { getProfile, profileSummaryLines } from './profile'
 import { dayColor, contrastText } from './colors'
 import { foodBalanceForDate, formatFoodBalance, formatPersonalTotal } from './mealAllowance'
-import { shareOrDownloadFile } from './share'
+import { safeFileName, shareOrDownloadFile } from './share'
 import { pdfSafeText } from './pdfText'
 
 const PAGE_W = 595.28 // A4 portrait, points
@@ -20,6 +20,19 @@ const MUTED_GRAY: [number, number, number] = [163, 163, 163]
 const PAYBACK_ORANGE: [number, number, number] = [180, 83, 9]
 const BUN: [number, number, number] = [217, 119, 6]
 const PATTY: [number, number, number] = [120, 53, 15]
+
+/**
+ * The first line of `text` that fits in `width` at the current font, with an
+ * ellipsis when the rest had to go. Long titles and report names used to run
+ * straight on into the amount or the page label beside them.
+ */
+function fitLine(doc: jsPDF, text: string, width: number): string {
+  const lines = doc.splitTextToSize(text, width) as string[]
+  if (lines.length <= 1) return lines[0] ?? ''
+  let first = lines[0]
+  while (first.length > 1 && doc.getTextWidth(`${first}…`) > width) first = first.slice(0, -1)
+  return `${first.trimEnd()}…`
+}
 
 /** A "no receipt" glyph — a crossed-out circle, drawn with jsPDF's vector
  * primitives rather than a raster asset so it stays crisp at any size. */
@@ -82,7 +95,7 @@ export async function exportReportPdf(report: Report, expenses: Expense[]): Prom
   doc.text('Expense Report', MARGIN, 52)
   doc.setFontSize(14)
   doc.setFont('helvetica', 'normal')
-  doc.text(report.name, MARGIN, 76)
+  doc.text(fitLine(doc, report.name, PAGE_W - 2 * MARGIN), MARGIN, 76)
   doc.setFontSize(10)
   doc.text(
     `Generated ${new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}  ·  ${expenses.length} expense${expenses.length === 1 ? '' : 's'}`,
@@ -270,12 +283,19 @@ export async function exportReportPdf(report: Report, expenses: Expense[]): Prom
       doc.setTextColor(...SLATE)
       doc.setFont('helvetica', 'bold')
       doc.setFontSize(11)
-      doc.text(expense.title || expense.merchant || 'Untitled expense', MARGIN, 25)
-      doc.setFont('helvetica', 'normal')
       const receiptLabel =
         totalPages > 1
           ? `Receipt ${index + 1} of ${expenses.length}  ·  page ${p + 1} of ${totalPages}`
           : `Receipt ${index + 1} of ${expenses.length}`
+      doc.setFont('helvetica', 'normal')
+      const labelWidth = doc.getTextWidth(receiptLabel)
+      doc.setFont('helvetica', 'bold')
+      doc.text(
+        fitLine(doc, expense.title || expense.merchant || 'Untitled expense', PAGE_W - 2 * MARGIN - labelWidth - 16),
+        MARGIN,
+        25,
+      )
+      doc.setFont('helvetica', 'normal')
       doc.text(receiptLabel, PAGE_W - MARGIN, 25, { align: 'right' })
 
       // Day banner, matching the summary table's day dividers
@@ -342,10 +362,16 @@ export async function exportReportPdf(report: Report, expenses: Expense[]): Prom
       doc.setTextColor(...TEAL)
       doc.setFont('helvetica', 'bold')
       doc.setFontSize(15)
-      doc.text(expense.title || expense.merchant || 'Untitled expense', MARGIN, dy)
+      const amountText = formatMoney(expense.amount, expense.currency)
+      const amountWidth = doc.getTextWidth(amountText)
+      doc.text(
+        fitLine(doc, expense.title || expense.merchant || 'Untitled expense', PAGE_W - 2 * MARGIN - amountWidth - 16),
+        MARGIN,
+        dy,
+      )
       doc.setTextColor(...SLATE)
       doc.setFontSize(15)
-      doc.text(formatMoney(expense.amount, expense.currency), PAGE_W - MARGIN, dy, { align: 'right' })
+      doc.text(amountText, PAGE_W - MARGIN, dy, { align: 'right' })
 
       dy += 22
       doc.setFont('helvetica', 'normal')
@@ -360,13 +386,18 @@ export async function exportReportPdf(report: Report, expenses: Expense[]): Prom
       if (expense.notes) {
         dy += 18
         doc.setTextColor(100, 116, 139)
-        const noteLines = doc.splitTextToSize(expense.notes, PAGE_W - 2 * MARGIN)
-        doc.text(noteLines.slice(0, 3), MARGIN, dy)
+        // As many lines as fit above the bottom margin, not a fixed three,
+        // and an ellipsis when some still had to be left off.
+        const noteLines = doc.splitTextToSize(expense.notes, PAGE_W - 2 * MARGIN) as string[]
+        const room = Math.max(1, Math.floor((PAGE_H - MARGIN - dy) / 12) + 1)
+        const shown = noteLines.slice(0, room)
+        if (noteLines.length > room) shown[room - 1] = `${shown[room - 1].trimEnd()}…`
+        doc.text(shown, MARGIN, dy)
       }
     }
   }
 
-  const safeName = report.name.replace(/[^\w-]+/g, '_') || 'expense_report'
+  const safeName = safeFileName(report.name, 'expense_report')
   // Go through the same hardened share/download path CSV export uses, rather
   // than jsPDF's own doc.save() — that call is fire-and-forget internally, so
   // a blocked/failed download wouldn't reject and this export would look like

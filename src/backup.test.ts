@@ -71,6 +71,55 @@ const TINY_PNG_BASE64 =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='
 
 describe('validateBackup', () => {
+  it('stores only the fields the app knows, dropping anything else in the file', async () => {
+    const { validateBackup } = await import('./backup')
+    const backup = validBackup()
+    ;(backup.reports[0] as unknown as Record<string, unknown>).extra = { deep: { deeper: 'x' } }
+    ;(backup.expenses[0] as unknown as Record<string, unknown>).junk = [1, 2, 3]
+    const plan = await validateBackup(asFile(backup))
+    expect(plan.reports[0]).not.toHaveProperty('extra')
+    expect(plan.expenses[0]).not.toHaveProperty('junk')
+  })
+
+  it.each([
+    ['a negative amount', { amount: -5 }],
+    ['a personal amount above the total', { personalAmount: 20 }],
+    ['a date that is not yyyy-mm-dd', { date: 'yesterday' }],
+  ])('rejects an expense with %s', async (_label, change) => {
+    const { validateBackup } = await import('./backup')
+    const backup = validBackup()
+    backup.expenses[0] = { ...backup.expenses[0], ...change }
+    await expect(validateBackup(asFile(backup))).rejects.toThrow(/expense #0 is malformed/)
+  })
+
+  it('rejects two expenses with the same id', async () => {
+    const { validateBackup } = await import('./backup')
+    const backup = validBackup()
+    backup.expenses.push({ ...backup.expenses[0] })
+    await expect(validateBackup(asFile(backup))).rejects.toThrow(/two expenses with the same id/)
+  })
+
+  it('rejects a backup from a newer version of the app, and says to update', async () => {
+    const { validateBackup } = await import('./backup')
+    const backup = { ...validBackup(), version: 2 }
+    await expect(validateBackup(asFile(backup))).rejects.toThrow(/newer version/)
+  })
+
+  it('rejects an exchange-rate key that is not a currency code', async () => {
+    const { validateBackup } = await import('./backup')
+    const backup = validBackup()
+    backup.reports[0] = { ...backup.reports[0], exchangeRates: { 'not a code': 1.1 } }
+    await expect(validateBackup(asFile(backup))).rejects.toThrow(/report #0 is malformed/)
+  })
+
+  it('counts receipt pages the expenses point at that the file does not carry', async () => {
+    const { validateBackup } = await import('./backup')
+    const backup = validBackup()
+    backup.expenses[0] = { ...backup.expenses[0], imageId: 'gone', extraImageIds: ['also-gone'] }
+    const plan = await validateBackup(asFile(backup))
+    expect(plan.counts.missingImages).toBe(2)
+  })
+
   it('accepts a well-formed backup', async () => {
     const { validateBackup } = await import('./backup')
     const { reports, expenses, images } = await validateBackup(asFile(validBackup()))
@@ -260,7 +309,7 @@ describe('validateBackup / commitBackup split', () => {
       asFile(validBackup({ images: [{ id: 'img1', dataUrl: `data:image/png;base64,${TINY_PNG_BASE64}` }] })),
     )
 
-    expect(plan.counts).toEqual({ reports: 1, expenses: 1, overwrites: 0 })
+    expect(plan.counts).toEqual({ reports: 1, expenses: 1, overwrites: 0, missingImages: 0 })
     expect(await db.getReport('r1')).toBeUndefined()
     expect(await db.getExpense('e1')).toBeUndefined()
     expect(await db.getImage('img1')).toBeUndefined()
@@ -369,7 +418,8 @@ describe('validateBackup record and text ceilings', () => {
     const bad = validBackup({
       reports: [{ id: 'r1', name: 'Trip', createdAt: 1, exchangeRates: { ['E'.repeat(2001)]: 1.08 } }],
     })
-    await expect(validateBackup(asFile(bad))).rejects.toThrow(/text longer than the 2000-character limit/)
+    // Refused either way: a key that long is not a currency code either.
+    await expect(validateBackup(asFile(bad))).rejects.toThrow(/text longer than the 2000-character limit|malformed/)
   })
 
   it('accepts a string of exactly 2000 characters', async () => {
@@ -437,11 +487,13 @@ describe('the profile in a backup', () => {
     await expect(validateBackup(asFile(bad))).rejects.toThrow(/profile is malformed/i)
   })
 
-  it('rejects a profile with more than 200 project numbers', async () => {
+  // The same limit the app itself keeps, so a restored list is never longer
+  // than one this app could have made.
+  it('rejects a profile with more than 50 project numbers', async () => {
     const { validateBackup } = await import('./backup')
-    const projects = Array.from({ length: 201 }, (_, i) => `PRJ-${i}`)
+    const projects = Array.from({ length: 51 }, (_, i) => `PRJ-${i}`)
     const bad = validBackup({ profile: makeProfile({ projects }) })
-    await expect(validateBackup(asFile(bad))).rejects.toThrow(/more than 200 project numbers/)
+    await expect(validateBackup(asFile(bad))).rejects.toThrow(/more than 50 project numbers/)
   })
 
   it('rejects a profile carrying a string over the 2000-character limit', async () => {
@@ -542,6 +594,24 @@ describe('importBackup', () => {
     expect(await db.getReport('r1')).toBeDefined()
     expect(await db.getExpense('e1')).toBeDefined()
     expect(await db.getImage('img1')).toBeDefined()
+  })
+
+  // The photo was replaced after the backup was taken. Restoring puts the
+  // old expense back; the new photo would then belong to nothing.
+  it('removes a receipt page that the restored expense no longer points at', async () => {
+    const db = await import('./db')
+    await db.importBackupData(
+      [{ id: 'r1', name: 'Trip', createdAt: 1 }],
+      [{ ...validBackup().expenses[0], imageId: 'newer-photo' }],
+      [{ id: 'newer-photo', blob: new Blob(['n']) }],
+    )
+    await db.importBackupData(
+      [{ id: 'r1', name: 'Trip', createdAt: 1 }],
+      [{ ...validBackup().expenses[0], imageId: 'older-photo' }],
+      [{ id: 'older-photo', blob: new Blob(['o']) }],
+    )
+    expect(await db.getImage('newer-photo')).toBeUndefined()
+    expect(await db.getImage('older-photo')).toBeDefined()
   })
 
   it('writes nothing at all when one record in the file is invalid', async () => {
