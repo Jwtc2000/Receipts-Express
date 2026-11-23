@@ -1,9 +1,10 @@
 import * as pdfjsLib from 'pdfjs-dist'
 import { compressImage } from './image'
+import { PDFJS_DIR } from './engineDirs'
 
 // Self-hosted, matching the Tesseract setup (see scripts/copy-pdfjs-assets.mjs)
 // so a PDF receipt can be rasterized fully offline, with no CDN calls.
-const ASSET_BASE = `${import.meta.env.BASE_URL}pdfjs`
+const ASSET_BASE = `${import.meta.env.BASE_URL}${PDFJS_DIR}`
 pdfjsLib.GlobalWorkerOptions.workerSrc = `${ASSET_BASE}/pdf.worker.min.mjs`
 
 const MAX_RENDER_DIM = 1800
