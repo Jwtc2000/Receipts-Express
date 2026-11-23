@@ -21,6 +21,12 @@ function getWorker(): Promise<Worker> {
       workerPath: `${ASSET_BASE}/worker.min.js`,
       corePath: ASSET_BASE,
       langPath: ASSET_BASE,
+      // tesseract.js keeps the unpacked model in IndexedDB under
+      // `${cachePath}/eng.traineddata`. With no cachePath that key was
+      // "./eng.traineddata" whatever the version, so a new model was never
+      // fetched once a device had any copy. The versioned directory makes
+      // each model its own entry; forgetOldModelCopies removes the old ones.
+      cachePath: TESSERACT_DIR,
       logger: (m) => {
         if (m.status === 'recognizing text' && progressCallback) {
           progressCallback(Math.round(m.progress * 100))
@@ -30,8 +36,47 @@ function getWorker(): Promise<Worker> {
       workerPromise = null
       throw err
     })
+    void workerPromise.then(() => forgetOldModelCopies(`${TESSERACT_DIR}/eng.traineddata`), () => {})
   }
   return workerPromise
+}
+
+/**
+ * Delete every cached English model except the one in use. tesseract.js
+ * stores them in the `keyval-store` database that its idb-keyval dependency
+ * creates; the old "./eng.traineddata" copy of the larger model is about
+ * 22 MB that nothing reads any more.
+ *
+ * Only done where the browser can list databases, so that checking never
+ * creates the database on a device that has none.
+ */
+export async function forgetOldModelCopies(currentKey: string): Promise<void> {
+  try {
+    if (typeof indexedDB === 'undefined' || typeof indexedDB.databases !== 'function') return
+    const dbs = await indexedDB.databases()
+    if (!dbs.some((d) => d.name === 'keyval-store')) return
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const req = indexedDB.open('keyval-store')
+      req.onsuccess = () => resolve(req.result)
+      req.onerror = () => reject(req.error)
+    })
+    try {
+      if (!db.objectStoreNames.contains('keyval')) return
+      const store = db.transaction('keyval', 'readwrite').objectStore('keyval')
+      const keys = await new Promise<IDBValidKey[]>((resolve, reject) => {
+        const req = store.getAllKeys()
+        req.onsuccess = () => resolve(req.result)
+        req.onerror = () => reject(req.error)
+      })
+      for (const key of keys) {
+        if (typeof key === 'string' && key.endsWith('eng.traineddata') && key !== currentKey) store.delete(key)
+      }
+    } finally {
+      db.close()
+    }
+  } catch {
+    // Housekeeping only; scanning works either way.
+  }
 }
 
 /**

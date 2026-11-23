@@ -57,6 +57,9 @@ describe('OCR engine assets are self-hosted', () => {
     expect(options.workerPath).toBe(`${base}/worker.min.js`)
     expect(options.corePath).toBe(base)
     expect(options.langPath).toBe(base)
+    // The cached copy is keyed by this, so a new model is a new entry rather
+    // than the old one silently reused (see src/ocrCache.test.ts).
+    expect(options.cachePath).toBe(TESSERACT_DIR)
   })
 })
 

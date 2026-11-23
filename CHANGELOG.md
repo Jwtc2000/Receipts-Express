@@ -8,6 +8,18 @@ user-facing features, and `PATCH` for fixes with no visible feature change. The
 version lives in `package.json` and is shown in the app under Menu → About. Every
 merge to `main` that changes app behavior gets a version bump and a tag.
 
+## [1.17.0] - 2026-11-23
+
+### Changed
+- The English text-recognition model is the integerised LSTM-only one:
+  2.9 MB to download instead of 10.9 MB, and about 5 MB stored on the device
+  instead of about 22 MB. The part removed is data for Tesseract's legacy
+  engine, which the app's engine cannot use; on 40 test receipts both models
+  read the same merchant, date and total.
+- The stored model's key now includes the engine version, so a future model
+  is fetched instead of the stored copy being reused, and old copies are
+  deleted after the first scan.
+
 ## [1.16.0] - 2026-11-23
 
 The rest of the project audit's findings, in five pull requests (#81 to #85).

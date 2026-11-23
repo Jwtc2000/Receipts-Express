@@ -1,6 +1,6 @@
 # Third-Party Notices — Receipts Express
 
-Receipts Express 1.16.0. Compiled 2026-11-23 from the packages installed in `node_modules/`
+Receipts Express 1.17.0. Compiled 2026-11-23 from the packages installed in `node_modules/`
 and from the build they produce.
 
 Receipts Express itself is licensed under the Apache License, Version 2.0, Copyright 2026
@@ -421,19 +421,21 @@ table row above is the only place it exists for this build.
 |---|---|---|---|
 | @tesseract.js-data/eng | 1.0.0 | Apache-2.0, on the terms `tesseract-ocr/tessdata` declares for its data. No copyright holder is named anywhere upstream — see below, and item 1 in §9. | https://github.com/naptha/tessdata |
 
-This is the single largest file the app serves — `tesseract/eng.traineddata.gz`, 10,923,060
-bytes. What the installed package actually says is very little:
+This is the single largest file the app serves — `tesseract/eng.traineddata.gz`, 2,952,873
+bytes (the package's `4.0.0_best_int` model; before 1.17.0 it was the 10,923,060-byte `4.0.0`
+model). What the installed package actually says is very little:
 
 - `package.json` declares `"license": "MIT"` and `"author": "Balearica <admin@scribeocr.com>"`.
 - The package holds five files: `README.md`, `package.json`, `index.js`, and one
   `eng.traineddata.gz` in each of two directories. Those two are **different models, not two
   copies of one.** `4.0.0/eng.traineddata.gz` is 10,923,060 bytes;
-  `4.0.0_best_int/eng.traineddata.gz` is 2,952,873 bytes; their MD5s differ. `index.js` sets
-  `langPath` to `4.0.0`, `scripts/copy-tesseract-assets.mjs` copies that one, and the shipped
-  `tesseract/eng.traineddata.gz` has the same MD5 as `4.0.0/`. **The `_best_int` model is not
-  distributed**, so whatever governs it is not this project's problem; the row above is about
-  the `4.0.0` model only. There is **no `LICENSE`, `COPYING` or `NOTICE`** anywhere in the
-  package.
+  `4.0.0_best_int/eng.traineddata.gz` is 2,952,873 bytes; their MD5s differ.
+  `scripts/copy-tesseract-assets.mjs` now copies `4.0.0_best_int`. Unpacked, its LSTM
+  dictionaries and version string are byte-identical to those inside `4.0.0`, and its LSTM
+  network has the same architecture; what `4.0.0` adds is data for Tesseract's legacy engine,
+  which the LSTM-only cores shipped here cannot use. On 40 synthetic receipts read through the
+  app's own parser, the two models gave identical results.
+- There is **no `LICENSE`, `COPYING` or `NOTICE`** anywhere in the package.
 - `README.md` says only "eng traineddata for tesseract.js" plus install and usage sections.
   It has no licence section and names no copyright holder.
 
@@ -441,22 +443,25 @@ So the npm `"MIT"` field is unbacked by any licence text and the package identif
 copyright holder. The upstream repositories were read to settle it (2026-11-22), and this is
 what they say.
 
-- **The file is the unmodified upstream model.** Decompressed, the shipped file is 23,466,654
-  bytes with git blob SHA-1 `f4744c201359d02ced6914c77f0de68ee9bbdd74`, which is the blob the
-  GitHub API reports for `eng.traineddata` in `tesseract-ocr/tessdata` at `main` and at its
-  `4.0.0` and `4.1.0` tags. `naptha/tessdata`'s README names that repository as the source of
-  its `4.0.0` directory.
-- **That repository declares Apache-2.0 for its data.** Its `README.md` reads `All data in the
-  repository are licensed under the` / `Apache-2.0 License, see file [LICENSE](LICENSE).`, and
-  its root `LICENSE` is the Apache-2.0 text. `naptha/tessdata`'s root `LICENSE` is Apache-2.0
+- **Where the shipped model comes from.** `naptha/tessdata`'s README describes
+  `4.0.0_best_int` as the "Integerized Version of \"Tessdata Best\"", whose source is
+  `tesseract-ocr/tessdata_best`. That repository's README reads `All data in the repository are
+  licensed under the` / `Apache-2.0 License, see file [LICENSE](LICENSE).`, and its root
+  `LICENSE` is the Apache-2.0 text (read 2026-11-22). The `4.0.0` model shipped before 1.17.0
+  was, decompressed, byte-identical to `eng.traineddata` in `tesseract-ocr/tessdata` (git blob
+  SHA-1 `f4744c201359d02ced6914c77f0de68ee9bbdd74`); the integerised file is derived by the
+  packager and has no byte-identical upstream counterpart to compare with.
+- **`tesseract-ocr/tessdata` declares Apache-2.0 for its data in the same words.** Its
+  `README.md` reads `All data in the repository are licensed under the` / `Apache-2.0 License,
+  see file [LICENSE](LICENSE).`, and its root `LICENSE` is the Apache-2.0 text. `naptha/tessdata`'s root `LICENSE` is Apache-2.0
   as well.
 - **The npm `"MIT"` is a template value.** `scripts/gen-pkg.js` in `naptha/tessdata` writes
   `"license": "MIT"` into every language package. No MIT text exists in the package or in
-  either repository, and the app ships none of the wrapper files that field could describe,
+  any of the three repositories, and the app ships none of the wrapper files that field could describe,
   only the `.gz`.
-- **No copyright holder is named.** The only copyright line in either licence file is the
-  unfilled appendix placeholder, neither repository has a `NOTICE` or `AUTHORS` file, and
-  `strings` over the decompressed model finds no copyright string.
+- **No copyright holder is named.** The only copyright line in any of the licence files is
+  the unfilled appendix placeholder, none of the repositories has a `NOTICE` or `AUTHORS`
+  file, and `strings` over either decompressed model finds no copyright string.
 
 On that reading the model is Apache-2.0 and the duty to supply the licence is already
 discharged by `LICENSE.txt`. Two things keep it on the list in §9. The declaration is the

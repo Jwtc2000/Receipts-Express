@@ -17,5 +17,8 @@ function version(pkg) {
 }
 
 export const PDFJS_DIR = `pdfjs/${version('pdfjs-dist')}`
-// Three packages land in one directory, and any of them can move alone.
-export const TESSERACT_DIR = `tesseract/${version('tesseract.js')}-${version('tesseract.js-core')}-${version('@tesseract.js-data/eng')}`
+// Three packages land in one directory, and any of them can move alone. The
+// "-int" names which of the data package's two English models is shipped
+// (see TESSERACT_MODEL), so changing model is a new URL as well.
+export const TESSERACT_MODEL = '4.0.0_best_int'
+export const TESSERACT_DIR = `tesseract/${version('tesseract.js')}-${version('tesseract.js-core')}-${version('@tesseract.js-data/eng')}-int`
