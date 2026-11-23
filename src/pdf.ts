@@ -1,6 +1,6 @@
 import type { jsPDF } from 'jspdf'
 import type { Report, Expense } from './types'
-import { formatMoney, formatTotal, formatDate, dayNumbersByDate, usdTotal } from './types'
+import { formatMoney, formatTotal, formatDate, dayLabel, dayNumbersByDate, usdTotal } from './types'
 import { getImage } from './db'
 import { blobToDataURL, imageDimensions } from './image'
 import { getProfile, profileSummaryLines } from './profile'
@@ -191,7 +191,7 @@ export async function exportReportPdf(report: Report, expenses: Expense[]): Prom
       doc.setTextColor(...contrastText(bg))
       doc.setFont('helvetica', 'bold')
       doc.setFontSize(9)
-      doc.text(`DAY ${dayNumber}`, cols.date, y)
+      doc.text(dayLabel(dayNumber).toUpperCase(), cols.date, y)
       doc.text(formatDate(e.date), cols.title, y)
       if (foodBalance) {
         doc.setFont('helvetica', 'normal')
@@ -317,7 +317,7 @@ export async function exportReportPdf(report: Report, expenses: Expense[]): Prom
         doc.setTextColor(...contrastText(bg))
         doc.setFont('helvetica', 'bold')
         doc.setFontSize(9)
-        doc.text(`DAY ${dayNumber}`, MARGIN, 40 + 14)
+        doc.text(dayLabel(dayNumber).toUpperCase(), MARGIN, 40 + 14)
         doc.setFont('helvetica', 'normal')
         doc.text(formatDate(expense.date), MARGIN + 55, 40 + 14)
         if (pageFoodBalance) {

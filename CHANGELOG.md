@@ -8,6 +8,25 @@ user-facing features, and `PATCH` for fixes with no visible feature change. The
 version lives in `package.json` and is shown in the app under Menu → About. Every
 merge to `main` that changes app behavior gets a version bump and a tag.
 
+## [1.18.0] - 2026-11-23
+
+### Changed
+- The travel icons drifting across the header are redrawn as outline icons
+  (plane, coffee, fuel pump, car, bed) in the same style as the app's
+  buttons. They are moved with transforms, which is cheaper on phones, and
+  fade in and out at the edges instead of being cut off.
+- Icon buttons are at least 44 px square, and show a hover background on
+  devices with a pointer.
+- Keyboard focus shows a visible ring on every control, white on the header
+  and the floating button.
+- The New Report and Add Expense buttons use a plus icon instead of a typed
+  "+".
+
+### Fixed
+- An expense dated before the trip's first day showed a negative day number
+  (for example "Day -254") in the report and the PDF. It now reads
+  "Pre-trip".
+
 ## [1.17.0] - 2026-11-23
 
 ### Changed
