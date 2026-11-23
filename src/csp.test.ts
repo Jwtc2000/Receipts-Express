@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { build } from 'vite'
+import { createHash } from 'node:crypto'
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -143,7 +144,8 @@ describe('production build', () => {
    * side legitimately moves.
    */
   it.each(DOC_PAGES)('injects a CSP into the copy of docs/%s', (page) => {
-    const csp = cspMeta(readFileSync(join(outDir, 'docs', page), 'utf-8'))
+    const html = readFileSync(join(outDir, 'docs', page), 'utf-8')
+    const csp = cspMeta(html)
     expect(csp, `docs/${page} shipped without a Content-Security-Policy`).not.toBeNull()
     const d = directives(csp!)
     expect(d['default-src']).toEqual(["'self'"])
@@ -152,10 +154,15 @@ describe('production build', () => {
     expect(d['base-uri']).toEqual(["'self'"])
     // Nothing the app needs and a page of text does not: no WebAssembly, no
     // workers, no plugin content, no frames, no blob: or data: images.
-    expect(d['script-src'][0]).toBe("'self'")
-    // Nothing after 'self' but hashes of the page's own inline scripts: no
-    // 'wasm-unsafe-eval', and no 'unsafe-eval' either, which also allows it.
-    for (const source of d['script-src'].slice(1)) expect(source).toMatch(/^'sha256-[A-Za-z0-9+/]+={0,2}'$/)
+    // Exactly 'self' plus one hash per inline script in the shipped page,
+    // computed here independently: no 'wasm-unsafe-eval', no 'unsafe-eval'
+    // (which also allows WebAssembly), and no hash missing, which would leave
+    // that page's script blocked.
+    const inline = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)].map(
+      ([, body]) => `'sha256-${createHash('sha256').update(body, 'utf-8').digest('base64')}'`,
+    )
+    if (page === 'pilot-deck.html') expect(inline.length).toBeGreaterThan(0)
+    expect(d['script-src']).toEqual(["'self'", ...inline])
     expect(d['worker-src']).toEqual(["'none'"])
     expect(d['img-src']).toEqual(["'self'"])
     expect(d['object-src']).toEqual(["'none'"])
