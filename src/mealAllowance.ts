@@ -30,14 +30,19 @@ export interface FoodBalance {
  */
 export function foodBalanceForDate(expenses: Expense[], date: string, allowance: number): FoodBalance {
   const mealExpenses = expenses.filter((e) => e.date === date && e.category === 'Meals')
-  const used = mealExpenses.reduce((sum, e) => sum + businessAmount(e), 0)
+  // Summed in whole cents. As floating-point, three meals adding up to
+  // exactly the allowance (5.02 + 29.60 + 15.38 against 50) came out a hair
+  // over it, and the day was flagged "$0.00 over".
+  const usedCents = mealExpenses.reduce((sum, e) => sum + Math.round(businessAmount(e) * 100), 0)
+  const used = usedCents / 100
   const currencies = new Set(mealExpenses.map((e) => e.currency.trim().toUpperCase() || 'USD'))
   const currency = mealExpenses[0]?.currency.trim().toUpperCase() || 'USD'
   if (currencies.size > 1) {
     return { used: 0, allowance, remaining: allowance, over: false, currency, mixed: true }
   }
-  const remaining = allowance - used
-  return { used, allowance, remaining, over: remaining < 0, currency, mixed: false }
+  const remainingCents = Math.round(allowance * 100) - usedCents
+  const remaining = remainingCents / 100
+  return { used, allowance, remaining, over: remainingCents < 0, currency, mixed: false }
 }
 
 /** "Food $45.00 used · $5.00 left" or, over budget, "Food $60.00 used · $10.00 over". */
