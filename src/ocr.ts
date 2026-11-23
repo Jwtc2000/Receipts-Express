@@ -1,4 +1,5 @@
 import { createWorker, type Worker } from 'tesseract.js'
+import { TESSERACT_DIR } from './engineDirs'
 
 export interface ExtractedReceipt {
   merchant?: string
@@ -9,7 +10,7 @@ export interface ExtractedReceipt {
 
 // The OCR engine is self-hosted (see scripts/copy-tesseract-assets.mjs),
 // so scanning works offline and never talks to a CDN.
-const ASSET_BASE = `${import.meta.env.BASE_URL}tesseract`
+const ASSET_BASE = `${import.meta.env.BASE_URL}${TESSERACT_DIR}`
 
 let workerPromise: Promise<Worker> | null = null
 let progressCallback: ((pct: number) => void) | null = null
@@ -52,10 +53,24 @@ export async function extractReceipt(
   }
 }
 
-const MONEY_RE = /(?:[$€£]\s*)?(\d{1,3}(?:[.,]\d{3})*[.,]\d{2})(?!\d)/g
+// An amount: either digits grouped in threes ("1,234.56", "1.234,56") or a
+// plain run of any length ("1234.56"), then a separator and two decimals.
+//
+// The integer part used to be capped at three digits with nothing anchoring
+// its left edge, so an amount of 1,000 or more printed without a thousands
+// separator matched from its second digit on: "1234.56" was read as 234.56
+// and "Total 1000.00" as 0. The leading group pins the match to the start of
+// the number. It is a consumed group, not a lookbehind, because a lookbehind
+// is a syntax error on older Safari and would take the whole module with it.
+//
+// The trailing check also refuses a match that runs on into more digits
+// after a separator, which is what a dotted date looks like: "18.07.2026"
+// is not 18.07.
+const MONEY_SOURCE = String.raw`(?:^|[^\d.,])((?:\d{1,3}(?:[.,]\d{3})+|\d+)[.,]\d{2})(?!\d|[.,]\d)`
+const MONEY_RE = new RegExp(MONEY_SOURCE, 'g')
 
 function hasMoney(line: string): boolean {
-  return /(?:[$€£]\s*)?(?:\d{1,3}(?:[.,]\d{3})*[.,]\d{2})(?!\d)/.test(line)
+  return new RegExp(MONEY_SOURCE).test(line)
 }
 
 function parseMoney(raw: string): number {

@@ -3,10 +3,14 @@
 // the app is fully self-hosted — no CDN calls at runtime.
 import fs from 'node:fs'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { TESSERACT_DIR, root } from './engine-dirs.mjs'
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const dest = path.join(root, 'public', 'tesseract')
+// The files go into a directory named for the installed package versions (see
+// scripts/engine-dirs.mjs for why). Everything already under public/tesseract
+// is removed first: a directory left over from a previous version would
+// otherwise be copied into the build and served, 60 MB at a time.
+const dest = path.join(root, 'public', TESSERACT_DIR)
+fs.rmSync(path.join(root, 'public', 'tesseract'), { recursive: true, force: true })
 fs.mkdirSync(dest, { recursive: true })
 
 const copies = [
@@ -59,4 +63,4 @@ for (const file of cores) {
 for (const [from, to] of copies) {
   fs.copyFileSync(path.join(root, from), path.join(dest, to))
 }
-console.log(`Copied ${copies.length} Tesseract assets to public/tesseract/`)
+console.log(`Copied ${copies.length} Tesseract assets to public/${TESSERACT_DIR}/`)
