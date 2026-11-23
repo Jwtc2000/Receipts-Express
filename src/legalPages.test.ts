@@ -473,11 +473,15 @@ describe('legal pages', () => {
         'January', 'February', 'March', 'April', 'May', 'June',
         'July', 'August', 'September', 'October', 'November', 'December',
       ]
-      const [year, month, day] = TERMS_VERSION.split('-').map(Number)
-      expect(months[month - 1], `TERMS_VERSION is not an ISO date: ${TERMS_VERSION}`).toBeDefined()
-      const written = `${day} ${months[month - 1]} ${year}`
+      // An ISO date, then ".N" for the Nth revision published that day.
+      const parts = TERMS_VERSION.match(/^(\d{4})-(\d{2})-(\d{2})(?:\.(\d+))?$/)
+      expect(parts, `TERMS_VERSION is not an ISO date: ${TERMS_VERSION}`).not.toBeNull()
+      const [, year, month, day, revision] = parts!
+      expect(months[Number(month) - 1], `TERMS_VERSION is not an ISO date: ${TERMS_VERSION}`).toBeDefined()
+      const written = `${Number(day)} ${months[Number(month) - 1]} ${year}${revision ? ` (revision ${revision})` : ''}`
 
-      expect(readProse(page)).toContain(`Last updated ${written}`)
+      // Not followed by a revision the version does not have.
+      expect(readProse(page)).toMatch(new RegExp(`Last updated ${written.replace(/[()]/g, '\\$&')}(?! \\(revision)`))
     },
   )
 })

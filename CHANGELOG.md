@@ -8,6 +8,43 @@ user-facing features, and `PATCH` for fixes with no visible feature change. The
 version lives in `package.json` and is shown in the app under Menu → About. Every
 merge to `main` that changes app behavior gets a version bump and a tag.
 
+## [1.19.0] - 2026-11-23
+
+### Changed
+- A PDF that carries its own text, such as an emailed or downloaded invoice,
+  is read from that text instead of by text recognition of a picture of its
+  first page. The merchant, date and total come out exactly as printed, from
+  every page rather than only the first, in a fraction of a second, and
+  without first downloading the recognition model. The banner says "Details
+  read from the PDF" when this happens.
+- A scanned PDF, which is only pictures of pages, and a PDF whose text looks
+  broken (fonts with no Unicode map) are still read with text recognition.
+  Text recognition now goes on to the next page of a scanned PDF while it
+  has not found a total, up to five pages, instead of reading only page 1.
+- The merchant is picked with more care. A line the recognition engine is
+  unsure of (a photo's table or background read as letters) is passed over,
+  and so are addresses, phone numbers, dates, till fields ("Server:",
+  "Check #6") and lines such as "Receipt" or "Order Summary". A name given as
+  "receipt for ...", "Thank you for choosing ..." or an email's sender is
+  used when there is one, and a footer name above the street address when
+  the header has none. When no line looks like a name the field is left
+  empty instead of filled with the wrong text. On 14 real receipts the
+  merchant went from 1 right to 10 right; of the other four, one had a
+  letter misread and three were left empty, their name being only a logo or
+  not printed at all. On 120 synthetic receipts nothing changed.
+- The date is the earliest one on the receipt, so a hotel folio or rental
+  invoice gives the arrival or pickup day rather than the day it was
+  printed. A date written "Mar14,2026" or "Mar 2nd, 2026" is read.
+- Light text on a dark band, such as the date in a coffee app's receipt
+  header, is inverted before recognition so it is read; a dark-mode
+  screenshot, which the engine already handles, is left as it is.
+- The Privacy Policy says that a PDF's own text is read, that the inverted
+  copy of an image exists only in memory, and that the full text of a
+  receipt is discarded however it was read. The Terms say that reading a
+  PDF's text can also pick the wrong figure. Both are dated "23 November
+  2026 (revision 2)", and existing users are asked to accept again once;
+  `TERMS_VERSION` takes a ".N" suffix for a second change on the same day.
+
 ## [1.18.0] - 2026-11-23
 
 ### Changed

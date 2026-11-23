@@ -67,6 +67,48 @@ const MAX_RENDER_DIM = 1800
 // every page in an unbroken, uncancellable sequence with no feedback.
 const MAX_PAGES = 25
 
+/** A text item as PDF.js's getTextContent gives it; marked-content entries have no `str`. */
+interface TextPiece {
+  str: string
+  transform: number[]
+  height?: number
+}
+
+/**
+ * Put a page's text items back into lines. PDF.js gives runs of text in
+ * drawing order, which for most invoices is near reading order but not on the
+ * same line: a label and its amount are often separate runs. Runs whose
+ * baselines are within half a glyph height share a line, and a line reads
+ * left to right; lines read top to bottom (PDF y grows upwards).
+ */
+export function textItemsToLines(items: readonly unknown[]): string {
+  const rows: { y: number; parts: { x: number; s: string }[] }[] = []
+  for (const item of items) {
+    if (!item || typeof item !== 'object' || !('str' in item) || !('transform' in item)) continue
+    const { str, transform, height } = item as TextPiece
+    if (!str.trim()) continue
+    const x = transform[4]
+    const y = transform[5]
+    const h = Math.abs(transform[3]) || height || 10
+    let row = rows.find((r) => Math.abs(r.y - y) < h * 0.5)
+    if (!row) rows.push((row = { y, parts: [] }))
+    row.parts.push({ x, s: str.trim() })
+  }
+  rows.sort((a, b) => b.y - a.y)
+  return rows.map((r) => r.parts.sort((a, b) => a.x - b.x).map((p) => p.s).join(' ')).join('\n')
+}
+
+export interface PdfReceipt {
+  /** One JPEG per page, for storage, display and export. */
+  pages: Blob[]
+  /**
+   * The text the PDF itself carries, every page in order, as lines. Empty for
+   * a scanned PDF, which is only pictures of pages. Not checked: a PDF whose
+   * fonts lack a Unicode map gives text that is not what is shown.
+   */
+  text: string
+}
+
 /**
  * Rasterize every page of a PDF receipt into compressed JPEG blobs, one per
  * page — a single-page invoice and a multi-page itemized receipt both fall
@@ -74,6 +116,15 @@ const MAX_PAGES = 25
  * OCR and export code as a photographed receipt.
  */
 export async function renderPdfPages(file: Blob): Promise<Blob[]> {
+  return (await readPdfReceipt(file)).pages
+}
+
+/**
+ * renderPdfPages, plus the text layer of each page, read while the page is
+ * open anyway. An emailed or downloaded invoice usually has one, and its text
+ * is exact where OCR of the rendered page is a guess.
+ */
+export async function readPdfReceipt(file: Blob): Promise<PdfReceipt> {
   const data = await file.arrayBuffer()
   await ensureWorker()
   const loadingTask = pdfjsLib.getDocument({
@@ -100,6 +151,7 @@ export async function renderPdfPages(file: Blob): Promise<Blob[]> {
       throw err
     }
     const pages: Blob[] = []
+    const texts: string[] = []
     for (let i = 1; i <= pdf.numPages; i++) {
       const page = await pdf.getPage(i)
       const viewport = page.getViewport({ scale: 1 })
@@ -115,9 +167,15 @@ export async function renderPdfPages(file: Blob): Promise<Blob[]> {
       // compressImage applies to photos, so running it through that as well
       // only decoded and re-encoded every page a second time.
       pages.push(await encodeJpeg(canvas, 0.85))
+      try {
+        texts.push(textItemsToLines((await page.getTextContent()).items))
+      } catch {
+        // No text is the same as a scanned page: OCR reads the picture.
+        texts.push('')
+      }
       page.cleanup()
     }
-    return pages
+    return { pages, text: texts.filter(Boolean).join('\n') }
   } finally {
     // Awaited: the worker is shared between imports, and PDF.js refuses to
     // reuse it while a previous document on it is still being torn down.

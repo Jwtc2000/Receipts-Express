@@ -4,7 +4,7 @@ import { CATEGORIES, newId, todayIso } from '../types'
 import { getExpense, saveExpenseWithImage, getImage, nextPosition } from '../db'
 import { compressImage } from '../image'
 import { isPdfFile } from '../pdfDetect'
-import { extractReceipt } from '../ocr'
+import { extractReceipt, receiptFromText } from '../ocr'
 import { setHasUnsavedWork, isDiscardConfirmed, noteEdit } from '../unsavedWork'
 import Icon from './icons'
 import { HeaderPlanes } from './decorative'
@@ -103,6 +103,8 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
   const [imageChanged, setImageChanged] = useState(false)
   const [scanState, setScanState] = useState<'idle' | 'scanning' | 'done' | 'failed'>('idle')
   const [scanPct, setScanPct] = useState(0)
+  // Whether the last details came from the PDF's own text rather than OCR.
+  const [readFromText, setReadFromText] = useState(false)
   // True while a picked file is being rendered/compressed, before OCR even
   // starts — the only feedback during that stretch otherwise was none at
   // all, which is also the window a second, faster pick could race into.
@@ -274,17 +276,18 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
     // the rejection was swallowed by the `void onImagePicked(...)` caller
     // and the freshly picked receipt vanished with no message.
     let pages: Blob[]
+    let pdfText = ''
     try {
       if (isPdfFile(file)) {
         // Loaded on demand so the PDF.js engine — sizeable — never ships to
         // someone who only ever attaches photos.
-        let renderPdfPages: (typeof import('../pdfReceipt'))['renderPdfPages']
+        let readPdfReceipt: (typeof import('../pdfReceipt'))['readPdfReceipt']
         try {
-          ;({ renderPdfPages } = await import('../pdfReceipt'))
+          ;({ readPdfReceipt } = await import('../pdfReceipt'))
         } catch {
           throw new PdfReaderUnavailable()
         }
-        pages = await renderPdfPages(file)
+        ;({ pages, text: pdfText } = await readPdfReceipt(file))
       } else {
         pages = [await compressImage(file)]
       }
@@ -316,12 +319,16 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
     // even though OCR (below) is still running in the background.
     setPicking(false)
 
-    // Auto-extract details with on-device OCR, from the receipt's first page
+    // Auto-extract details: from a PDF's own text when it has usable text,
+    // which is exact and covers every page; otherwise with on-device OCR,
+    // which reads further pages of a scanned PDF only until it finds a total.
     const scan = ++scanGenRef.current
+    const fromText = pdfText ? receiptFromText(pdfText) : null
+    setReadFromText(!!fromText)
     setScanState('scanning')
     setScanPct(0)
     try {
-      const extracted = await extractReceipt(firstPage, setScanPct)
+      const extracted = fromText ?? (await extractReceipt(pages, setScanPct))
       if (scan !== scanGenRef.current) return
       // OCR is a guess. It fills a field only when the user has not typed in
       // it, and, when an existing expense is being edited, only when that
@@ -632,7 +639,7 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
         )}
         {scanState === 'done' && (
           <div className="scan-banner success" role="status">
-            Details extracted — review and adjust below
+            {readFromText ? 'Details read from the PDF' : 'Details extracted'} — review and adjust below
           </div>
         )}
         {scanState === 'failed' && (

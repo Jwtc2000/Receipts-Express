@@ -48,7 +48,7 @@ Free receipt-scanner apps are commonly ad-supported, and commonly do their scann
 
 ## Features
 
-* <img src="./assets/camera.svg" width="18" height="18" align="center" /> **Scan receipts with your camera, or upload a photo or PDF** — single-page and multi-page PDF receipts are both supported, rasterized on-device page by page. On-device text recognition (Tesseract.js OCR) automatically extracts the merchant, date, and total — you just review and adjust.
+* <img src="./assets/camera.svg" width="18" height="18" align="center" /> **Scan receipts with your camera, or upload a photo or PDF** — single-page and multi-page PDF receipts are both supported, rasterized on-device page by page. The merchant, date, and total are filled in automatically — you just review and adjust. A PDF that carries its own text (an emailed or downloaded invoice) is read from that text, exactly and in a fraction of a second; a photo or a scanned PDF is read with on-device text recognition (Tesseract.js OCR).
 * <img src="./assets/reports.svg" width="18" height="18" align="center" /> **Multiple expense reports**, each with its own timeline of expenses.
 * <img src="./assets/reorder.svg" width="18" height="18" align="center" /> **Reorganize freely** — drag expenses to reorder them on the timeline (or use the arrow buttons on mobile), and move expenses between reports.
 * <img src="./assets/pdf.svg" width="18" height="18" align="center" /> **One-tap PDF export** — a summary page listing every expense with the grand total, followed by a full page for each receipt image (one page per page, for multi-page PDF receipts), with the expense's title and details shown once, beneath the last page.
@@ -112,7 +112,7 @@ Branch protection on `main` requires **both** systems to report success before a
 | --- | --- | --- |
 | **User Interface (UI)** | React 19 + TypeScript + Vite | **React** handles rendering the screens and components; **TypeScript** is a programming language that catches bugs early by checking code types; **Vite** is a packager (build tool) that compiles files for the web. |
 | **Receipt OCR** | Tesseract.js (runs fully in-browser) | An offline engine that runs in-browser to transcribe text out of pictures using **WebAssembly (WASM)**, which lets native binary code run fast in the browser. |
-| **PDF Receipt Rasterization** | PDF.js (runs fully in-browser) | Converts an uploaded PDF receipt into one image per page on-device, so it flows through the same OCR/storage/export path as a photographed receipt. |
+| **PDF Receipt Rasterization** | PDF.js (runs fully in-browser) | Converts an uploaded PDF receipt into one image per page on-device, so it flows through the same storage/export path as a photographed receipt, and reads the PDF's own text where it has some, so OCR is only needed for scanned PDFs. |
 | **Storage** | IndexedDB via `idb` | A local database inside your browser that holds reports, expenses, and receipt images. The browser keeps it sandboxed away from other sites; the app writes it unencrypted, so what guards it is the device's own lock screen and disk encryption. |
 | **PDF Export** | jsPDF | A library that packages receipt details and images into a PDF file entirely on your machine. |
 | **Offline Support** | `vite-plugin-pwa` service worker + manifest | Technology that allows the app to be installed onto your home screen and run offline without an internet connection (**Progressive Web App**). |

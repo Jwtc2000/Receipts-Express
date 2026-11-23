@@ -6,17 +6,23 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 // native `canvas` package. Mocking pdfjs-dist at the module boundary keeps
 // this test focused on renderPdfPages' own loop/cap logic — the off-by-one
 // risk the audit flagged — without needing real rasterization.
-function makePage(width = 100, height = 100) {
+// A text run as PDF.js gives it: the last two numbers of `transform` are x and y.
+function run(str: string, x: number, y: number, size = 10) {
+  return { str, transform: [size, 0, 0, size, x, y], height: size }
+}
+
+function makePage(width = 100, height = 100, getTextContent = vi.fn(() => Promise.resolve({ items: [] as unknown[] }))) {
   return {
     getViewport: vi.fn(({ scale }: { scale: number }) => ({ width: width * scale, height: height * scale })),
     render: vi.fn(() => ({ promise: Promise.resolve() })),
+    getTextContent,
     cleanup: vi.fn(),
   }
 }
 
-function makeLoadingTask(numPages: number) {
+function makeLoadingTask(numPages: number, pageFor: (n: number) => ReturnType<typeof makePage> = () => makePage()) {
   const destroy = vi.fn()
-  const getPage = vi.fn(() => Promise.resolve(makePage()))
+  const getPage = vi.fn((n: number) => Promise.resolve(pageFor(n)))
   return {
     promise: Promise.resolve({ numPages, getPage }),
     destroy,
@@ -103,6 +109,43 @@ describe('renderPdfPages', () => {
     ;(getDocument as ReturnType<typeof vi.fn>).mockReturnValue(failTask)
     await expect(renderPdfPages(new Blob(['pdf-bytes']))).rejects.toThrow()
     expect(failTask.destroy).toHaveBeenCalledOnce()
+  })
+})
+
+describe('readPdfReceipt', () => {
+  it('returns the text of every page, in page order, with the pages', async () => {
+    const { getDocument } = await import('pdfjs-dist')
+    const texts: Record<number, unknown[]> = {
+      1: [run('Hotel Marigold', 10, 700)],
+      2: [run('Total', 10, 100), run('$312.40', 200, 100)],
+    }
+    const task = makeLoadingTask(2, (n) => makePage(100, 100, vi.fn(() => Promise.resolve({ items: texts[n] }))))
+    ;(getDocument as ReturnType<typeof vi.fn>).mockReturnValue(task)
+
+    const { readPdfReceipt } = await import('./pdfReceipt')
+    const { pages, text } = await readPdfReceipt(new Blob(['pdf-bytes']))
+    expect(pages).toHaveLength(2)
+    expect(text).toBe('Hotel Marigold\nTotal $312.40')
+  })
+
+  it('treats a page whose text cannot be read as a scanned page', async () => {
+    const { getDocument } = await import('pdfjs-dist')
+    const task = makeLoadingTask(1, () => makePage(100, 100, vi.fn(() => Promise.reject(new Error('bad font')))))
+    ;(getDocument as ReturnType<typeof vi.fn>).mockReturnValue(task)
+
+    const { readPdfReceipt } = await import('./pdfReceipt')
+    const { pages, text } = await readPdfReceipt(new Blob(['pdf-bytes']))
+    expect(pages).toHaveLength(1)
+    expect(text).toBe('')
+  })
+})
+
+describe('textItemsToLines', () => {
+  it('joins runs on one baseline left to right, and reads lines top down', async () => {
+    const { textItemsToLines } = await import('./pdfReceipt')
+    // Drawn out of order, as PDFs often are: the amount before its label.
+    const items = [run('9.75', 300, 100), run('Total', 20, 101), run('Corner Bakery', 20, 500), { type: 'beginMarkedContent' }, run(' ', 0, 0)]
+    expect(textItemsToLines(items)).toBe('Corner Bakery\nTotal 9.75')
   })
 })
 

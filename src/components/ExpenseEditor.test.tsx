@@ -16,7 +16,10 @@ const { getExpense, saveExpenseWithImage, getImage, nextPosition } = vi.hoisted(
   nextPosition: vi.fn().mockResolvedValue(0),
 }))
 vi.mock('../db', () => ({ getExpense, saveExpenseWithImage, getImage, nextPosition }))
-vi.mock('../ocr', () => ({ extractReceipt: vi.fn().mockResolvedValue({}) }))
+vi.mock('../ocr', () => ({ extractReceipt: vi.fn().mockResolvedValue({}), receiptFromText: vi.fn(() => null) }))
+vi.mock('../pdfReceipt', () => ({
+  readPdfReceipt: vi.fn(() => Promise.resolve({ pages: [new Blob(['page'])], text: '' })),
+}))
 vi.mock('../image', () => ({ compressImage: vi.fn(() => Promise.resolve(new Blob(['compressed']))) }))
 
 const { default: ExpenseEditor } = await import('./ExpenseEditor')
@@ -191,6 +194,37 @@ describe('ExpenseEditor and a scan that finishes late', () => {
 
     expect(screen.getByLabelText('Amount')).toHaveValue(12.5)
     expect(screen.getByPlaceholderText("e.g. Joe's Diner")).toHaveValue('Cafe')
+  })
+})
+
+describe('ExpenseEditor PDF text', () => {
+  it("fills the fields from a PDF's own text and does not run OCR", async () => {
+    const { extractReceipt, receiptFromText } = await import('../ocr')
+    const { readPdfReceipt } = await import('../pdfReceipt')
+    vi.mocked(extractReceipt).mockClear()
+    vi.mocked(readPdfReceipt).mockResolvedValueOnce({ pages: [new Blob(['page'])], text: 'Acme Car Rental ... Total 162.00' })
+    vi.mocked(receiptFromText).mockReturnValueOnce({ merchant: 'Acme Car Rental', total: 162, date: '2026-03-05', rawText: '' })
+    const user = userEvent.setup()
+    const { container } = render(<ExpenseEditor reportId="report-1" onDone={vi.fn()} />)
+
+    await user.upload(pickFileInput(container), new File(['%PDF'], 'invoice.pdf', { type: 'application/pdf' }))
+    await screen.findByText(/Details read from the PDF/)
+
+    expect(receiptFromText).toHaveBeenCalledWith('Acme Car Rental ... Total 162.00')
+    expect(extractReceipt).not.toHaveBeenCalled()
+    expect(screen.getByLabelText('Amount')).toHaveValue(162)
+    expect(screen.getByPlaceholderText("e.g. Joe's Diner")).toHaveValue('Acme Car Rental')
+  })
+
+  it('scans the first page when the PDF has no usable text', async () => {
+    const { extractReceipt } = await import('../ocr')
+    vi.mocked(extractReceipt).mockClear()
+    const user = userEvent.setup()
+    const { container } = render(<ExpenseEditor reportId="report-1" onDone={vi.fn()} />)
+
+    await user.upload(pickFileInput(container), new File(['%PDF'], 'scan.pdf', { type: 'application/pdf' }))
+    await screen.findByText(/Details extracted/)
+    expect(extractReceipt).toHaveBeenCalledOnce()
   })
 })
 
