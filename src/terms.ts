@@ -12,7 +12,7 @@ const ACCEPTED_KEY = 'br.termsAccepted'
 // ".2", ".3" ..., shown on the pages as "(revision 2)": the day cannot move,
 // and a version that stayed the same would never re-prompt the people who
 // accepted that morning's text.
-export const TERMS_VERSION = '2026-11-23.3'
+export const TERMS_VERSION = '2026-11-23.4'
 
 interface Acceptance {
   version: string

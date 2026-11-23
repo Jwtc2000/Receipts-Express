@@ -180,6 +180,32 @@ describe('production build', () => {
     expect(sw).toContain('docs-pages')
   })
 
+  // The first-run gate links to the Terms and the privacy pages and records
+  // acceptance of TERMS_VERSION. Served stale-while-revalidate, a returning
+  // user saw the copy stored before an amendment while agreeing to the new
+  // version. They must come from the network when there is one, and their
+  // route must come before the general docs/ one, which would match first.
+  it('serves the legal pages from the network first, ahead of the other docs/ pages', () => {
+    const sw = readFileSync(join(outDir, 'sw.js'), 'utf-8')
+    // The pattern the generated worker registers with NetworkFirst, as a
+    // regular expression literal, and where it sits among the routes.
+    const found = sw.match(/registerRoute\((\/(?:\\.|[^/\n])+\/[a-z]*),new [\w.]*NetworkFirst\(\{cacheName:"([\w-]+)"/)
+    expect(found, 'no NetworkFirst route in sw.js').not.toBeNull()
+    const [whole, literal, cacheName] = found!
+    const pattern = new RegExp(literal.slice(1, literal.lastIndexOf('/')), literal.slice(literal.lastIndexOf('/') + 1))
+    // Workbox tests a RegExp route against the request's full URL.
+    const site = 'https://example.github.io/Receipts-Express/docs/'
+    for (const page of ['terms.html', 'privacy.html', 'consumer-health-data.html', 'privacy.html?v=2', 'terms.html#section-3']) {
+      expect(pattern.test(site + page), page).toBe(true)
+    }
+    for (const page of ['pilot-deck.html', 'privacy.html.bak', 'terms.htm']) expect(pattern.test(site + page), page).toBe(false)
+    // Before the general docs/ route, which would otherwise match first,
+    // and in the cache that route used, so copies stored by earlier
+    // versions are still the ones read offline.
+    expect(sw.indexOf(whole)).toBeLessThan(sw.indexOf('registerRoute(/\\/docs\\//'))
+    expect(cacheName).toBe('docs-pages')
+  })
+
   // With the worker installed, a navigation to one of the shipped licence
   // files was answered with the app shell. They must be left to the network.
   it('does not answer a navigation to the licence and notice files with the app', () => {

@@ -221,3 +221,201 @@ export async function joinDots(image: Blob): Promise<Blob | null> {
     return null
   }
 }
+
+/*
+ * A photo of a receipt that reads poorly is often a little crooked, printed
+ * small, or grainy. Straightening it, enlarging it until a line of text is
+ * about LINE_HEIGHT pixels tall, and a 3x3 median filter to take out the
+ * grain make it read better. On a photo that already reads well it does
+ * harm, so like joinDots it is only used for a second reading of an unsure
+ * page; see extractReceipt in ocr.ts.
+ */
+
+// The text-line height, in pixels, the engine reads best at.
+const LINE_HEIGHT = 30
+// Never enlarged more than this, nor past MAX_PIXELS: an enlarged photo
+// costs memory and recognition time on a phone.
+const MAX_SCALE = 4
+const MAX_PIXELS = 6_000_000
+// The tilt searched for, either way, in degrees.
+const MAX_TILT = 6
+
+/** Otsu's threshold: the grey level that best splits ink from paper. Ink is at or below it. */
+export function inkThreshold(gray: Uint8ClampedArray): number {
+  const hist = new Float64Array(256)
+  for (const v of gray) hist[v]++
+  let sum = 0
+  for (let i = 0; i < 256; i++) sum += i * hist[i]
+  let sumBelow = 0
+  let below = 0
+  let best = -1
+  let threshold = 128
+  for (let i = 0; i < 256; i++) {
+    below += hist[i]
+    if (!below) continue
+    const above = gray.length - below
+    if (!above) break
+    sumBelow += i * hist[i]
+    const between = below * above * (sumBelow / below - (sum - sumBelow) / above) ** 2
+    if (between > best) {
+      best = between
+      threshold = i
+    }
+  }
+  return threshold
+}
+
+/**
+ * The text's tilt in degrees: the angle at which the ink, projected onto
+ * rows, makes the sharpest-edged rows, as straight lines of text do. Searched
+ * in 0.2-degree steps up to MAX_TILT either way. cleanUp rotates by its
+ * negative.
+ */
+export function tiltOf(gray: Uint8ClampedArray, width: number, height: number): number {
+  const t = inkThreshold(gray)
+  const xs: number[] = []
+  const ys: number[] = []
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (gray[y * width + x] <= t) {
+        xs.push(x)
+        ys.push(y)
+      }
+    }
+  }
+  let best = -1
+  let bestAngle = 0
+  const rows = new Float64Array(height * 2 + width)
+  for (let a = -MAX_TILT; a <= MAX_TILT + 1e-9; a += 0.2) {
+    const r = (a * Math.PI) / 180
+    const sin = Math.sin(r)
+    const cos = Math.cos(r)
+    rows.fill(0)
+    for (let i = 0; i < xs.length; i++) rows[Math.round(ys[i] * cos - xs[i] * sin + width)]++
+    let sharpness = 0
+    for (let i = 1; i < rows.length; i++) sharpness += (rows[i] - rows[i - 1]) ** 2
+    if (sharpness > best) {
+      best = sharpness
+      bestAngle = a
+    }
+  }
+  return Math.round(bestAngle * 10) / 10
+}
+
+/** The median height of runs of rows with ink in them: a text line's height. 0 when there are too few lines to tell. */
+export function lineHeightOf(gray: Uint8ClampedArray, width: number, height: number): number {
+  const t = inkThreshold(gray)
+  const runs: number[] = []
+  let start = -1
+  for (let y = 0; y <= height; y++) {
+    let ink = 0
+    if (y < height) for (let x = 0; x < width; x++) if (gray[y * width + x] <= t) ink++
+    const inked = y < height && ink > Math.max(2, width * 0.002)
+    if (inked && start < 0) start = y
+    if (!inked && start >= 0) {
+      if (y - start >= 4) runs.push(y - start)
+      start = -1
+    }
+  }
+  if (runs.length < 3) return 0
+  runs.sort((a, b) => a - b)
+  return runs[runs.length >> 1]
+}
+
+/** Each pixel takes the median of the 3x3 block around it: grain goes, strokes stay. */
+export function median3(gray: Uint8ClampedArray, width: number, height: number): Uint8ClampedArray {
+  const out = new Uint8ClampedArray(gray)
+  const block = new Uint8Array(9)
+  for (let y = 1; y < height - 1; y++) {
+    for (let x = 1; x < width - 1; x++) {
+      let k = 0
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) block[k++] = gray[(y + dy) * width + x + dx]
+      block.sort()
+      out[y * width + x] = block[4]
+    }
+  }
+  return out
+}
+
+/** How much to enlarge an image whose text lines are `lineHeight` tall: 1 to MAX_SCALE, within MAX_PIXELS. */
+export function enlargement(lineHeight: number, width: number, height: number): number {
+  if (!lineHeight) return 1
+  const wanted = Math.min(MAX_SCALE, Math.max(1, LINE_HEIGHT / lineHeight))
+  return Math.max(1, Math.min(wanted, Math.sqrt(MAX_PIXELS / (width * height))))
+}
+
+/**
+ * A straightened, enlarged and de-grained copy of the image, for a second
+ * reading; null where the browser cannot make one. Like the other copies, it
+ * exists only for the scan.
+ */
+export async function cleanUp(image: Blob): Promise<Blob | null> {
+  try {
+    if (typeof createImageBitmap !== 'function' || typeof document === 'undefined') return null
+    const bitmap = await createImageBitmap(image)
+    let canvas = document.createElement('canvas')
+    canvas.width = bitmap.width
+    canvas.height = bitmap.height
+    let ctx = canvas.getContext('2d', { willReadFrequently: true })
+    if (!ctx) return null
+    ctx.fillStyle = '#fff'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    ctx.drawImage(bitmap, 0, 0)
+    bitmap.close()
+
+    // The tilt is measured on a copy at most 600 pixels across: it is the
+    // ink's overall direction, and a full-size search would take seconds.
+    const small = Math.min(1, 600 / Math.max(canvas.width, canvas.height))
+    const probe = document.createElement('canvas')
+    probe.width = Math.max(1, Math.round(canvas.width * small))
+    probe.height = Math.max(1, Math.round(canvas.height * small))
+    const p = probe.getContext('2d', { willReadFrequently: true })
+    if (!p) return null
+    p.drawImage(canvas, 0, 0, probe.width, probe.height)
+    const tilt = tiltOf(grayOf(p, probe.width, probe.height), probe.width, probe.height)
+    if (Math.abs(tilt) >= 0.2) {
+      // Sized to the rotated image's bounding box, so no corner is cut off:
+      // on a long receipt a few degrees move its edges well outside the
+      // original frame.
+      const r = (Math.abs(tilt) * Math.PI) / 180
+      const turned = document.createElement('canvas')
+      turned.width = Math.ceil(canvas.width * Math.cos(r) + canvas.height * Math.sin(r))
+      turned.height = Math.ceil(canvas.width * Math.sin(r) + canvas.height * Math.cos(r))
+      const t = turned.getContext('2d', { willReadFrequently: true })!
+      t.fillStyle = '#fff'
+      t.fillRect(0, 0, turned.width, turned.height)
+      t.translate(turned.width / 2, turned.height / 2)
+      t.rotate((-tilt * Math.PI) / 180)
+      t.drawImage(canvas, -canvas.width / 2, -canvas.height / 2)
+      canvas = turned
+      ctx = t
+    }
+
+    let gray = grayOf(ctx, canvas.width, canvas.height)
+    const scale = enlargement(lineHeightOf(gray, canvas.width, canvas.height), canvas.width, canvas.height)
+    if (scale > 1.05) {
+      const big = document.createElement('canvas')
+      big.width = Math.round(canvas.width * scale)
+      big.height = Math.round(canvas.height * scale)
+      const b = big.getContext('2d', { willReadFrequently: true })!
+      b.imageSmoothingEnabled = true
+      b.imageSmoothingQuality = 'high'
+      b.fillStyle = '#fff'
+      b.fillRect(0, 0, big.width, big.height)
+      b.drawImage(canvas, 0, 0, big.width, big.height)
+      canvas = big
+      ctx = b
+      gray = grayOf(ctx, canvas.width, canvas.height)
+    }
+    return await fromGray(median3(gray, canvas.width, canvas.height), canvas.width, canvas.height)
+  } catch {
+    return null
+  }
+}
+
+function grayOf(ctx: CanvasRenderingContext2D, width: number, height: number): Uint8ClampedArray {
+  const rgba = ctx.getImageData(0, 0, width, height).data
+  const gray = new Uint8ClampedArray(width * height)
+  for (let i = 0, j = 0; j < gray.length; i += 4, j++) gray[j] = 0.299 * rgba[i] + 0.587 * rgba[i + 1] + 0.114 * rgba[i + 2]
+  return gray
+}

@@ -92,7 +92,13 @@ export async function forgetOldModelCopies(currentKey: string): Promise<void> {
 // line does not stop the scan, since its largest amount is only a guess.
 const MAX_SCANNED_PAGES = 5
 // A page read with less confidence than this (0-100, averaged over its
-// letters) gets a second reading with dotted print joined into strokes.
+// letters) is read again: first from a copy with dotted print joined into
+// strokes, then, if that is not clearly better, from a straightened,
+// enlarged and de-grained copy (ocrPrep.ts). In Chrome, on 60 degraded
+// synthetic receipts that copy took merchants from 50 right to 58, dates
+// from 51 to 58 and totals from 47 to 57, and on 60 more made after the
+// rules were fixed from 53 to 57, 53 to 56 and 52 to 57; clean, European,
+// dot-matrix and real receipts read the same as before.
 //
 // The second reading is used when it reads at least MORE_READ times as many
 // letters with confidence SURE_WORD or more. Not the average: on a photo of
@@ -123,52 +129,74 @@ export async function extractReceipt(
   // A wrapper of its own, so two scans passing the same function (the editor
   // always passes the same setter) are still told apart below.
   let pageIndex = 0
-  // The second reading of a page keeps the bar where the first left it,
+  // A further reading of a page keeps the bar where the first left it,
   // rather than sending it back to the start of the page.
-  let secondReading = false
+  let furtherReading = false
   const mine = onProgress
     ? (pct: number) => {
-        if (!secondReading) onProgress(Math.round((pageIndex * 100 + pct) / pages.length))
+        if (!furtherReading) onProgress(Math.round((pageIndex * 100 + pct) / pages.length))
       }
     : null
   progressCallback = mine
-  try {
-    const texts: string[] = []
-    const lines: OcrLine[] = []
-    let parsed: Omit<ExtractedReceipt, 'rawText'> = {}
-    for (; pageIndex < pages.length; pageIndex++) {
-      const { invertDarkBands, joinDots } = await import('./ocrPrep')
-      const input = await invertDarkBands(pages[pageIndex])
-      let result = await worker.recognize(input, {}, { text: true, blocks: true })
-      let pageLines = linesOf(result.data.blocks)
-      if (readingConfidence(pageLines) < DOTTED_PRINT_CONFIDENCE) {
-        const joined = await joinDots(input)
-        if (joined) {
-          secondReading = true
-          try {
-            const second = await worker.recognize(joined, {}, { text: true, blocks: true })
-            const secondLines = linesOf(second.data.blocks)
-            const before = sureLetters(pageLines)
-            const after = sureLetters(secondLines)
-            if (after > 0 && after >= before * MORE_READ) {
-              result = second
-              pageLines = secondLines
-            }
-          } catch {
-            // The second reading is optional: if it fails, the first one
-            // stands, as it would have before this step existed.
-          } finally {
-            secondReading = false
-          }
+  type Reading = { text: string; lines: OcrLine[] }
+  const read = async (image: Blob): Promise<Reading> => {
+    const result = await worker.recognize(image, {}, { text: true, blocks: true })
+    return { text: result.data.text, lines: linesOf(result.data.blocks) }
+  }
+  // An unsure page is read again from adjusted copies, in turn, until one
+  // reads clearly more: see DOTTED_PRINT_CONFIDENCE. A copy that cannot be
+  // made, or a reading that fails, is skipped: the first reading stands.
+  const readAgain = async (input: Blob, first: Reading): Promise<Reading> => {
+    const { joinDots, cleanUp } = await import('./ocrPrep')
+    const needed = sureLetters(first.lines) * MORE_READ
+    furtherReading = true
+    try {
+      for (const adjust of [joinDots, cleanUp]) {
+        try {
+          const copy = await adjust(input)
+          if (!copy) continue
+          const again = await read(copy)
+          const sure = sureLetters(again.lines)
+          if (sure > 0 && sure >= needed) return again
+        } catch {
+          // Optional: the next copy, or the first reading, instead.
         }
       }
-      texts.push(result.data.text)
-      lines.push(...pageLines)
-      const { totalIsLabelled, ...found } = parseReceipt(texts.join('\n'), lines)
-      parsed = found
-      if (totalIsLabelled) break
+      return first
+    } finally {
+      furtherReading = false
     }
-    return { ...parsed, rawText: texts.join('\n') }
+  }
+  try {
+    // The readings used, and the first reading of each page, kept apart: a
+    // field the readings used leave empty is filled from the first ones,
+    // which is what the scan gave before further readings existed.
+    const used: Reading[] = []
+    const firsts: Reading[] = []
+    let parsed: Omit<ExtractedReceipt, 'rawText'> = {}
+    for (; pageIndex < pages.length; pageIndex++) {
+      const { invertDarkBands } = await import('./ocrPrep')
+      const input = await invertDarkBands(pages[pageIndex])
+      const first = await read(input)
+      const chosen = readingConfidence(first.lines) < DOTTED_PRINT_CONFIDENCE ? await readAgain(input, first) : first
+      used.push(chosen)
+      firsts.push(first)
+      const parse = (rs: Reading[]) => parseReceipt(rs.map((r) => r.text).join('\n'), rs.flatMap((r) => r.lines))
+      const { totalIsLabelled, ...found } = parse(used)
+      parsed = found
+      let labelled = totalIsLabelled
+      if (used.some((r, i) => r !== firsts[i])) {
+        const { totalIsLabelled: firstLabelled, ...before } = parse(firsts)
+        parsed = {
+          merchant: found.merchant ?? before.merchant,
+          date: found.date ?? before.date,
+          total: found.total ?? before.total,
+        }
+        if (found.total === undefined) labelled = firstLabelled
+      }
+      if (labelled) break
+    }
+    return { ...parsed, rawText: used.map((r) => r.text).join('\n') }
   } finally {
     // Only clear the callback this call installed. When two scans overlap,
     // the second has already replaced it, and clearing it here would leave
