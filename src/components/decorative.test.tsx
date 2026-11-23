@@ -8,12 +8,25 @@ afterEach(cleanup)
 // Each flight's glyph name, after checking it is actually drawn: an <svg>
 // with at least one shape in it. A flight that kept its name but lost its
 // drawing would leave the header empty while the names still matched.
-const glyphs = (container: HTMLElement) =>
-  [...container.querySelectorAll<HTMLElement>('.topbar-plane')].map((el) => {
+//
+// The drawings must also follow the names: flights named alike draw the same
+// svg, and flights named differently draw different ones. Otherwise every
+// flight could draw, say, the plane while carrying the right names.
+const glyphs = (container: HTMLElement) => {
+  const drawingFor = new Map<string, string>()
+  const names = [...container.querySelectorAll<HTMLElement>('.topbar-plane')].map((el) => {
+    const name = el.dataset.glyph!
     const shapes = el.querySelectorAll('svg path, svg circle, svg rect, svg line')
-    expect(shapes.length, `glyph "${el.dataset.glyph}" has no drawing`).toBeGreaterThan(0)
-    return el.dataset.glyph
+    expect(shapes.length, `glyph "${name}" has no drawing`).toBeGreaterThan(0)
+    const drawing = el.querySelector('svg')!.innerHTML
+    if (drawingFor.has(name)) expect(drawing, `the two "${name}" flights draw differently`).toBe(drawingFor.get(name))
+    drawingFor.set(name, drawing)
+    return name
   })
+  const drawings = [...drawingFor.values()]
+  expect(new Set(drawings).size, 'two different glyph names draw the same thing').toBe(drawings.length)
+  return names
+}
 
 describe('HeaderPlanes', () => {
   it('flies travel glyphs most of the year, with no snow', () => {
