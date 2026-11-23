@@ -194,6 +194,38 @@ describe('ExpenseEditor and a scan that finishes late', () => {
   })
 })
 
+describe('ExpenseEditor small fixes', () => {
+  it('shows a saved amount of 0 instead of an empty field', async () => {
+    getExpense.mockResolvedValue(baseExpense({ amount: 0 }))
+    render(<ExpenseEditor reportId="report-1" expenseId="expense-1" onDone={vi.fn()} />)
+    await waitFor(() => expect(screen.getByLabelText('Amount')).toHaveValue(0))
+  })
+
+  it('keeps reading the attached receipt when a second pick cannot be opened', async () => {
+    const { extractReceipt } = await import('../ocr')
+    const { compressImage } = await import('../image')
+    type Scan = Awaited<ReturnType<typeof extractReceipt>>
+    let finishScan: (value: Scan) => void = () => {}
+    vi.mocked(extractReceipt).mockReturnValueOnce(
+      new Promise<Scan>((resolve) => {
+        finishScan = resolve
+      }),
+    )
+    const user = userEvent.setup()
+    const { container } = render(<ExpenseEditor reportId="report-1" onDone={vi.fn()} />)
+    await user.upload(pickFileInput(container), new File(['photo'], 'one.jpg', { type: 'image/jpeg' }))
+    await screen.findByText(/Reading receipt/)
+
+    vi.mocked(compressImage).mockRejectedValueOnce(new Error('cannot decode'))
+    await user.upload(pickFileInput(container), new File(['bad'], 'two.jpg', { type: 'image/jpeg' }))
+    await screen.findByText(/Couldn't process that photo/)
+
+    finishScan({ merchant: 'Corner Market', total: 9.5, rawText: '' })
+    await screen.findByText(/Details extracted/)
+    expect(screen.queryByText(/Reading receipt/)).toBeNull()
+  })
+})
+
 describe('ExpenseEditor submit-time validation', () => {
   const SAVE = { name: /^save$/i } as const
 

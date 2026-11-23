@@ -12,31 +12,54 @@ import { useEffect, useState } from 'react'
  * seconds, which meant the app's only signal that data had not been saved
  * could disappear while the user was looking at the camera or another tab —
  * a failure notice that erases itself is not a failure notice.
+ *
+ * It used to blame storage for every failure, whatever the cause. It now
+ * says so only when the error is one storage raises, and otherwise says
+ * plainly that something went wrong.
  */
+
+// Error names that come from the browser's storage, where running out of room
+// or losing the database is the likely story.
+const STORAGE_ERRORS = new Set([
+  'QuotaExceededError',
+  'InvalidStateError',
+  'TransactionInactiveError',
+  'AbortError',
+  'UnknownError',
+  'VersionError',
+  'DataError',
+])
+
+type Kind = 'storage' | 'other'
+
+function kindOf(reason: unknown): Kind {
+  const name = reason instanceof Error || reason instanceof DOMException ? reason.name : ''
+  return STORAGE_ERRORS.has(name) ? 'storage' : 'other'
+}
+
 export default function GlobalErrorToast() {
-  const [visible, setVisible] = useState(false)
+  const [kind, setKind] = useState<Kind | null>(null)
 
   useEffect(() => {
-    const onRejection = () => setVisible(true)
+    const onRejection = (event: PromiseRejectionEvent) => {
+      // Kept in the console, where whoever investigates can see the cause.
+      console.error('Unhandled rejection', event.reason)
+      setKind((current) => (current === 'storage' ? current : kindOf(event.reason)))
+    }
     window.addEventListener('unhandledrejection', onRejection)
     return () => window.removeEventListener('unhandledrejection', onRejection)
   }, [])
 
-  if (!visible) return null
+  if (!kind) return null
 
   return (
     <div className="error-toast" role="alert">
       <span>
-        Something went wrong — your last change may not have been saved. The usual cause
-        is this browser running out of storage room. Back up your receipts now, free up
-        space on your device, then reopen the expense and check the change is there.
+        {kind === 'storage'
+          ? 'Something went wrong saving your data — your last change may not have been saved. The usual cause is this browser running out of storage room. Back up your receipts now, free up space on your device, then reopen the expense and check the change is there.'
+          : 'Something went wrong — your last action may not have finished. Reopen what you were working on and check it, and reload the app if this keeps happening.'}
       </span>
-      <button
-        type="button"
-        className="btn ghost small"
-        onClick={() => setVisible(false)}
-        aria-label="Dismiss"
-      >
+      <button type="button" className="btn ghost small" onClick={() => setKind(null)} aria-label="Dismiss">
         Dismiss
       </button>
     </div>

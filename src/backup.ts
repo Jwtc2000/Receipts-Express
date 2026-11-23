@@ -1,6 +1,7 @@
 import type { Report, Expense, ReceiptImage } from './types'
 import { listReports, listAllExpenses, listAllImages, importBackupData } from './db'
-import { getProfile, saveProfile, type Profile } from './profile'
+import { getProfile, saveProfile, MAX_PROJECTS, normalizeProjects, type Profile } from './profile'
+import { todayIso } from './types'
 import { blobToDataURL } from './image'
 import { shareOrDownloadFile } from './share'
 
@@ -77,7 +78,16 @@ const MAX_EXPENSES = 10000
  * comes near 2,000 characters.
  */
 export const MAX_STRING_LENGTH = 2000
-const MAX_PROFILE_PROJECTS = 200
+// A file this large cannot be a backup the app wrote: the export refuses past
+// MAX_EXPORT_IMAGE_BYTES of images, and base64 adds a third. Checked before
+// the file is read, so an oversized file is refused without loading it.
+const MAX_FILE_BYTES = 600 * 1024 * 1024
+// More exchange rates than there are currencies is not a real report.
+const MAX_EXCHANGE_RATES = 300
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/
+const CURRENCY_KEY_RE = /^[A-Za-z]{3}$/
+/** The newest backup format this build reads, which is the one it writes. */
+const BACKUP_VERSION = 1
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v)
@@ -111,14 +121,17 @@ function isValidReport(v: unknown): v is Report {
     typeof v.name === 'string' &&
     typeof v.createdAt === 'number' &&
     Number.isFinite(v.createdAt) &&
-    (v.startDate === undefined || typeof v.startDate === 'string') &&
-    (v.endDate === undefined || typeof v.endDate === 'string') &&
+    (v.startDate === undefined || isDateOrBlank(v.startDate)) &&
+    (v.endDate === undefined || isDateOrBlank(v.endDate)) &&
     (v.dailyMealAllowance === undefined ||
-      (typeof v.dailyMealAllowance === 'number' && Number.isFinite(v.dailyMealAllowance))) &&
+      (typeof v.dailyMealAllowance === 'number' && Number.isFinite(v.dailyMealAllowance) && v.dailyMealAllowance >= 0)) &&
     (v.projectNumber === undefined || typeof v.projectNumber === 'string') &&
     (v.exchangeRates === undefined ||
       (isPlainObject(v.exchangeRates) &&
-        Object.values(v.exchangeRates).every((r) => typeof r === 'number' && Number.isFinite(r) && r > 0)))
+        Object.keys(v.exchangeRates).length <= MAX_EXCHANGE_RATES &&
+        Object.entries(v.exchangeRates).every(
+          ([code, r]) => CURRENCY_KEY_RE.test(code) && typeof r === 'number' && Number.isFinite(r) && r > 0,
+        )))
   )
 }
 
@@ -135,8 +148,9 @@ function isValidExpense(v: unknown): v is Expense {
     typeof v.merchant === 'string' &&
     typeof v.amount === 'number' &&
     Number.isFinite(v.amount) &&
+    v.amount >= 0 &&
     typeof v.currency === 'string' &&
-    typeof v.date === 'string' &&
+    isDateOrBlank(v.date) &&
     typeof v.category === 'string' &&
     typeof v.notes === 'string' &&
     (v.imageId === undefined || typeof v.imageId === 'string') &&
@@ -145,8 +159,77 @@ function isValidExpense(v: unknown): v is Expense {
     typeof v.createdAt === 'number' &&
     Number.isFinite(v.createdAt) &&
     (v.personalAmount === undefined ||
-      (typeof v.personalAmount === 'number' && Number.isFinite(v.personalAmount)))
+      (typeof v.personalAmount === 'number' &&
+        Number.isFinite(v.personalAmount) &&
+        v.personalAmount >= 0 &&
+        v.personalAmount <= v.amount))
   )
+}
+
+/** A real yyyy-mm-dd date, or blank: the only two things the editor can store. */
+function isDateOrBlank(v: unknown): v is string {
+  if (typeof v !== 'string') return false
+  if (v === '') return true
+  if (!ISO_DATE_RE.test(v)) return false
+  // The shape alone lets 2026-02-30 and 2026-13-01 through.
+  const [y, m, d] = v.split('-').map(Number)
+  const date = new Date(Date.UTC(y, m - 1, d))
+  return date.getUTCFullYear() === y && date.getUTCMonth() === m - 1 && date.getUTCDate() === d
+}
+
+// The importer used to store the parsed objects as they came, so any extra
+// property in the file, of any size and depth, went into IndexedDB unchecked,
+// never appeared in the app, and was written back out in every later backup.
+// Each record is now rebuilt from the fields this app knows and nothing else.
+function pickReport(r: Report): Report {
+  return {
+    id: r.id,
+    name: r.name,
+    createdAt: r.createdAt,
+    ...(r.startDate !== undefined ? { startDate: r.startDate } : {}),
+    ...(r.endDate !== undefined ? { endDate: r.endDate } : {}),
+    ...(r.dailyMealAllowance !== undefined ? { dailyMealAllowance: r.dailyMealAllowance } : {}),
+    ...(r.projectNumber !== undefined ? { projectNumber: r.projectNumber } : {}),
+    ...(r.exchangeRates !== undefined ? { exchangeRates: { ...r.exchangeRates } } : {}),
+  }
+}
+
+function pickExpense(e: Expense): Expense {
+  return {
+    id: e.id,
+    reportId: e.reportId,
+    position: e.position,
+    title: e.title,
+    merchant: e.merchant,
+    amount: e.amount,
+    currency: e.currency,
+    date: e.date,
+    category: e.category,
+    notes: e.notes,
+    createdAt: e.createdAt,
+    ...(e.imageId !== undefined ? { imageId: e.imageId } : {}),
+    ...(e.extraImageIds !== undefined ? { extraImageIds: [...e.extraImageIds] } : {}),
+    ...(e.personalAmount !== undefined ? { personalAmount: e.personalAmount } : {}),
+  }
+}
+
+function pickProfile(p: Profile): Profile {
+  return {
+    name: p.name,
+    employeeId: p.employeeId,
+    costCenter: p.costCenter,
+    projectNumber: p.projectNumber.trim(),
+    projects: normalizeProjects([p.projectNumber, ...p.projects]),
+  }
+}
+
+/** Throw if two records in one list share an id; a restore would keep only the last. */
+function rejectDuplicateIds(records: { id: string }[], what: string): void {
+  const seen = new Set<string>()
+  for (const r of records) {
+    if (seen.has(r.id)) throw new Error(`Backup has two ${what} with the same id`)
+    seen.add(r.id)
+  }
 }
 
 function isValidProfile(v: unknown): v is Profile {
@@ -208,6 +291,8 @@ export interface BackupPlan {
      * the user isn't already being told about.
      */
     overwrites: number
+    /** Receipt pages that expenses in the file point at but the file does not carry. */
+    missingImages: number
   }
 }
 
@@ -230,6 +315,9 @@ export async function validateBackup(file: File): Promise<BackupPlan> {
   // too large for the browser to hold as one string fails at the read, and
   // used to be reported as "isn't valid JSON", which sent the owner of a
   // perfectly good backup looking for the wrong problem.
+  if (file.size > MAX_FILE_BYTES) {
+    throw new Error('That file is larger than any Receipts Express backup can be')
+  }
   let text: string
   try {
     text = await file.text()
@@ -246,6 +334,9 @@ export async function validateBackup(file: File): Promise<BackupPlan> {
   const app = parsed.app
   const known = typeof app === 'string' && (app === APP_ID || LEGACY_APP_IDS.includes(app))
   if (!known) throw new Error('Not a Receipts Express backup file')
+  if (typeof parsed.version === 'number' && parsed.version > BACKUP_VERSION) {
+    throw new Error('This backup was made by a newer version of Receipts Express — update the app, then restore it')
+  }
   if (!Array.isArray(parsed.reports)) throw new Error('Backup file is missing its reports list')
 
   const rawReports = parsed.reports
@@ -266,8 +357,9 @@ export async function validateBackup(file: File): Promise<BackupPlan> {
     if (hasOverlongString(r)) {
       throw new Error(`Backup report #${i} has text longer than the ${MAX_STRING_LENGTH}-character limit`)
     }
-    return r
+    return pickReport(r)
   })
+  rejectDuplicateIds(reports, 'reports')
   const reportIds = new Set(reports.map((r) => r.id))
   const expenses = rawExpenses.map((e, i) => {
     if (!isValidExpense(e)) throw new Error(`Backup expense #${i} is malformed`)
@@ -288,8 +380,9 @@ export async function validateBackup(file: File): Promise<BackupPlan> {
     if (!reportIds.has(e.reportId)) {
       throw new Error(`Backup expense #${i} references a report that isn't in this backup`)
     }
-    return e
+    return pickExpense(e)
   })
+  rejectDuplicateIds(expenses, 'expenses')
 
   let totalImageBytes = 0
   const images = rawImages.map((img, i) => {
@@ -300,19 +393,27 @@ export async function validateBackup(file: File): Promise<BackupPlan> {
     }
     return decoded
   })
+  rejectDuplicateIds(images, 'images')
+  // Receipt pages an expense points at that the file does not carry. Not
+  // fatal: the expense restores without them. But the user is told how many,
+  // rather than finding blank receipts later.
+  const imageIds = new Set(images.map((img) => img.id))
+  const missingImages = expenses
+    .flatMap((e) => [e.imageId, ...(e.extraImageIds ?? [])])
+    .filter((id): id is string => !!id && !imageIds.has(id)).length
 
   // A file written before the profile was included simply has no `profile`
   // key; that is a valid backup and leaves this device's profile alone.
   let profile: Profile | null = null
   if (parsed.profile !== undefined) {
     if (!isValidProfile(parsed.profile)) throw new Error('Backup profile is malformed')
-    if (parsed.profile.projects.length > MAX_PROFILE_PROJECTS) {
-      throw new Error(`Backup profile has more than ${MAX_PROFILE_PROJECTS} project numbers`)
+    if (parsed.profile.projects.length > MAX_PROJECTS) {
+      throw new Error(`Backup profile has more than ${MAX_PROJECTS} project numbers`)
     }
     if (hasOverlongString(parsed.profile)) {
       throw new Error(`Backup profile has text longer than the ${MAX_STRING_LENGTH}-character limit`)
     }
-    profile = parsed.profile
+    profile = pickProfile(parsed.profile)
   }
 
   const [existingReports, existingExpenses] = await Promise.all([listReports(), listAllExpenses()])
@@ -328,7 +429,7 @@ export async function validateBackup(file: File): Promise<BackupPlan> {
     images,
     profile,
     exportedAt: typeof parsed.exportedAt === 'string' ? parsed.exportedAt : '',
-    counts: { reports: reports.length, expenses: expenses.length, overwrites },
+    counts: { reports: reports.length, expenses: expenses.length, overwrites, missingImages },
   }
 }
 
@@ -463,7 +564,9 @@ async function buildBackupBlob(): Promise<Blob> {
  */
 export async function exportBackup(): Promise<boolean> {
   const blob = await buildBackupBlob()
-  const name = `receipts-express-backup-${new Date().toISOString().slice(0, 10)}.json`
+  // The local date, as everywhere else in the app. The UTC date named an
+  // evening backup west of Greenwich after tomorrow.
+  const name = `receipts-express-backup-${todayIso()}.json`
   const file = new File([blob], name, { type: 'application/json' })
   const handedOff = await shareOrDownloadFile(file, 'Receipts Express backup')
   if (handedOff) {

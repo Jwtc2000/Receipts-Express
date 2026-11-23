@@ -1,5 +1,5 @@
 import type { Report, Expense } from './types'
-import { shareOrDownloadFile } from './share'
+import { safeFileName, shareOrDownloadFile } from './share'
 
 const HEADERS = ['Date', 'Title', 'Merchant', 'Category', 'Amount', 'Personal Amount', 'Currency', 'Notes']
 
@@ -17,7 +17,9 @@ const UTF8_BOM = '﻿'
 // they are numbers this file formats, where a leading "-" must stay a literal
 // minus sign.
 function neutralizeFormula(value: string): string {
-  return /^[=+\-@]/.test(value) ? `'${value}` : value
+  // Tab and carriage return too: some spreadsheet imports trim leading
+  // whitespace and then evaluate what is left.
+  return /^[=+\-@\t\r]/.test(value) ? `'${value}` : value
 }
 
 function csvEscape(value: string): string {
@@ -49,7 +51,7 @@ export function buildExpenseCsv(expenses: Expense[]): string {
  */
 export async function exportReportCsv(report: Report, expenses: Expense[]): Promise<void> {
   const csv = UTF8_BOM + buildExpenseCsv(expenses)
-  const safeName = report.name.replace(/[^\w-]+/g, '_') || 'expense_report'
+  const safeName = safeFileName(report.name, 'expense_report')
   const file = new File([csv], `${safeName}.csv`, { type: 'text/csv;charset=utf-8' })
   await shareOrDownloadFile(file, `${report.name} — CSV export`)
 }

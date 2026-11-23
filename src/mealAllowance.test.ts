@@ -78,6 +78,20 @@ describe('foodBalanceForDate', () => {
   })
 })
 
+describe('a day that spends exactly the allowance', () => {
+  // As floating-point, 5.02 + 29.6 + 15.38 is a hair over 50.
+  it('is not flagged as over', () => {
+    const day = [
+      makeExpense({ id: 'a', amount: 5.02 }),
+      makeExpense({ id: 'b', amount: 29.6 }),
+      makeExpense({ id: 'c', amount: 15.38 }),
+    ]
+    const balance = foodBalanceForDate(day, '2026-07-18', 50)
+    expect(balance.over).toBe(false)
+    expect(balance.remaining).toBe(0)
+  })
+})
+
 describe('a day with meals in more than one currency', () => {
   const day = [
     makeExpense({ id: 'a', amount: 12, currency: 'USD' }),

@@ -19,8 +19,12 @@ export interface Profile {
 
 const PROFILE_KEY = 'br.profile'
 
-/** Plenty for one person's project list; keeps a corrupted file from ballooning. */
-const MAX_PROJECTS = 50
+/**
+ * Plenty for one person's project list; keeps a corrupted file from
+ * ballooning. The backup importer uses the same number, so a restored list
+ * is never longer than one this app could have made.
+ */
+export const MAX_PROJECTS = 50
 
 const emptyProfile: Profile = {
   name: '',
@@ -35,7 +39,7 @@ function str(v: unknown): string {
 }
 
 /** Trim, drop blanks, de-duplicate (case-insensitively) and cap the list. */
-function normalizeProjects(codes: string[]): string[] {
+export function normalizeProjects(codes: string[]): string[] {
   const seen = new Set<string>()
   const out: string[] = []
   for (const raw of codes) {
