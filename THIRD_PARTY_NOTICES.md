@@ -1,6 +1,7 @@
 # Third-Party Notices — Receipts Express
 
-Receipts Express 1.13.0. Compiled 2026-08-08 from the packages installed in `node_modules/`.
+Receipts Express 1.14.0. Compiled 2026-11-21 from the packages installed in `node_modules/`
+and from the build they produce.
 
 Receipts Express itself is licensed under the Apache License, Version 2.0, Copyright 2026
 Jordan Campbell. That text ships to every user as `LICENSE.txt`. **This file is about other
@@ -55,20 +56,27 @@ its own terms.
 
 | Component | Version | Copyright (verbatim) | Project |
 |---|---|---|---|
-| react | 19.2.8 | `Copyright (c) Facebook, Inc. and its affiliates.` | https://github.com/facebook/react |
-| react-dom | 19.2.8 | `Copyright (c) Facebook, Inc. and its affiliates.` | https://github.com/facebook/react |
-| scheduler | 0.27.0 | `Copyright (c) Facebook, Inc. and its affiliates.` | https://github.com/facebook/react |
+| react | 19.3.1 | `Copyright (c) Meta Platforms, Inc. and affiliates.` | https://github.com/facebook/react |
+| react-dom | 19.3.1 | `Copyright (c) Meta Platforms, Inc. and affiliates.` | https://github.com/facebook/react |
+| scheduler | 0.28.0 | `Copyright (c) Meta Platforms, Inc. and affiliates.` | https://github.com/facebook/react |
 | regenerator-runtime | 0.13.11 | `Copyright (c) 2014-present, Facebook, Inc.` | https://github.com/facebook/regenerator |
+
+The first three rows name a different holder than they did at 19.2.8, because the packages do:
+their `LICENSE` files now read `Meta Platforms, Inc. and affiliates.` where they read
+`Facebook, Inc. and its affiliates.` The same line travels in the build. The main chunk,
+`assets/index-*.js`, carries five `@license React` headers — for `react.production.js`,
+`scheduler.production.js`, `react-dom.production.js`, `react-dom-client.production.js` and
+`react-jsx-runtime.production.js` — and each one has that copyright line in it.
 
 `regenerator-runtime` is here, and not in §2.3 with the unreachable `.html()` chunks, because
 it is in the precached main application bundle. `tesseract.js` declares it as a runtime
 dependency and publishes `src/index.js` as its npm `main`, so Vite compiles tesseract.js from
 source and resolves `regenerator-runtime` out of `node_modules/`. The whole of `runtime.js`
-lands in `assets/index-BugjxHvs.js` — findable by the `regeneratorRuntime` identifier and by the
-`Function("r","regeneratorRuntime = r")` fallback that closes that module — and `sw.js`
-precaches that file. **The copyright header at the top of `runtime.js` does not survive**: the
-only comments left in that chunk are React's four. The row above is the only place that notice
-exists for the main bundle.
+lands in `assets/index-*.js` — findable by the `regeneratorRuntime` identifier and by the
+``Function(`r`,`regeneratorRuntime = r`)`` fallback that closes that module — and `sw.js`
+precaches that file. **The copyright header at the top of `runtime.js` does not survive**: it
+is a plain block comment with no `@license` marker, and the only comments left in that chunk
+are React's five. The row above is the only place that notice exists for the main bundle.
 
 A second and separate copy of `regenerator-runtime` is compiled into `tesseract/worker.min.js`.
 That one has its own notice, in `tesseract/worker.min.js.LICENSE.txt` (§5.1).
@@ -92,20 +100,36 @@ the notice above and §11.1. The Zlib half covers the upstream C code pako deriv
 pako's own `LICENSE` contains only the MIT text, so there is no separate Zlib notice in the
 package to reproduce.
 
-jsPDF's own `@license` banner — the one naming James Hall and yWorks — does **not** survive into
-`assets/jspdf.es.min-Cwr5uZnZ.js`. The chunk opens straight at Vite's `__vite__mapDeps`
-preamble, and `grep -c "James Hall"` on it returns 0. The `jspdf` row above is therefore the
-only place that notice exists for this build. Seven *other* licence headers, for code jsPDF
-vendored into its own source, do survive into that chunk; they are in §2.6.
+jsPDF's own `@license` banner — the one naming James Hall and yWorks — survives into
+`assets/jspdf.es.min-*.js`, and `grep -c "James Hall"` on that chunk returns 1. It is a longer
+notice than the `LICENSE` line quoted above: it goes on to name seventeen further copyright
+holders by year, and it carries the full MIT text. The banner in the chunk is the
+authoritative form; the row above quotes `node_modules/jspdf/LICENSE`, which is the shorter
+one. `pako`'s one-line banner, `pako 2.2.0 https://github.com/nodeca/pako @license (MIT AND
+Zlib)`, survives in the same chunk. Twenty-one *other* licence headers, for code jsPDF
+vendored into its own source, survive there too; they are in §2.6.
+
+None of this is the bundler's default. This project's Vite 8 build drops every licence comment
+from the chunks it emits unless it is told to keep them, and from the upgrade to Vite 8 until
+this file was recompiled the deployed build carried none. `vite.config.ts` now sets
+`build.rolldownOptions.output.comments.legal`, which keeps any comment that contains `@license`
+or `@preserve` or opens with `/*!`. Every statement in this file about a header surviving into
+a chunk depends on that one option staying set.
 
 ### 2.3 jsPDF's optional `.html()` renderer — served, but unreachable
 
 jsPDF declares `canvg`, `html2canvas`, `dompurify` and `core-js` as optional dependencies of
-its `.html()` method. **This app never calls `.html()`.** Rollup cannot prove that from
+its `.html()` method. **This app never calls `.html()`.** The bundler cannot prove that from
 jsPDF's dynamic imports, so it emits them as separate chunks — `assets/index.es-*.js`,
-`assets/html2canvas.esm-*.js`, `assets/purify.es-*.js` — which are excluded from the service
+`assets/html2canvas-*.js`, `assets/purify.es-*.js` — which are excluded from the service
 worker precache but are still served on request. They are attributed here because they are
 served, not because any code path reaches them.
+
+`assets/html2canvas-*.js` opens with html2canvas's own banner, `html2canvas 1.4.1
+<https://html2canvas.hertzen.com>` / `Copyright (c) 2022 Niklas von Hertzen
+<https://hertzen.com>` / `Released under MIT License`. The year differs from the row below
+because the two are read from different files: the banner says 2022, and
+`node_modules/html2canvas/LICENSE` says 2012. Both are quoted as found.
 
 | Component | Version | Copyright (verbatim) | Project |
 |---|---|---|---|
@@ -167,7 +191,7 @@ Apache-2.0 (§4); `base64-js` has no notice anywhere, which is dealt with in §5
 |---|---|---|---|
 | workbox-core, workbox-expiration, workbox-precaching, workbox-routing, workbox-strategies, workbox-window | 7.4.1 | `Copyright 2018 Google LLC` | https://github.com/GoogleChrome/workbox |
 
-Workbox reaches the build through `vite-plugin-pwa` 0.21.2, which generates `sw.js`,
+Workbox reaches the build through `vite-plugin-pwa` 2.0.0, which generates `sw.js`,
 `workbox-*.js` and `assets/workbox-window.prod.es5-*.js`. **None of those files carries a
 copyright header** — the minified output begins straight at `define(["exports"],...)`. MIT
 requires the notice to be included in all copies, so this table is the only place that
@@ -188,8 +212,12 @@ minification into the deployed file, where anyone can read it. **Those headers a
 authoritative text; this section is a map to them.** They are not all MIT, so each row names its
 own terms.
 
-Seven of them survive in `assets/jspdf.es.min-Cwr5uZnZ.js`, which `sw.js` precaches — so unlike
-§2.3 this code is downloaded on first visit whether or not it runs.
+Twenty-three licence headers survive in `assets/jspdf.es.min-*.js`, which `sw.js` precaches — so
+unlike §2.3 this code is downloaded on first visit whether or not it runs. Twenty-two of them
+are every `@license` comment in `node_modules/jspdf/dist/jspdf.es.min.js`, the file Vite
+bundles; the twenty-third is `pako`'s banner (§2.2). One of the twenty-two is jsPDF's own
+banner (§2.2). The table accounts for the other twenty-one. Where several headers differ only
+in a year or a plugin name they share a row, and the row says how many it stands for.
 
 | Vendored code | Header, verbatim | Licence |
 |---|---|---|
@@ -198,21 +226,27 @@ Seven of them survive in `assets/jspdf.es.min-Cwr5uZnZ.js`, which `sw.js` precac
 | RC4 keystream helper | `FPDF is released under a permissive license: there is no usage restriction. You may embed it freely in your application (commercial or not), with or without modifications.` / `Reference: http://www.fpdf.org/en/script/script37.php` | FPDF permissive |
 | PDF standard-security handler | `Licensed under the MIT License.` / `http://opensource.org/licenses/mit-license` / `Author: Owen Leong (@owenl131)` / `Date: 15 Oct 2020` | MIT — the header names an author but carries no copyright line |
 | JPEG encoder | `Copyright (c) 2008, Adobe Systems Incorporated` / `All rights reserved.` | **BSD-3-Clause** — the header carries the full text; reproduced in §11.4 |
-| jsPDF plugin code | `Copyright (c) 2017 Aras Abbasi` / `Licensed under the MIT License.` / `http://opensource.org/licenses/mit-license` | MIT |
+| GIF decoder (`omggif`) | `(c) Dean McNamee <dean@gmail.com>, 2013.` / `https://github.com/deanm/omggif` | MIT — the header carries the full MIT text |
+| WebP decoder (`WebPRiffParser`) | `Copyright (c) 2017 Dominik Homberger` / `https://webpjs.appspot.com` / `WebPRiffParser dominikhlbg@gmail.com` | MIT — the header carries the full MIT text |
+| Unicode Bidi engine | `Unicode Bidi Engine based on the work of Alex Shensis (@asthensis)` / `MIT License` | MIT — the header names whose work it is based on but carries no copyright line |
 | jsPDF XMP metadata plugin | `jsPDF XMP metadata plugin` / `Copyright (c) 2016 Jussi Utunen, u-jussi@suomi24.fi` | MIT — the header carries the full MIT text |
+| jsPDF plugin code — six headers | `Copyright (c) 2017 Aras Abbasi` (twice), `Copyright (c) 2018 Aras Abbasi`, `Copyright (c) 2019 Aras Abbasi`, `jsPDF filters PlugIn` / `Copyright (c) 2014 Aras Abbasi`, and `jsPDF fileloading PlugIn` / `Copyright (c) 2018 Aras Abbasi (aras.abbasi@gmail.com)` — each followed by `Licensed under the MIT License.` / `http://opensource.org/licenses/mit-license` | MIT |
+| jsPDF plugin code — three headers | `Copyright (c) 2014 Steven Spungin (TwelveTone LLC)  steven@twelvetone.tv` / `Licensed under the MIT License.` / `http://opensource.org/licenses/mit-license`, three times over | MIT |
+| jsPDF code with no named holder — three headers | `Licensed under the MIT License.` / `http://opensource.org/licenses/mit-license` (twice), and the same two lines under `jsPDF virtual FileSystem functionality` | MIT — none of the three carries a copyright line |
 
 The Adobe row is why the earlier claim that `ieee754` was "the only BSD-3-Clause component in
 the distribution" was wrong (§5.1). Adobe's JPEG encoder is BSD-3-Clause, it is in a precached
 chunk, and its full licence text ships with it.
 
-Two of the seven are not really third-party. Aras Abbasi is a jsPDF maintainer, and the two rows
-naming him and Jussi Utunen head jsPDF plugin code, already covered by the `jspdf` row in §2.2.
-They are listed anyway, because they are distinct licence headers in the shipped bytes and
-anyone auditing that chunk should find all seven accounted for rather than six. The unminified
-`node_modules/jspdf/dist/jspdf.es.js` carries more such headers than survive here; only the ones
-that reach users are listed.
+The last four rows are not really third-party. They head jsPDF's own plugin code, already
+covered by the `jspdf` row in §2.2, and jsPDF's banner itself names Aras Abbasi and Steven
+Spungin among its copyright holders. They are listed anyway, because they are distinct licence
+headers in the shipped bytes and anyone auditing that chunk should find all twenty-three
+accounted for rather than ten. An earlier edition of this file listed seven headers here,
+because the build it was compiled against kept seven; this one keeps every header jsPDF
+publishes, and the count follows the bytes.
 
-Three of the seven state terms that are not a standard licence, and that is how their authors
+Three of the rows state terms that are not a standard licence, and that is how their authors
 published them:
 
 - **`RGBColor`** — "Use it if you like it" is the entire grant. It is permissive on its face and
@@ -225,10 +259,11 @@ published them:
 - **FPDF** — "no usage restriction", embedding expressly permitted, commercial or not. No
   attribution condition attaches; the header ships anyway.
 
-**tslib**, Microsoft's TypeScript helper library, is the eighth. It is not in `node_modules/`:
-`html2canvas` and `svg-pathdata` each compiled it into their published bundles, and each bundle
-carries its banner. It therefore ships twice — in `assets/html2canvas.esm-QH1iLAAe.js` and in
-`assets/index.es-D6K0VeIz.js`, the canvg chunk, which is where `svg-pathdata` lands. Both copies
+**tslib**, Microsoft's TypeScript helper library, is one more, and it is not in the jsPDF chunk.
+It is not in `node_modules/` either: `html2canvas` and `svg-pathdata` each compiled it into
+their published bundles, and each bundle carries its banner. It therefore ships twice — in
+`assets/html2canvas-*.js` and in `assets/index.es-*.js`, the canvg chunk, which is where
+`svg-pathdata` lands. Both copies
 sit in the `.html()` chunks of §2.3: served, never precached, never reached. The two banners are
 byte-identical:
 
@@ -266,7 +301,7 @@ Full text in §11.2.
 
 | Component | Version | Copyright (verbatim) | Project |
 |---|---|---|---|
-| idb | 8.0.3 | `Copyright (c) 2016, Jake Archibald <jaffathecake@gmail.com>` | https://github.com/jakearchibald/idb |
+| idb | 8.0.4 | `Copyright (c) 2016, Jake Archibald <jaffathecake@gmail.com>` | https://github.com/jakearchibald/idb |
 
 ## 4. Apache License, Version 2.0
 
@@ -275,7 +310,7 @@ Apache-2.0 §4(a) asks for. It is not reproduced again here.
 
 | Component | Version | Copyright | Project |
 |---|---|---|---|
-| pdfjs-dist | 6.2.108 | `Copyright 2024 Mozilla Foundation` — from the `@licstart` header of `node_modules/pdfjs-dist/build/pdf.mjs`. The package's own `LICENSE` is the bare Apache-2.0 text with an unfilled appendix, so it names no holder. | https://mozilla.github.io/pdf.js/ |
+| pdfjs-dist | 6.5.438 | `Copyright 2024 Mozilla Foundation` — from the `@licstart` header of `node_modules/pdfjs-dist/build/pdf.mjs`. The package's own `LICENSE` is the bare Apache-2.0 text with an unfilled appendix, so it names no holder. | https://mozilla.github.io/pdf.js/ |
 | tesseract.js | 7.0.0 | **UNDETERMINED — verify before publishing.** `LICENSE.md` is the bare Apache-2.0 text; the appendix placeholder is unfilled and `package.json` has no author. | https://github.com/naptha/tesseract.js |
 | tesseract.js-core | 7.0.0 | **UNDETERMINED — verify before publishing.** `LICENSE` is the bare Apache-2.0 text, appendix still reading `Copyright {yyyy} {name of copyright owner}`. `package.json` names `antimatter15`, which is metadata, not a notice. | https://github.com/naptha/tesseract.js-core |
 | idb-keyval | 6.3.0 | `Copyright 2016, Jake Archibald` — verbatim from `node_modules/idb-keyval/LICENCE`, which is the Apache-2.0 short header form with the holder filled in. Reaches the build inside `tesseract/worker.min.js`. | https://github.com/jakearchibald/idb-keyval |
@@ -290,7 +325,11 @@ spelling walked past it. It is the clearest reason this file's method now globs 
 
 Apache-2.0 §4(d) requires a redistributor to reproduce any `NOTICE` file the Work carries. A
 recursive search of `node_modules/` for `NOTICE`, `NOTICE.txt` and `NOTICE.md` returns
-nothing. No Apache-2.0 dependency here ships one, so §4(d) has no content to reproduce.
+TypeScript's and nothing else: `node_modules/typescript/NOTICE.txt`, and a second copy inside
+the platform-specific package TypeScript installs beside it. TypeScript is a `devDependency`
+and no byte of it is distributed (§10), so its `NOTICE` is not this distribution's to
+reproduce. No Apache-2.0 component that reaches users ships one, so §4(d) has no content to
+reproduce.
 
 Receipts Express itself also has no `NOTICE` file, which is deliberate — adding one would
 create an ongoing §4(d) obligation for every downstream fork and buys nothing the `LICENSE`
@@ -300,13 +339,21 @@ does not already give.
 
 | Component | Version | Copyright (verbatim from the shipped chunk header) | Project |
 |---|---|---|---|
-| dompurify | 3.4.13 | `@license DOMPurify 3.4.13 \| (c) Cure53 and other contributors \| Released under the Apache license 2.0 and Mozilla Public License 2.0` | https://github.com/cure53/DOMPurify |
+| dompurify | 3.4.17 | `@license DOMPurify 3.4.17 \| (c) Cure53 and other contributors \| Released under the Apache license 2.0 and Mozilla Public License 2.0 \| github.com/cure53/DOMPurify/blob/3.4.17/LICENSE` | https://github.com/cure53/DOMPurify |
 
 DOMPurify declares `"(MPL-2.0 OR Apache-2.0)"` — disjunctive, so the recipient elects.
 **Receipts Express elects Apache-2.0**, and recording that here is what puts the election on
 the record. On that election MPL-2.0's file-level source-disclosure duty never attaches. It
 arrives via jsPDF's `.html()` path and is unreachable dead code (§2.3); the header above
-survives minification intact in `assets/purify.es-*.js`.
+survives minification intact in `assets/purify.es-*.js`, where it is the first thing in the
+file.
+
+That chunk carries one more banner, and it is not DOMPurify's: `regenerator-runtime --
+Copyright (c) 2014-present, Facebook, Inc. -- license (MIT):
+https://github.com/babel/babel/blob/main/packages/babel-helpers/LICENSE`. DOMPurify's published
+`dist/purify.es.mjs` has a Babel helper compiled into it, and the helper's notice came along.
+It is the same holder and the same licence as the `regenerator-runtime` row in §2.1, the MIT
+text is in §11.1, and the banner ships verbatim.
 
 ## 5. The Tesseract OCR engine
 
@@ -407,37 +454,70 @@ pasted in.
 ## 6. PDF.js bundled sub-components
 
 `scripts/copy-pdfjs-assets.mjs` copies the `standard_fonts`, `cmaps`, `wasm` and `iccs`
-directories recursively, so **PDF.js's own licence files travel with the assets they cover** —
-with one exception, the last row below. Ten licence files ship under `pdfjs/`. For the first ten
-rows this table is a map and the shipped file is authoritative.
+directories recursively, so **PDF.js's own licence files travel with the assets they cover**.
+One thing in those directories is left behind on purpose: the Liberation Sans fonts and their
+licence file, for the reason given below the table. Eleven licence files ship under `pdfjs/`,
+each byte-identical to the one in `node_modules/pdfjs-dist/`. This table is a map and the
+shipped file is authoritative.
 
 | Sub-component | Copyright (verbatim from the shipped file) | Shipped licence file |
 |---|---|---|
 | Adobe CMap resources | `%%Copyright: Copyright 1990-2009 Adobe Systems Incorporated.` | `pdfjs/cmaps/LICENSE` |
 | ICC colour profiles | `CC0 1.0 Universal` — public-domain dedication, no attribution duty | `pdfjs/iccs/LICENSE` |
 | Foxit standard fonts | `// Copyright 2014 PDFium Authors. All rights reserved.` | `pdfjs/standard_fonts/LICENSE_FOXIT` |
-| Liberation fonts | `Digitized data copyright (c) 2010 Google Corporation` / `Copyright (c) 2012 Red Hat, Inc.` | `pdfjs/standard_fonts/LICENSE_LIBERATION` |
 | JBIG2 (PDFium) | `// Copyright 2014 The PDFium Authors` | `pdfjs/wasm/LICENSE_JBIG2` |
 | OpenJPEG | `Copyright (c) 2002-2014, Universite catholique de Louvain (UCL), Belgium` and others | `pdfjs/wasm/LICENSE_OPENJPEG` |
 | QCMS | `Copyright (C) 2009-2024 Mozilla Corporation` | `pdfjs/wasm/LICENSE_QCMS` |
 | PDF.js JBIG2 wrapper | `Copyright 2026 Mozilla Foundation` | `pdfjs/wasm/LICENSE_PDFJS_JBIG2` |
 | PDF.js OpenJPEG wrapper | `Copyright (c) 2024, Mozilla Foundation` | `pdfjs/wasm/LICENSE_PDFJS_OPENJPEG` |
-| PDF.js QCMS wrapper | `Copyright (c) 2025, Mozilla Foundation` | `pdfjs/wasm/LICENSE_PDFJS_QCMS` |
-| QuickJS engine — `pdfjs/wasm/quickjs-eval.wasm` (469,105 bytes) and `quickjs-eval.js` | **UNDETERMINED — verify before publishing.** | **none** |
+| PDF.js QCMS wrapper | `pdfjs/wasm/LICENSE_PDFJS_QCMS` opens `MIT License` and contains **no copyright line**. There is no notice to reproduce. | `pdfjs/wasm/LICENSE_PDFJS_QCMS` |
+| QuickJS engine — `pdfjs/wasm/quickjs-eval.wasm` (469,105 bytes) and `quickjs-eval.js` | `Copyright (c) 2017-2021 Fabrice Bellard` / `Copyright (c) 2017-2021 Charlie Gordon` — MIT | `pdfjs/wasm/LICENSE_QUICKJS` |
+| PDF.js QuickJS wrapper | `Copyright (c) 2026 Mozilla Foundation` — MIT | `pdfjs/wasm/LICENSE_PDFJS_QUICKJS` |
 
-That last row is the one hole in an otherwise complete set, and its shape is what makes it
-worth stating. `pdfjs-dist` ships a `LICENSE_*` file beside every other binary it vendors —
-JBIG2, OpenJPEG and QCMS, each with a Mozilla wrapper licence as well — and none beside QuickJS,
-which is the largest of the four. `strings -a` over `quickjs-eval.wasm` returns no occurrence of
-`copyright` at all; the one identifying string it carries is
-`QuickJS memory usage -- 1.0.0 version, %d-bit, malloc limit: %lld`, which gives an engine
-version of 1.0.0 and nothing more. `quickjs-eval.js` opens
-`/* THIS FILE IS GENERATED - DO NOT EDIT */` and carries no notice either. Nothing in the
-installed package settles this, so: establish which QuickJS this is — Bellard's original and the
-`quickjs-ng` fork both exist and the shipped bytes do not say which built this — then read that
-project's licence and record the holder and text here. `pdfjs-dist`'s own
-`"license": "Apache-2.0"` is a declaration about Mozilla's package, and the JBIG2/OpenJPEG/QCMS
-files prove Mozilla does not treat it as covering the binaries it vendors.
+Three rows read differently from the last edition of this file and one row is gone, and in
+each case it is a licence file that changed, between `pdfjs-dist` 6.2.108 and 6.5.438.
+
+**QuickJS is no longer undetermined.** 6.2.108 shipped a `LICENSE_*` file beside every binary
+it vendored except QuickJS, the largest of them, and the binary carries no copyright string of
+its own, so the row was marked UNDETERMINED and listed in §9. 6.5.438 ships
+`LICENSE_QUICKJS`, headed `QuickJS Javascript Engine` and naming Fabrice Bellard and Charlie
+Gordon, and `LICENSE_PDFJS_QUICKJS` for Mozilla's wrapper. Both are the MIT text and both
+travel with the binary. The item is off §9.
+
+**The QCMS wrapper file lost its copyright line.** It carried `Copyright (c) 2025, Mozilla
+Foundation` in 6.2.108. In 6.5.438 it is the MIT text under the heading `MIT License` with no
+holder named, and the row says so rather than carrying the old line forward.
+
+**The Liberation Sans fonts are no longer shipped.** `pdfjs-dist` carries four
+`LiberationSans-*.ttf` files as its fallback for Helvetica, and until this edition the build
+copied them and this table listed them. The four files are byte-identical between the two
+versions. What changed is the file beside them. 6.2.108 shipped the SIL Open Font License 1.1
+there, opening
+`Digitized data copyright (c) 2010 Google Corporation`. 6.5.438 ships Red Hat's `LICENSE
+AGREEMENT AND LIMITED PRODUCT WARRANTY` / `LIBERATION FONT SOFTWARE`, which grants a licence
+`pursuant to the GNU General Public License v.2 with the exceptions set forth below` — one for
+embedding the font in a document, one for object code in a physical product — and is followed
+by the full GPL v2 text. The fonts' own metadata agrees with the new file, not the old one:
+`strings -a` over `LiberationSans-Regular.ttf` gives `Copyright (c) 2007 Red Hat, Inc. All
+rights reserved. LIBERATION is a trademark of Red Hat, Inc.`, `Version 1.07.4` and `Licensed
+under the Liberation Fonts license`. On that evidence these were never OFL fonts, and they
+shipped beside a licence file that did not describe them.
+
+Shipping the right file would have left a question open: what GPL v2 §3 — the section on
+distributing `object code or executable form` — asks of a site that serves four `.ttf` files
+unmodified, whether a font file is object code in that section's sense, and what would count
+as its source. That is not something to answer from a guess, and everything else under
+`pdfjs/` is under permissive terms or CC0. So the fonts were taken out instead.
+`scripts/copy-pdfjs-assets.mjs` skips the four `.ttf` files and `LICENSE_LIBERATION`, nothing
+under `pdfjs/` is theirs, and they are in §10 with the other things that are installed but not
+distributed.
+
+What that gives up is narrow. PDF.js reaches for those files only when a PDF names Helvetica,
+or a font PDF.js substitutes it for, without embedding it, and the device has none of the
+eighteen local fonts it tries first — `Helvetica`, `Arial`, `Liberation Sans` and `DejaVu Sans`
+among them. On such a device the request for the font file now fails, PDF.js logs `Cannot load
+system font` and carries on, and the text is drawn in the browser's generic `sans-serif`. The
+Foxit fonts beside them are unaffected.
 
 QuickJS ships because `scripts/copy-pdfjs-assets.mjs` copies `wasm/` recursively, and it is
 reached by nothing. Its only loader inside `pdfjs-dist` is `build/pdf.sandbox.mjs`, the PDF
@@ -446,11 +526,13 @@ returns 0 on both the shipped `pdfjs/pdf.worker.min.mjs` and `assets/pdfReceipt-
 `.html()` chunks in §2.3, it is attributed here because it is served, not because any code path
 reaches it.
 
-PDF.js carries its Mozilla copyright in an `@licstart` comment, a LibreJS convention esbuild
-does not treat as a legal comment, so the notice is stripped from `assets/pdfReceipt-*.js`.
-Apache-2.0 has no clause requiring notices to survive into object code, so no condition is
-breached — but the Mozilla Foundation row in §4 is the only place that notice now exists for
-the main bundle.
+PDF.js carries its Mozilla copyright in an `@licstart` comment, a LibreJS convention the
+bundler does not treat as a legal comment — it has no `@license` or `@preserve` in it and does
+not open with `/*!` — so the notice is stripped from `assets/pdfReceipt-*.js` even with licence
+comments kept (§2.2). Apache-2.0 has no clause requiring notices to survive into object code,
+so no condition is breached — but the Mozilla Foundation row in §4 is the only place that
+notice now exists for the main bundle. The worker is a different case: `pdfjs/pdf.worker.min.mjs`
+is copied rather than bundled, and it opens with that header intact.
 
 ## 7. Webfonts — SIL Open Font License 1.1
 
@@ -536,11 +618,10 @@ consciously accepted.**
 | 4 | libtiff (in WASM) | Copyright line and licence text | libtiff upstream |
 | 5 | libpng (in WASM) | Copyright line and licence text | libpng upstream |
 | 6 | zlib (in WASM, via libpng) | Copyright line and licence text | zlib upstream |
-| 7 | tesseract.js 5.1.1, tesseract.js-core 5.1.1 | Copyright holder; both licence files are bare Apache-2.0 with an unfilled appendix | Upstream repository headers |
+| 7 | tesseract.js 7.0.0, tesseract.js-core 7.0.0 | Copyright holder; both licence files are bare Apache-2.0 with an unfilled appendix | Upstream repository headers |
 | 8 | ieee754 | Its own BSD-3-Clause text for §11.4; not in `node_modules/` (§5.1) | `feross/ieee754` |
 | 9 | Feather Icons | The copyright line, and the glyph comparisons in §8; Feather is not installed | `feathericons/feather` |
 | 10 | base64-js | Licence and copyright holder; bundled into `tesseract/worker.min.js`, not installed, no header in its source (§5.1) | `beatgammit/base64-js` |
-| 11 | QuickJS 1.0.0 (in `pdfjs/wasm/`) | Which QuickJS, then its licence and copyright holder; `pdfjs-dist` ships no licence file for it and the binary carries none (§6) | QuickJS upstream, `mozilla/pdf.js` `external/quickjs` |
 
 Two items that were on this list are off it, both because the answer was sitting in
 `node_modules/` the whole time. `idb-keyval` 6.3.0 was recorded as shipping no licence file; it
@@ -548,7 +629,13 @@ ships `LICENCE`, and it names Jake Archibald (§4). `regenerator-runtime` was fi
 unreachable `.html()` code; it is in the precached main bundle (§2.1). Neither was a hard
 question. Both were answered by opening the file.
 
-`is-url` 1.2.4 is a milder twelfth case: its `LICENSE-MIT` genuinely contains no copyright
+A third came off for a different reason. QuickJS was item 11 while `pdfjs-dist` shipped no
+licence file for it; 6.5.438 ships two (§6), and upstream answered what no amount of reading
+the old package could. The same upgrade replaced the licence file beside the Liberation Sans
+fonts, which would have put a new item in its place; the fonts were removed from the build
+instead (§6), so there is nothing to list.
+
+`is-url` 1.2.4 is a milder eleventh case: its `LICENSE-MIT` genuinely contains no copyright
 line, so there is nothing to reproduce and nothing to fix. It is recorded in §2.4 instead. The
 three non-standard headers in §2.6 — "Use it if you like it", the MD5 header stating that no
 licence was specified, and FPDF's — are likewise not listed here: each ships verbatim in the
@@ -569,14 +656,20 @@ listed above despite the label: the two `@fontsource-variable` packages (§7), w
 files are served to every reader, and `vite-plugin-pwa`, whose generated Workbox runtime
 ships as the service worker (§2.5).
 
-Two more that the dependency graph lists but that do not reach users:
+Two more that are installed but do not reach users:
 
-- **`loose-envify` and `js-tokens`.** `loose-envify` is a dependency of `react`, `react-dom`
-  and `scheduler`, but it is a browserify source transform. React's published files reference
-  `process.env.NODE_ENV` directly and never `require` it, so Rollup never pulls it in.
 - **`@napi-rs/canvas`**, an optional dependency of `pdfjs-dist`. The browser bundle contains
   only the module specifier inside a Node-only code path; the native module is never bundled
   or served.
+- **The Liberation Sans fonts** inside `pdfjs-dist`: four `LiberationSans-*.ttf` files and
+  `LICENSE_LIBERATION`, in `node_modules/pdfjs-dist/standard_fonts/`.
+  `scripts/copy-pdfjs-assets.mjs` copies everything else in that directory and leaves these
+  where they are (§6).
+
+`loose-envify` and `js-tokens` used to be listed beside it, as dependencies of `react`,
+`react-dom` and `scheduler` that never reached the bundle. At React 19.3.1 they are not
+dependencies of React at all: `react` and `scheduler` declare none, `react-dom` declares only
+`scheduler`, and `loose-envify` is no longer installed.
 
 ## 11. Full licence texts
 
@@ -635,9 +728,11 @@ Apache-2.0 §4(a) requires.
 Applies to two components: the Adobe JPEG encoder vendored into the jsPDF chunk (§2.6) and
 `ieee754` (§5.1).
 
-Adobe's text ships verbatim inside `assets/jspdf.es.min-Cwr5uZnZ.js` and is reproduced from
-that file here — the opening `/**` and ` * @license` lines and the closing `*/` dropped, every
-other byte, line break and indent as found:
+Adobe's text ships inside `assets/jspdf.es.min-*.js`. It is reproduced here from
+`node_modules/jspdf/dist/jspdf.es.min.js`, the file that chunk is built from — the opening
+`/**` and ` * @license` lines and the closing `*/` dropped, every other byte, line break and
+indent as found. The copy in the chunk is the same text line for line; the minifier removes
+the leading spaces from each line and changes nothing else:
 
 ```
   Copyright (c) 2008, Adobe Systems Incorporated
@@ -695,5 +790,5 @@ headers, all in §2.6. §11 is not a complete inventory on its own; §2.6 is par
 
 ---
 
-*Eleven items in §9 remain unresolved. Do not describe this file as a finished attribution
+*Ten items in §9 remain unresolved. Do not describe this file as a finished attribution
 record until each is resolved or consciously accepted.*
