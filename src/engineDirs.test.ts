@@ -18,6 +18,6 @@ describe('engine directories', () => {
 
   it('carry the installed package versions', () => {
     expect(PDFJS_DIR).toMatch(/^pdfjs\/\d+\.\d+\.\d+/)
-    expect(TESSERACT_DIR).toMatch(/^tesseract\/\d+\.\d+\.\d+-\d+\.\d+\.\d+-\d+\.\d+\.\d+/)
+    expect(TESSERACT_DIR).toMatch(/^tesseract\/\d+\.\d+\.\d+-\d+\.\d+\.\d+-\d+\.\d+\.\d+-int$/)
   })
 })

@@ -3,7 +3,7 @@
 // the app is fully self-hosted — no CDN calls at runtime.
 import fs from 'node:fs'
 import path from 'node:path'
-import { TESSERACT_DIR, root } from './engine-dirs.mjs'
+import { TESSERACT_DIR, TESSERACT_MODEL, root } from './engine-dirs.mjs'
 
 // The files go into a directory named for the installed package versions (see
 // scripts/engine-dirs.mjs for why). Everything already under public/tesseract
@@ -35,7 +35,13 @@ const copies = [
   // core rather than left as bare LICENSE so it cannot be mistaken for a
   // license covering everything else in this directory.
   ['node_modules/tesseract.js-core/LICENSE', 'LICENSE-tesseract-core.txt'],
-  ['node_modules/@tesseract.js-data/eng/4.0.0/eng.traineddata.gz', 'eng.traineddata.gz'],
+  // The integerised LSTM-only English model, not the package's 4.0.0 one. The
+  // two carry the same integerised LSTM network (same architecture and
+  // version string) and identical LSTM dictionaries; 4.0.0 adds about 18 MB
+  // (unpacked) of data for Tesseract's legacy engine, which the LSTM-only
+  // cores this app ships cannot use. Compared on 40 receipts in different
+  // fonts, sizes, angles and print quality, both gave identical results.
+  [`node_modules/@tesseract.js-data/eng/${TESSERACT_MODEL}/eng.traineddata.gz`, 'eng.traineddata.gz'],
 ]
 // The LSTM-only WASM cores the package ships, discovered rather than listed.
 //

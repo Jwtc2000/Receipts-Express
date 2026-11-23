@@ -6,7 +6,7 @@ const ACCEPTED_KEY = 'br.termsAccepted'
  * should not re-prompt everyone. The stored value is compared against it, so
  * a bump asks every existing user to acknowledge again.
  */
-export const TERMS_VERSION = '2026-08-08'
+export const TERMS_VERSION = '2026-11-23'
 
 interface Acceptance {
   version: string

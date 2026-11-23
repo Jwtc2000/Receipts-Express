@@ -13,4 +13,5 @@ import { version as tesseractData } from '@tesseract.js-data/eng/package.json'
 // that pair, so every PDF import failed for up to 30 days and the app blamed
 // the user's file. A new version is now a new URL and so a cache miss.
 export const PDFJS_DIR = `pdfjs/${pdfjs}`
-export const TESSERACT_DIR = `tesseract/${tesseract}-${tesseractCore}-${tesseractData}`
+// "-int": the integerised LSTM-only English model (scripts/engine-dirs.mjs).
+export const TESSERACT_DIR = `tesseract/${tesseract}-${tesseractCore}-${tesseractData}-int`
