@@ -284,11 +284,21 @@ export default defineConfig({
             handler: 'CacheFirst',
             options: {
               cacheName: 'tesseract-engine',
-              // Without maxAgeSeconds these entries never expire, so a
-              // future security patch to tesseract.js/pdfjs-dist would
-              // never reach an already-onboarded device short of manually
-              // clearing site data.
-              expiration: { maxEntries: 12, maxAgeSeconds: 30 * 24 * 60 * 60 }
+              // No maxAgeSeconds, on purpose. These entries used to expire
+              // after 30 days so that a patched engine would eventually
+              // reach an onboarded device. That did two things badly. In
+              // the 30 days after an upgrade the old engine was still served
+              // to the new app code, which broke PDF import outright. And
+              // because the age is counted from the fetch, not from last
+              // use, scanning stopped working offline on day 30 for someone
+              // who scans every day, which is not what "works offline" in
+              // the published pages says.
+              //
+              // The engine directories are now named for the package
+              // versions (src/engineDirs.ts), so an upgrade is a new URL and
+              // a cache miss, and the old version's files are pushed out by
+              // maxEntries as the new ones arrive.
+              expiration: { maxEntries: 12 }
             }
           },
           {
@@ -296,7 +306,7 @@ export default defineConfig({
             handler: 'CacheFirst',
             options: {
               cacheName: 'pdfjs-engine',
-              expiration: { maxEntries: 40, maxAgeSeconds: 30 * 24 * 60 * 60 }
+              expiration: { maxEntries: 40 }
             }
           },
           {

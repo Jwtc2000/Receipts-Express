@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { parseReceiptText } from './ocr'
+import { TESSERACT_DIR } from './engineDirs'
 
 // The real library would be loaded (and a real worker started) just to read
 // the options it was handed, so it is replaced with a recorder.
@@ -49,9 +50,10 @@ describe('OCR engine assets are self-hosted', () => {
     },
   )
 
-  it('points all three at the vendored copy under /tesseract', async () => {
+  it('points all three at the vendored, versioned copy under /tesseract', async () => {
     const options = await workerOptions()
-    const base = `${import.meta.env.BASE_URL}tesseract`
+    const base = `${import.meta.env.BASE_URL}${TESSERACT_DIR}`
+    expect(base).toMatch(/tesseract\/\d/)
     expect(options.workerPath).toBe(`${base}/worker.min.js`)
     expect(options.corePath).toBe(base)
     expect(options.langPath).toBe(base)
@@ -59,6 +61,24 @@ describe('OCR engine assets are self-hosted', () => {
 })
 
 describe('parseReceiptText', () => {
+  // The integer part of an amount was once capped at three digits with no
+  // left boundary, so these lost their leading digits (234.56, 0, 345).
+  it.each([
+    ['Total 1234.56', 1234.56],
+    ['Total 1000.00', 1000],
+    ['TOTAL $12345.00', 12345],
+    ['Total 1,234.56', 1234.56],
+    ['Total 1.234,56', 1234.56],
+    ['Total €19,50', 19.5],
+  ])('reads the whole amount in %j', (line, expected) => {
+    expect(parseReceiptText(`Store\n${line}`).total).toBe(expected)
+  })
+
+  it('does not take the day and month of a dotted date for an amount', () => {
+    const text = ['Shop', '18.07.2026', 'Coffee 3.50', 'Bagel 4.25'].join('\n')
+    expect(parseReceiptText(text).total).toBe(4.25)
+  })
+
   it('picks the largest keyword-matched total over a plain subtotal', () => {
     const text = ['Joe\'s Diner', 'Subtotal 18.00', 'Tax 1.50', 'Total 19.50'].join('\n')
     expect(parseReceiptText(text).total).toBe(19.5)

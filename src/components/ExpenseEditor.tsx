@@ -95,6 +95,11 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
   // matches when it resolves has been superseded by a newer one and must
   // not overwrite whatever the newer pick already applied.
   const pickGenRef = useRef(0)
+  // Fields the user has typed in during this editing session. A scan takes
+  // 10-20 seconds and the fields stay usable while it runs, so its result
+  // can arrive after the user has already entered the amount by hand. OCR
+  // may fill a field in, but never over something the user put there.
+  const typedRef = useRef(new Set<keyof Draft>())
   // Synchronous re-entry lock for save() — the `saving` state above only
   // takes effect after a render commits, which doesn't block two save()
   // calls dispatched within the same tick (e.g. a fast double-tap).
@@ -182,6 +187,7 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
   }, [invalid])
 
   const set = (patch: Partial<Draft>) => {
+    for (const key of Object.keys(patch)) typedRef.current.add(key as keyof Draft)
     setDirty(true)
     // Typing is the user answering the message, so clear it rather than
     // leaving a complaint on screen about a value they have since changed.
@@ -251,12 +257,23 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
     try {
       const extracted = await extractReceipt(firstPage, setScanPct)
       if (gen !== pickGenRef.current) return
+      // OCR is a guess. It fills a field only when the user has not typed in
+      // it, and, when an existing expense is being edited, only when that
+      // field is empty: replacing the photo on a saved expense must not
+      // replace the amount and date that were saved with it.
+      const typed = typedRef.current
+      // `expenseId`, not `existing`: this handler closed over `existing` when
+      // the file was picked, which can be before the saved expense finished
+      // loading, and would then treat a saved expense as a new one.
+      const mayFill = (key: keyof Draft, current: string) =>
+        !typed.has(key) && (expenseId ? current === '' : true)
       setDraft((d) => ({
         ...d,
-        merchant: extracted.merchant ?? d.merchant,
-        title: d.title || extracted.merchant || '',
-        amount: extracted.total !== undefined ? extracted.total.toFixed(2) : d.amount,
-        date: extracted.date ?? d.date,
+        merchant: extracted.merchant && mayFill('merchant', d.merchant) ? extracted.merchant : d.merchant,
+        title: d.title || (!typed.has('title') && extracted.merchant) || '',
+        amount:
+          extracted.total !== undefined && mayFill('amount', d.amount) ? extracted.total.toFixed(2) : d.amount,
+        date: extracted.date && mayFill('date', d.date) ? extracted.date : d.date,
       }))
       setScanState('done')
     } catch {
