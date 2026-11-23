@@ -23,7 +23,7 @@ This checklist prepares the **Receipts Express** application for governance revi
   * *Classification*: **Confidential / Restricted**. 
   * Receipts contain real personal and financial data (merchant names, transaction dates, itemized purchase list, amounts, and partial card numbers).
 * **What data does the project use?**
-  * Receipt images, the merchant name, date and total read from them by OCR, and whatever the user types (title, category, notes, personal amount). Itemized purchase lines are visible in the image but are not extracted or stored as text.
+  * Receipt images, the merchant name, date and total read from them by OCR, and whatever the user types (title, category, notes, personal amount). OCR reads the whole receipt's text in memory, itemized lines included, but only the merchant, date and total are kept; the rest is never stored.
 * **Is the data public, synthetic, internal, confidential, regulated, or unknown?**
   * Confidential.
 * **Does it include customer, employee, package, route, facility, security, or financial data?**

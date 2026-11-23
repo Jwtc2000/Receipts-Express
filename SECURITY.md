@@ -18,9 +18,11 @@ accordingly:
   employee ID, cost center, project numbers) and four small flags and
   timestamps are in localStorage; the Privacy Policy lists all five keys.
   Nothing is written to a server or a third-party service.
-- **Export is a local file only**: a PDF or CSV of a report, or a JSON
+- **Exports are made on the device**: a PDF or CSV of a report, or a JSON
   backup of everything, generated in-browser and handed to the browser's
-  own download/share mechanism. There is no upload step.
+  own download or share mechanism. The app uploads nothing itself; where
+  the file goes next is up to the user, and a share target they pick
+  (a cloud drive, an email app) may send it on.
 - **The sole network access this app makes is loading the app itself**
   from GitHub Pages. No analytics, no telemetry, no third-party requests
   of any kind.
@@ -66,8 +68,8 @@ brought under the policy without changing hosts, by starting it from a
 **Known limitation: WebRTC is outside the CSP.** `connect-src` does not
 govern `RTCPeerConnection`, and the meta policy sets nothing that does.
 The app uses no WebRTC, and the source check in `src/noNetwork.test.ts`
-fails the build if `RTCPeerConnection` or `WebTransport` appears in it, so
-the protection is the test, not the browser.
+fails the build if `RTCPeerConnection` or `WebTransport` appears in it (added
+in #84), so the protection is the test, not the browser.
 
 **Known limitation: the origin is shared with the account's other Pages
 sites.** GitHub Pages serves this app as a project site under the account's
