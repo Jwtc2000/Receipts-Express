@@ -10,6 +10,7 @@ function makePage(width = 100, height = 100) {
   return {
     getViewport: vi.fn(({ scale }: { scale: number }) => ({ width: width * scale, height: height * scale })),
     render: vi.fn(() => ({ promise: Promise.resolve() })),
+    cleanup: vi.fn(),
   }
 }
 
@@ -27,7 +28,9 @@ vi.mock('pdfjs-dist', () => ({
   GlobalWorkerOptions: { workerSrc: '' },
   getDocument: vi.fn(),
 }))
-vi.mock('./image', () => ({ compressImage: vi.fn((blob: Blob) => Promise.resolve(blob)) }))
+vi.mock('./image', () => ({
+  encodeJpeg: vi.fn(() => Promise.resolve(new Blob(['fake-page'], { type: 'image/jpeg' }))),
+}))
 
 beforeEach(() => {
   vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation(function (

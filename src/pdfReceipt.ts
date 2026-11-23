@@ -1,5 +1,5 @@
 import * as pdfjsLib from 'pdfjs-dist'
-import { compressImage } from './image'
+import { encodeJpeg } from './image'
 import { PDFJS_DIR } from './engineDirs'
 
 // Self-hosted, matching the Tesseract setup (see scripts/copy-pdfjs-assets.mjs)
@@ -55,13 +55,12 @@ export async function renderPdfPages(file: Blob): Promise<Blob[]> {
       canvas.width = Math.ceil(scaledViewport.width)
       canvas.height = Math.ceil(scaledViewport.height)
       await page.render({ canvas, viewport: scaledViewport }).promise
-
-      const rendered = await new Promise<Blob>((resolve, reject) => {
-        canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('PDF page render failed'))), 'image/jpeg', 0.9)
-      })
-      // Route through the same compressor used for photos so every stored
-      // page — however it originated — ends up at the same size/format.
-      pages.push(await compressImage(rendered, MAX_RENDER_DIM))
+      // Encoded once, at the quality photos are stored at. The page is
+      // already within MAX_RENDER_DIM, which is the same limit
+      // compressImage applies to photos, so running it through that as well
+      // only decoded and re-encoded every page a second time.
+      pages.push(await encodeJpeg(canvas, 0.85))
+      page.cleanup()
     }
     return pages
   } finally {

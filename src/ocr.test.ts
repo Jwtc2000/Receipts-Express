@@ -60,6 +60,50 @@ describe('OCR engine assets are self-hosted', () => {
   })
 })
 
+describe('parseReceiptText dates', () => {
+  it.each([
+    ['ISO', 'Store\n2026-07-18', '2026-07-18'],
+    ['US month first', 'Store\n07/18/2026', '2026-07-18'],
+    ['day first when the first number cannot be a month', 'Store\n18/07/2026', '2026-07-18'],
+    ['two-digit year', 'Store\n07-18-26', '2026-07-18'],
+    ['month name first', 'Store\nJul 18, 2026', '2026-07-18'],
+    ['day first with a month name', 'Store\n18 July 2026', '2026-07-18'],
+  ])('reads a %s date', (_label, text, expected) => {
+    expect(parseReceiptText(text).date).toBe(expected)
+  })
+
+  it('rejects a day the month does not have instead of rolling it into the next month', () => {
+    expect(parseReceiptText('Store\n04/31/2026').date).toBeUndefined()
+  })
+
+  it('skips a dotted phone number and finds the real date further down', () => {
+    const text = ['Boulangerie', 'Tel 01.23.45.67.89', '2026-07-18'].join('\n')
+    expect(parseReceiptText(text).date).toBe('2026-07-18')
+  })
+
+  it('does not read a month inside a longer word', () => {
+    expect(parseReceiptText('Walmart 2041\nSupermarket 2026').date).toBeUndefined()
+  })
+
+  it('does not accept a date in the future', () => {
+    expect(parseReceiptText('Trans 04-12-0033\n2026-07-18').date).toBe('2026-07-18')
+  })
+})
+
+describe('parseReceiptText merchant', () => {
+  it('keeps accented letters', () => {
+    expect(parseReceiptText('Café Rouge\nTotal 4.50').merchant).toBe('Café Rouge')
+  })
+
+  it('keeps the combining marks a script writes vowels with', () => {
+    expect(parseReceiptText('किराना स्टोर\nTotal 20.00').merchant).toBe('किराना स्टोर')
+  })
+
+  it('accepts a two-letter brand', () => {
+    expect(parseReceiptText('H&M\n12 High Street\nTotal 20.00').merchant).toBe('H&M')
+  })
+})
+
 describe('parseReceiptText', () => {
   // The integer part of an amount was once capped at three digits with no
   // left boundary, so these lost their leading digits (234.56, 0, 345).
@@ -72,6 +116,12 @@ describe('parseReceiptText', () => {
     ['Total €19,50', 19.5],
   ])('reads the whole amount in %j', (line, expected) => {
     expect(parseReceiptText(`Store\n${line}`).total).toBe(expected)
+  })
+
+  it('ignores a keyword line reading 0.00 when there is a real amount', () => {
+    // No other keyword line: before the fix, the 0.00 was taken as the total.
+    const text = ['Cafe', 'Coffee 4.50', 'Balance due 0.00'].join('\n')
+    expect(parseReceiptText(text).total).toBe(4.5)
   })
 
   it('does not take the day and month of a dotted date for an amount', () => {
