@@ -308,6 +308,47 @@ describe('parseReceiptText', () => {
   })
 })
 
+describe('parseReceiptText total, checked against the other lines', () => {
+  const total = (lines: string[]) => parseReceiptText(lines.join('\n')).total
+
+  it('restores a decimal point OCR lost when the result agrees with subtotal plus tax', () => {
+    expect(total(['Corner Bakery', 'Subtotal 186.96', 'Tax 15.42', 'TOTAL 20238'])).toBe(202.38)
+  })
+
+  it('reads a "$" taken for a digit off the total when that agrees with subtotal plus tax', () => {
+    expect(total(['Corner Bakery', 'SUBTOTAL 9.26', 'TAX 0.65', 'TOTAL 49.91'])).toBe(9.91)
+  })
+
+  it('checks a total against the card payment', () => {
+    expect(total(['Corner Bakery', 'TOTAL $22233', 'VISA ****1234 $222.33'])).toBe(222.33)
+  })
+
+  it('keeps the printed total when a tip makes it more than subtotal plus tax', () => {
+    expect(total(['Corner Bakery', 'Subtotal 30.00', 'Tax 2.40', 'Tip 6.00', 'Total 38.40'])).toBe(38.4)
+  })
+
+  it('never takes a tax rate for money', () => {
+    expect(total(['Corner Bakery', 'Subtotal 20.00', 'Tax 8.25% 1.65', 'Total 21.65'])).toBe(21.65)
+    expect(total(['Corner Bakery', 'Tax 8.25%'])).toBeUndefined()
+  })
+
+  it('does not take cash handed over or change for the total', () => {
+    expect(total(['Corner Bakery', 'Coffee 4.50', 'CASH 20.00', 'CHANGE 15.50'])).toBe(4.5)
+  })
+
+  it('adds subtotal and tax when no total line was read', () => {
+    expect(total(['Corner Bakery', 'Subtotal 106.95', 'Tax 8.82'])).toBe(115.77)
+  })
+
+  it('reads "TOTAL" as OCR misspells it', () => {
+    expect(total(['Corner Bakery', 'SUBTOTAL $131.34', 'TAX $9.10', 'TOTAS $140.53'])).toBe(140.53)
+  })
+
+  it('does not repair three digits of noise at the end of a total line', () => {
+    expect(total(['Corner Bakery', 'Paper 50.16', 'Total Ti aad i900'])).toBe(50.16)
+  })
+})
+
 describe('receiptFromText', () => {
   const invoice = ['Acme Car Rental', 'Invoice Date: 03/05/2026', 'Rental charges 150.00', 'Tax 12.00', 'Total Amount Due 162.00'].join('\n')
 

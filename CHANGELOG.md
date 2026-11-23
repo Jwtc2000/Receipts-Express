@@ -8,6 +8,26 @@ user-facing features, and `PATCH` for fixes with no visible feature change. The
 version lives in `package.json` and is shown in the app under Menu → About. Every
 merge to `main` that changes app behavior gets a version bump and a tag.
 
+## [1.21.0] - 2026-11-23
+
+### Changed
+- The total is checked against subtotal plus tax and against the card
+  payment line. A total that agrees is taken as read. When none agrees, the
+  total line is also tried with the decimal point OCR lost restored ("TOTAL
+  20238" for 202.38) and with a "$" read as a digit removed ("49.91" for
+  $9.91), and a reading that agrees is used. Otherwise the printed total
+  stands, so a tip or a fee that makes it larger than subtotal plus tax is
+  kept.
+- A tax rate ("Tax 8.25%") is never read as money, and cash handed over or
+  change given is never taken for the total. "TOTAL" misread as "T0TAL",
+  "TOTAI" or "TOTAS" is still a total line. With no total line, subtotal
+  plus tax is used, or the card payment when there is one.
+- In Chrome, on receipts these rules were not written from: clean synthetic
+  receipts went from 33 to 39 right totals of 40, degraded ones from 46 to
+  52 of 60, and dot-matrix ones stayed at 33 of 40. No total that was right
+  before became wrong on any of the eight test sets, and merchants and dates
+  did not change.
+
 ## [1.20.0] - 2026-11-23
 
 ### Changed
