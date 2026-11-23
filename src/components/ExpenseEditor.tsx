@@ -127,6 +127,10 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
   // receipt stays attached, so its scan must still be allowed to finish.
   // Sharing one counter left the "Reading receipt…" spinner stuck forever.
   const scanGenRef = useRef(0)
+  // The title a scan filled in, if the field still holds it. A later scan of
+  // a replacement receipt may replace that title; it may never replace one
+  // the user typed.
+  const autoTitleRef = useRef<string | null>(null)
   // Fields the user has typed in during this editing session. A scan takes
   // 10-20 seconds and the fields stay usable while it runs, so its result
   // can arrive after the user has already entered the amount by hand. OCR
@@ -303,7 +307,13 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
       setDraft((d) => ({
         ...d,
         merchant: extracted.merchant && mayFill('merchant', d.merchant) ? extracted.merchant : d.merchant,
-        title: d.title || (!typed.has('title') && extracted.merchant) || '',
+        title: (() => {
+          if (typed.has('title')) return d.title
+          const ownTitle = d.title === '' || d.title === autoTitleRef.current
+          if (!ownTitle || !extracted.merchant) return d.title
+          autoTitleRef.current = extracted.merchant
+          return extracted.merchant
+        })(),
         amount:
           extracted.total !== undefined && mayFill('amount', d.amount) ? extracted.total.toFixed(2) : d.amount,
         date: extracted.date && mayFill('date', d.date) ? extracted.date : d.date,

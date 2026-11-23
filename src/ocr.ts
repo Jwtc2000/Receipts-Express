@@ -43,7 +43,9 @@ export async function extractReceipt(
   onProgress?: (pct: number) => void,
 ): Promise<ExtractedReceipt> {
   const worker = await getWorker()
-  const mine = onProgress ?? null
+  // A wrapper of its own, so two scans passing the same function (the editor
+  // always passes the same setter) are still told apart below.
+  const mine = onProgress ? (pct: number) => onProgress(pct) : null
   progressCallback = mine
   try {
     const result = await worker.recognize(image)
@@ -195,7 +197,7 @@ export function parseReceiptText(text: string): Omit<ExtractedReceipt, 'rawText'
   for (const line of lines.slice(0, 6)) {
     // Any letter, not only ASCII ones, and two are enough: "H&M" and "BP"
     // are merchants, and were passed over for the address line below them.
-    const letters = line.replace(/[^\p{L}]/gu, '')
+    const letters = line.replace(/[^\p{L}\p{M}]/gu, '')
     if (letters.length >= 2 && line.length <= 40 && !hasMoney(line)) {
       merchant = tidyMerchant(line)
       break
@@ -208,7 +210,9 @@ export function parseReceiptText(text: string): Omit<ExtractedReceipt, 'rawText'
 function tidyMerchant(line: string): string {
   // Keep letters in any script and the curly apostrophe: "Café" used to come
   // out as "Caf".
-  const cleaned = line.replace(/[^\p{L}\p{N}\s&'’.-]/gu, '').replace(/\s+/g, ' ').trim()
+  // \p{M}: the combining marks many scripts write vowels with. Without them
+  // "किराना" came out as "करन".
+  const cleaned = line.replace(/[^\p{L}\p{M}\p{N}\s&'’.-]/gu, '').replace(/\s+/g, ' ').trim()
   // Title-case ALL CAPS names
   if (cleaned === cleaned.toUpperCase()) {
     return cleaned

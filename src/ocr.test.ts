@@ -95,6 +95,10 @@ describe('parseReceiptText merchant', () => {
     expect(parseReceiptText('Café Rouge\nTotal 4.50').merchant).toBe('Café Rouge')
   })
 
+  it('keeps the combining marks a script writes vowels with', () => {
+    expect(parseReceiptText('किराना स्टोर\nTotal 20.00').merchant).toBe('किराना स्टोर')
+  })
+
   it('accepts a two-letter brand', () => {
     expect(parseReceiptText('H&M\n12 High Street\nTotal 20.00').merchant).toBe('H&M')
   })
@@ -115,7 +119,8 @@ describe('parseReceiptText', () => {
   })
 
   it('ignores a keyword line reading 0.00 when there is a real amount', () => {
-    const text = ['Cafe', 'Coffee 4.50', 'Total 4.50', 'Balance due 0.00'].join('\n')
+    // No other keyword line: before the fix, the 0.00 was taken as the total.
+    const text = ['Cafe', 'Coffee 4.50', 'Balance due 0.00'].join('\n')
     expect(parseReceiptText(text).total).toBe(4.5)
   })
 
