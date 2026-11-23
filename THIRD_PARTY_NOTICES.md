@@ -317,10 +317,22 @@ Apache-2.0 §4(a) asks for. It is not reproduced again here.
 | Component | Version | Copyright | Project |
 |---|---|---|---|
 | pdfjs-dist | 6.5.438 | `Copyright 2024 Mozilla Foundation` — from the `@licstart` header of `node_modules/pdfjs-dist/build/pdf.mjs`. The package's own `LICENSE` is the bare Apache-2.0 text with an unfilled appendix, so it names no holder. | https://mozilla.github.io/pdf.js/ |
-| tesseract.js | 7.0.0 | **UNDETERMINED — verify before publishing.** `LICENSE.md` is the bare Apache-2.0 text; the appendix placeholder is unfilled and `package.json` has no author. | https://github.com/naptha/tesseract.js |
-| tesseract.js-core | 7.0.0 | **UNDETERMINED — verify before publishing.** `LICENSE` is the bare Apache-2.0 text, appendix still reading `Copyright {yyyy} {name of copyright owner}`. `package.json` names `antimatter15`, which is metadata, not a notice. | https://github.com/naptha/tesseract.js-core |
+| tesseract.js | 7.0.0 | Upstream publishes no copyright line. `LICENSE.md` is the bare Apache-2.0 text with the appendix placeholder `Copyright {yyyy} {name of copyright owner}` unfilled, in the installed package and at the `v7.0.0` tag of `naptha/tesseract.js`, and `package.json` has no author. There is no notice to reproduce. | https://github.com/naptha/tesseract.js |
+| tesseract.js-core | 7.0.0 | The package publishes no copyright line either: `LICENSE` is the bare Apache-2.0 text with the same unfilled placeholder, and `package.json` names `antimatter15`, which is metadata, not a notice. The Tesseract engine compiled into it does name holders, file by file; see below. | https://github.com/naptha/tesseract.js-core |
 | idb-keyval | 6.3.0 | `Copyright 2016, Jake Archibald` — verbatim from `node_modules/idb-keyval/LICENCE`, which is the Apache-2.0 short header form with the holder filled in. Reaches the build inside `tesseract/worker.min.js`. | https://github.com/jakearchibald/idb-keyval |
 | wasm-feature-detect | 1.8.0 | `LICENSE` is the bare Apache-2.0 text with no filled copyright line. `package.json` names `Surma <surma@surma.link>`, repository `GoogleChromeLabs/wasm-feature-detect`. Imported by tesseract.js. | https://github.com/GoogleChromeLabs/wasm-feature-detect |
+
+The two Tesseract rows were marked **UNDETERMINED** until the upstream repositories were read
+(2026-11-22). They say no more than the installed packages do: the placeholder is unfilled at
+the `v7.0.0` tag of both, so there is no holder of record to name and none is invented here.
+The engine inside the core is a different matter. `tesseract.js-core` 7.0.0 builds it from
+`Balearica/tesseract` at commit `2a9c1c49`, and `strings -a` over the shipped
+`tesseract-core.wasm` gives the matching `5.1.0-288-g2a9c1`. That tree's `LICENSE` is again
+the bare Apache-2.0 text and it has no `NOTICE` file, but its source files carry their own
+headers, in the forms `(C) Copyright <year>, Google Inc.` and `(C) Copyright <year>,
+Hewlett-Packard Ltd.` (also `Hewlett-Packard Company.`). Those headers are in the source and
+not in the binary; Apache-2.0 does not require them to survive into object code, and this
+paragraph is the only place they are recorded for this build.
 
 `idb-keyval` was marked **UNDETERMINED — ships no licence file at all** in an earlier draft.
 That was false: the file is `LICENCE`, not `LICENSE`, and a check written against the American
@@ -380,11 +392,10 @@ the authoritative text for those four; this paragraph is a map to it, not a subs
 vendored into the precached jsPDF chunk is Adobe's, under the same licence, and its full text
 ships in that chunk's own header (§2.6). What is true of `ieee754` is narrower: it is not
 present in `node_modules/` — it arrives already bundled inside the pre-minified worker — so
-there is no local `LICENSE` to quote, and *its* copy of the BSD-3-Clause text is
-**UNDETERMINED — verify before publishing**: read
-https://github.com/feross/ieee754/blob/master/LICENSE and paste it into §11.4 beside Adobe's.
-The one-line notice its author publishes does ship, which is the part that does not depend on
-getting that text right.
+there is no local `LICENSE` to quote. Its text is in §11.4 beside Adobe's, read from the
+`LICENSE` of ieee754 1.2.1, the version tesseract.js 7.0.0's own lockfile resolves. The holder
+that file names is `Copyright 2008 Fair Oaks Labs, Inc.`, not the package's author, whose name
+is the one in the banner. That one-line banner ships in `worker.min.js.LICENSE.txt`.
 
 **Two things inside the worker have no notice anywhere in the distribution.** Neither is
 visible in the shipped file — both were found by reading the `sources` and `sourcesContent` of
@@ -393,7 +404,7 @@ above does not catch them.
 
 | Component | How it gets in | Copyright and licence |
 |---|---|---|
-| `base64-js` | `node_modules/base64-js/index.js` per the worker's sourcemap; `buffer/index.js` `require`s it and `buffer` is in there too. Not installed in this tree — it arrives already bundled. | **UNDETERMINED — verify before publishing.** The map's `sourcesContent` carries the whole module and it has no header comment of any kind; there is no installed package to read a `LICENSE`, a `license` field or a version from. Read `beatgammit/base64-js` upstream and record what it actually says. |
+| `base64-js` | `node_modules/base64-js/index.js` per the worker's sourcemap; `buffer/index.js` `require`s it and `buffer` is in there too. Not installed in this tree — it arrives already bundled. | `Copyright (c) 2014 Jameson Little` — MIT, verbatim from the `LICENSE` of base64-js 1.5.1 (https://raw.githubusercontent.com/beatgammit/base64-js/v1.5.1/LICENSE). 1.5.1 is the version tesseract.js 7.0.0's lockfile resolves, and the module in the worker's sourcemap is byte-identical to that release's `index.js`. The module itself has no header comment, so nothing in the worker carries this line. MIT text in §11.1. |
 | `arrayBufferToBase64` | tesseract.js's own `src/worker-script/utils/arrayBufferToBase64.js` | `// Copied from https://gist.github.com/jonleighton/958841` / `// Copyright 2011 Jon Leighton, MIT LICENSE` — verbatim, the first two lines of that file. MIT text in §11.1. |
 
 Jon Leighton's notice is lost because both lines are `//` comments, and the minifier that
@@ -408,7 +419,7 @@ table row above is the only place it exists for this build.
 
 | Component | Version | Licence | Project |
 |---|---|---|---|
-| @tesseract.js-data/eng | 1.0.0 | **UNDETERMINED — verify before publishing.** | https://github.com/naptha/tessdata |
+| @tesseract.js-data/eng | 1.0.0 | Apache-2.0, on the terms `tesseract-ocr/tessdata` declares for its data. No copyright holder is named anywhere upstream — see below, and item 1 in §9. | https://github.com/naptha/tessdata |
 
 This is the single largest file the app serves — `tesseract/eng.traineddata.gz`, 10,923,060
 bytes. What the installed package actually says is very little:
@@ -427,35 +438,68 @@ bytes. What the installed package actually says is very little:
   It has no licence section and names no copyright holder.
 
 So the npm `"MIT"` field is unbacked by any licence text and the package identifies no
-copyright holder. The declared licence is also in tension with the model's likely
-provenance: `naptha/tessdata` repackages the tesseract-ocr project's `tessdata`, and
-tesseract-ocr is Apache-2.0. **Do not settle this by trusting the npm field.** Read the root
-LICENSE of `tesseract-ocr/tessdata` and of `naptha/tessdata`, decide which governs, and
-record the answer here. If Apache-2.0, the duty to supply the licence is already discharged
-by `LICENSE.txt`. If MIT, the package supplies no notice, so there is none to reproduce.
+copyright holder. The upstream repositories were read to settle it (2026-11-22), and this is
+what they say.
 
-### 5.3 The WASM cores statically link C libraries — TODO, read upstream
+- **The file is the unmodified upstream model.** Decompressed, the shipped file is 23,466,654
+  bytes with git blob SHA-1 `f4744c201359d02ced6914c77f0de68ee9bbdd74`, which is the blob the
+  GitHub API reports for `eng.traineddata` in `tesseract-ocr/tessdata` at `main` and at its
+  `4.0.0` and `4.1.0` tags. `naptha/tessdata`'s README names that repository as the source of
+  its `4.0.0` directory.
+- **That repository declares Apache-2.0 for its data.** Its `README.md` reads `All data in the
+  repository are licensed under the` / `Apache-2.0 License, see file [LICENSE](LICENSE).`, and
+  its root `LICENSE` is the Apache-2.0 text. `naptha/tessdata`'s root `LICENSE` is Apache-2.0
+  as well.
+- **The npm `"MIT"` is a template value.** `scripts/gen-pkg.js` in `naptha/tessdata` writes
+  `"license": "MIT"` into every language package. No MIT text exists in the package or in
+  either repository, and the app ships none of the wrapper files that field could describe,
+  only the `.gz`.
+- **No copyright holder is named.** The only copyright line in either licence file is the
+  unfilled appendix placeholder, neither repository has a `NOTICE` or `AUTHORS` file, and
+  `strings` over the decompressed model finds no copyright string.
 
-The four cores in `tesseract/` are compiled binaries with several permissively licensed C
+On that reading the model is Apache-2.0 and the duty to supply the licence is already
+discharged by `LICENSE.txt`. Two things keep it on the list in §9. The declaration is the
+repository's, added by a maintainer, not a statement from whoever trained the data; and there
+is no holder to name. Neither can be settled by reading further. They are for the owner to
+accept or not.
+
+### 5.3 The WASM cores statically link C libraries
+
+The six cores in `tesseract/` are compiled binaries with several permissively licensed C
 libraries linked in, each carrying its own binary-redistribution condition.
 `node_modules/tesseract.js-core/` holds exactly one licence artifact, the bare Apache-2.0
 text, which covers the Tesseract code and says nothing about anything linked into it. That
-text now ships as `tesseract/LICENSE-tesseract-core.txt`; the rows below are still open.
+text ships as `tesseract/LICENSE-tesseract-core.txt`.
+
+**How each library and version was identified.** The shipped cores are byte-identical to the
+files committed at the `v7.0.0` tag of `naptha/tesseract.js-core`, which is the commit npm
+records for the installed 7.0.0. That commit pins each library as a git submodule at one
+commit, and the licence texts in §11.7 were fetched from upstream at exactly those commits
+(2026-11-22). Where the binary carries a version string of its own it agrees with the pin, and
+the table says so. What this does not prove is that the maintainers compiled from an unmodified
+checkout of those pins; the binaries say nothing that contradicts it.
 
 Evidence is from `strings -a` over the shipped `tesseract-core.wasm`.
 
-| Library | Evidence in the shipped binary | Licence | Status |
+| Library | Evidence in the shipped binary | Pinned source | Licence and copyright |
 |---|---|---|---|
-| libjpeg (Independent JPEG Group) | `Copyright (C) 2014, Thomas G. Lane, Guido Vollbeding` | IJG License | **TODO — UNDETERMINED, verify before publishing.** The IJG licence requires an executable-only distribution to state that the software is based in part on the work of the Independent JPEG Group, in wording the licence itself prescribes. Read that wording upstream and paste it verbatim. |
-| Leptonica | `leptonica-%d.%d.%d`, `# Raw PBM file written by leptonica (www.leptonica.com)` | BSD-2-Clause per upstream | **TODO — UNDETERMINED, verify before publishing.** Read `DanBloomberg/leptonica/leptonica-license.txt` and reproduce its copyright line and text. |
-| libtiff | `libtiff does not allow writing more than 2147483647 bytes in a tag` | libtiff (Sam Leffler / Silicon Graphics) | **TODO — UNDETERMINED, verify before publishing.** |
-| libpng | `Application built with libpng-`, `libpng error: %s` | PNG Reference Library License | **TODO — UNDETERMINED, verify before publishing.** |
-| zlib | linked via libpng | zlib License | **TODO — UNDETERMINED, verify before publishing.** |
+| libjpeg (Independent JPEG Group) | `Copyright (C) 2014, Thomas G. Lane, Guido Vollbeding`, `9a  19-Jan-2014` | `LuaDist/libjpeg` at `6c0fcb8d`, a mirror of IJG release 9a; its `README` and `jversion.h` are byte-identical to those in the IJG's own `jpegsrc.v9a.tar.gz` | IJG licence. `This software is copyright (C) 1991-2014, Thomas G. Lane, Guido Vollbeding.` Text in §11.7. This is the original IJG library, not libjpeg-turbo |
+| Leptonica | `leptonica-%d.%d.%d`, `# Raw PBM file written by leptonica (www.leptonica.com)` | `DanBloomberg/leptonica` at `4af068b5` | Two-clause BSD-style licence, which upstream gives no name. `Copyright (C) 2001-2020 Leptonica.  All rights reserved.` Text in §11.7 |
+| libtiff | `libtiff does not allow writing more than 2147483647 bytes in a tag` | `libtiff/libtiff` (GitLab) at `b51bb157`, version 4.3.0 | libtiff licence. `Copyright (c) 1988-1997 Sam Leffler` / `Copyright (c) 1991-1997 Silicon Graphics, Inc.` Its LZW codec carries a separate University of California notice. Both in §11.7 |
+| libpng | `Application built with libpng-`, `libpng error: %s`, `1.6.38.git` | `glennrp/libpng` at `a37d4836` | PNG Reference Library License version 2. `Copyright (c) 1995-2020 The PNG Reference Library Authors.` and four further lines. Text in §11.7 |
+| zlib | `1.2.12` | `madler/zlib` at `21767c65`, version 1.2.12 | zlib licence. `Copyright (C) 1995-2022 Jean-loup Gailly and Mark Adler` Text in §11.7 |
 
-**These five licence texts are deliberately not reproduced in §11.** Writing them from memory
-would be worse than the current gap: a wrong licence text is an affirmative misstatement,
-where a missing one is an omission. Each must be read from its own upstream repository and
-pasted in.
+**The IJG licence prescribes wording for a distribution like this one**, and here it is, in the
+form the licence asks for: this software is based in part on the work of the Independent JPEG
+Group.
+
+**Three more libraries are built into the cores and are not accounted for.** The build script
+at that tag also builds `giflib`, `libwebp` and `openlibm`, and passes the first two to
+Leptonica's build as its GIF and WebP libraries. The binary bears that out for those two:
+`strings` finds `failed to create GIF image handle` and `invalid WebP file` in it. Whether
+`openlibm` ends up in the final binary was not established. None of the three has a row above
+or a text in §11, because none has been read from upstream yet. They are items 2 to 4 in §9.
 
 ## 6. PDF.js bundled sub-components
 
@@ -567,12 +611,13 @@ webfont and uses the system stack.
 
 | Component | Copyright | Project |
 |---|---|---|
-| Feather Icons | **UNDETERMINED — verify before publishing.** `Copyright (c) 2013-2023 Cole Bemis` — MIT. See the note below on how this line was obtained. | https://github.com/feathericons/feather |
+| Feather Icons | `Copyright (c) 2013-2023 Cole Bemis` — MIT. See the note below on how this line was obtained. | https://github.com/feathericons/feather |
 
-Feather is not installed, so there is no local `LICENSE` to quote and the line above was
-taken from the upstream repository rather than read out of `node_modules/`. It should be
-confirmed against https://github.com/feathericons/feather/blob/main/LICENSE before this file
-is published.
+Feather is not installed, so there is no local `LICENSE` to quote. The line above was read
+from the upstream file, https://raw.githubusercontent.com/feathericons/feather/main/LICENSE
+(2026-11-22), which is titled `The MIT License (MIT)` and is byte-identical to the `LICENSE`
+in the `feather-icons` 4.29.2 npm package. Releases up to 4.29.0 carry `2013-2017` in place of
+`2013-2023`; the line here matches current upstream. MIT text in §11.1.
 
 The derivation is real and was checked glyph by glyph, and the record of that check is the
 header comment in `src/components/icons.tsx`. In that file, these reproduce Feather path data:
@@ -585,14 +630,22 @@ polyline; and `edit` (`edit`) is identical with the closing `9.5-9.5` segment re
 The wrapper `<svg>` uses Feather's own convention — `viewBox="0 0 24 24"`, `fill="none"`,
 `stroke="currentColor"`, stroke width 2, round caps and joins. In the repository,
 `assets/camera.svg` is Feather `camera`, `assets/lock.svg` is Feather `lock` and
-`assets/pdf.svg` is Feather `file-text`, each byte-identical; `assets/reports.svg` is Feather
+`assets/pdf.svg` is Feather `file-text`, each with the same elements in the same order; `assets/reports.svg` is Feather
 `clipboard` with three lines added. Those SVGs are used by `README.md` and are not part of
 the deployed build.
 
-Every comparison in that paragraph is against upstream Feather, which is not installed here, so
-none of it could be re-checked while this file was written; it stands as
-`src/components/icons.tsx` records it. The copyright line above has the same status. Settling
-both is one job, and it is item 9 in §9.
+Every comparison in that paragraph was re-checked against upstream Feather's `icons/*.svg`
+(2026-11-22) and holds, with one correction made above: the three repository SVGs are not
+byte-identical to Feather's files. Their shapes are the same, element for element, but the
+files set `stroke="#0f766e"` where Feather has `currentColor` and are laid out over several
+lines.
+
+One deployed file was missing from this section. `docs/pilot-deck.html`, which ships as
+`docs/pilot-deck.html` on the site, draws its icons as inline SVG, and those are Feather's
+too: `camera`, `folder`, `smartphone`, `upload`, `plus`, `flag`, `download`, `monitor`,
+`alert-triangle`, `clock`, `chevron-left`, `chevron-right` and `check` unchanged, and close
+copies of `database` and `file-text`. The page carries no attribution of its own, so the row
+above is where that notice is given for it.
 
 The rest of `icons.tsx` is not Feather's, and it splits two ways — a distinction an earlier
 draft blurred by filing all of it under "generic marks":
@@ -618,30 +671,34 @@ consciously accepted.**
 
 | # | Component | What is missing | Where to look |
 |---|---|---|---|
-| 1 | @tesseract.js-data/eng 1.0.0 | Operative licence and copyright holder; ships no licence file (§5.2) | `tesseract-ocr/tessdata`, `naptha/tessdata` |
-| 2 | libjpeg (in WASM) | The IJG acknowledgement wording, which the licence prescribes | libjpeg-turbo upstream |
-| 3 | Leptonica (in WASM) | Copyright line and BSD-2-Clause text | `DanBloomberg/leptonica` |
-| 4 | libtiff (in WASM) | Copyright line and licence text | libtiff upstream |
-| 5 | libpng (in WASM) | Copyright line and licence text | libpng upstream |
-| 6 | zlib (in WASM, via libpng) | Copyright line and licence text | zlib upstream |
-| 7 | tesseract.js 7.0.0, tesseract.js-core 7.0.0 | Copyright holder; both licence files are bare Apache-2.0 with an unfilled appendix | Upstream repository headers |
-| 8 | ieee754 | Its own BSD-3-Clause text for §11.4; not in `node_modules/` (§5.1) | `feross/ieee754` |
-| 9 | Feather Icons | The copyright line, and the glyph comparisons in §8; Feather is not installed | `feathericons/feather` |
-| 10 | base64-js | Licence and copyright holder; bundled into `tesseract/worker.min.js`, not installed, no header in its source (§5.1) | `beatgammit/base64-js` |
+| 1 | @tesseract.js-data/eng 1.0.0 | Nothing that further reading can supply. Upstream declares Apache-2.0 for the data but names no copyright holder, and the declaration is the repository's, not the trainer's (§5.2). To be accepted or not | `tesseract-ocr/tessdata` |
+| 2 | giflib (in WASM) | Licence and copyright line; built into the cores and linked through Leptonica (§5.3) | `mirrorer/giflib` at `fa376720`, the commit `tesseract.js-core` 7.0.0 pins |
+| 3 | libwebp (in WASM) | Licence, copyright line and any patent grant file; built into the cores and linked through Leptonica (§5.3) | `webmproject/libwebp` at `20ef03ee` |
+| 4 | openlibm (possibly in WASM) | Whether it is in the final binary at all, then its licences and copyright lines (§5.3) | `JuliaMath/openlibm` at `ae2d9169` |
 
-Two items that were on this list are off it, both because the answer was sitting in
+Seven items came off this list on 2026-11-22, when each was read from its upstream source at
+the version this build ships: the IJG wording for libjpeg, and the texts for Leptonica,
+libtiff, libpng and zlib (§5.3, §11.7); ieee754's own BSD-3-Clause text (§11.4); and base64-js
+(§5.1). Two more were answered by upstream having nothing to say: neither tesseract.js nor
+tesseract.js-core names a copyright holder at any tag (§4). Feather's copyright line was
+confirmed and its glyph comparisons re-checked (§8).
+
+The same reading added three. The cores' build script builds giflib, libwebp and openlibm
+beside the five libraries this file already listed, and nobody had looked.
+
+Two items that were on this list earlier are off it because the answer was sitting in
 `node_modules/` the whole time. `idb-keyval` 6.3.0 was recorded as shipping no licence file; it
 ships `LICENCE`, and it names Jake Archibald (§4). `regenerator-runtime` was filed as
 unreachable `.html()` code; it is in the precached main bundle (§2.1). Neither was a hard
 question. Both were answered by opening the file.
 
-A third came off for a different reason. QuickJS was item 11 while `pdfjs-dist` shipped no
-licence file for it; 6.5.438 ships two (§6), and upstream answered what no amount of reading
-the old package could. The same upgrade replaced the licence file beside the Liberation Sans
-fonts, which would have put a new item in its place; the fonts were removed from the build
-instead (§6), so there is nothing to list.
+QuickJS came off for a different reason. `pdfjs-dist` shipped no licence file for it until
+6.5.438, which ships two (§6), and upstream answered what no amount of reading the old package
+could. The same upgrade replaced the licence file beside the Liberation Sans fonts, which
+would have put a new item in its place; the fonts were removed from the build instead (§6), so
+there is nothing to list.
 
-`is-url` 1.2.4 is a milder eleventh case: its `LICENSE-MIT` genuinely contains no copyright
+`is-url` 1.2.4 is a milder case of its own: its `LICENSE-MIT` genuinely contains no copyright
 line, so there is nothing to reproduce and nothing to fix. It is recorded in §2.4 instead. The
 three non-standard headers in §2.6 — "Use it if you like it", the MD5 header stating that no
 licence was specified, and FPDF's — are likewise not listed here: each ships verbatim in the
@@ -732,7 +789,7 @@ Apache-2.0 §4(a) requires.
 ### 11.4 BSD-3-Clause License
 
 Applies to two components: the Adobe JPEG encoder vendored into the jsPDF chunk (§2.6) and
-`ieee754` (§5.1).
+`ieee754` (§5.1). Each has its own text below.
 
 Adobe's text ships inside `assets/jspdf.es.min-*.js`. It is reproduced here from
 `node_modules/jspdf/dist/jspdf.es.min.js`, the file that chunk is built from — the opening
@@ -776,11 +833,27 @@ Its second clause is the operative one here: a binary redistribution must reprod
 notice, and the app does — the header travels inside the chunk it covers, and it is repeated
 above.
 
-`ieee754`'s own text is **UNDETERMINED — verify before publishing**: it is not present in
-`node_modules/`, there is no local file to copy from, and one package's licence text is not
-pasted under another package's name here even when the template is the same. Read
-https://github.com/feross/ieee754/blob/master/LICENSE and add it beside Adobe's. The one-line
-notice its author publishes already ships verbatim in
+`ieee754`'s own text is a different wording of the same licence, with a different holder, which
+is why Adobe's could not stand in for it. It is not present in `node_modules/`, so it is
+reproduced here verbatim from the `LICENSE` at the `v1.2.1` tag of `feross/ieee754`
+(https://raw.githubusercontent.com/feross/ieee754/v1.2.1/LICENSE), the version tesseract.js
+7.0.0 bundles. The file is byte-identical in the 1.2.1 npm package:
+
+```
+Copyright 2008 Fair Oaks Labs, Inc.
+
+Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
+
+3. Neither the name of the copyright holder nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+```
+
+The one-line notice its author publishes ships verbatim in
 `tesseract/worker.min.js.LICENSE.txt`.
 
 ### 11.5 SIL Open Font License 1.1
@@ -794,7 +867,318 @@ Three grants are short enough to be quoted where they belong rather than collect
 are not repeated: **tslib**'s banner and the **FPDF** and `RGBColor` **"use it if you like it"**
 headers, all in §2.6. §11 is not a complete inventory on its own; §2.6 is part of it.
 
+### 11.7 Libraries linked into the Tesseract cores
+
+Each text below was fetched from upstream on 2026-11-22 at the commit `tesseract.js-core` 7.0.0
+pins (§5.3) and pasted from the fetched file, not retyped.
+
+**libjpeg.** The `LEGAL ISSUES` section of the `README` of IJG release 9a, as far as the end of
+the licence terms. Condition (2) is the one that applies to a binary-only distribution, and
+the statement it asks for is made in §5.3.
+
+```
+LEGAL ISSUES
+============
+
+In plain English:
+
+1. We don't promise that this software works.  (But if you find any bugs,
+   please let us know!)
+2. You can use this software for whatever you want.  You don't have to pay us.
+3. You may not pretend that you wrote this software.  If you use it in a
+   program, you must acknowledge somewhere in your documentation that
+   you've used the IJG code.
+
+In legalese:
+
+The authors make NO WARRANTY or representation, either express or implied,
+with respect to this software, its quality, accuracy, merchantability, or
+fitness for a particular purpose.  This software is provided "AS IS", and you,
+its user, assume the entire risk as to its quality and accuracy.
+
+This software is copyright (C) 1991-2014, Thomas G. Lane, Guido Vollbeding.
+All Rights Reserved except as specified below.
+
+Permission is hereby granted to use, copy, modify, and distribute this
+software (or portions thereof) for any purpose, without fee, subject to these
+conditions:
+(1) If any part of the source code for this software is distributed, then this
+README file must be included, with this copyright and no-warranty notice
+unaltered; and any additions, deletions, or changes to the original files
+must be clearly indicated in accompanying documentation.
+(2) If only executable code is distributed, then the accompanying
+documentation must state that "this software is based in part on the work of
+the Independent JPEG Group".
+(3) Permission for use of this software is granted only if the user accepts
+full responsibility for any undesirable consequences; the authors accept
+NO LIABILITY for damages of any kind.
+
+These conditions apply to any software derived from or based on the IJG code,
+not just to the unmodified library.  If you use our work, you ought to
+acknowledge us.
+
+Permission is NOT granted for the use of any IJG author's name or company name
+in advertising or publicity relating to this software or products derived from
+it.  This software may be referred to only as "the Independent JPEG Group's
+software".
+
+We specifically permit and encourage the use of this software as the basis of
+commercial products, provided that all warranty or liability claims are
+assumed by the product vendor.
+```
+
+**Leptonica.** The whole of `leptonica-license.txt`.
+
+```
+/*====================================================================*
+ -  Copyright (C) 2001-2020 Leptonica.  All rights reserved.
+ -
+ -  Redistribution and use in source and binary forms, with or without
+ -  modification, are permitted provided that the following conditions
+ -  are met:
+ -  1. Redistributions of source code must retain the above copyright
+ -     notice, this list of conditions and the following disclaimer.
+ -  2. Redistributions in binary form must reproduce the above
+ -     copyright notice, this list of conditions and the following
+ -     disclaimer in the documentation and/or other materials
+ -     provided with the distribution.
+ -
+ -  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ -  ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ -  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ -  A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL ANY
+ -  CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ -  EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ -  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ -  PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+ -  OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ -  NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ -  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *====================================================================*/
+```
+
+**libtiff.** The whole of `COPYRIGHT`.
+
+```
+Copyright (c) 1988-1997 Sam Leffler
+Copyright (c) 1991-1997 Silicon Graphics, Inc.
+
+Permission to use, copy, modify, distribute, and sell this software and 
+its documentation for any purpose is hereby granted without fee, provided
+that (i) the above copyright notices and this permission notice appear in
+all copies of the software and related documentation, and (ii) the names of
+Sam Leffler and Silicon Graphics may not be used in any advertising or
+publicity relating to the software without the specific, prior written
+permission of Sam Leffler and Silicon Graphics.
+
+THE SOFTWARE IS PROVIDED "AS-IS" AND WITHOUT WARRANTY OF ANY KIND, 
+EXPRESS, IMPLIED OR OTHERWISE, INCLUDING WITHOUT LIMITATION, ANY 
+WARRANTY OF MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.  
+
+IN NO EVENT SHALL SAM LEFFLER OR SILICON GRAPHICS BE LIABLE FOR
+ANY SPECIAL, INCIDENTAL, INDIRECT OR CONSEQUENTIAL DAMAGES OF ANY KIND,
+OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
+WHETHER OR NOT ADVISED OF THE POSSIBILITY OF DAMAGE, AND ON ANY THEORY OF 
+LIABILITY, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE 
+OF THIS SOFTWARE.
+```
+
+libtiff's LZW codec, `libtiff/tif_lzw.c`, carries a second notice of its own, and that file is
+compiled in:
+
+```
+/*
+ * Copyright (c) 1985, 1986 The Regents of the University of California.
+ * All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * James A. Woods, derived from original work by Spencer Thomas
+ * and Joseph Orost.
+ *
+ * Redistribution and use in source and binary forms are permitted
+ * provided that the above copyright notice and this paragraph are
+ * duplicated in all such forms and that any documentation,
+ * advertising materials, and other materials related to such
+ * distribution and use acknowledge that the software was developed
+ * by the University of California, Berkeley.  The name of the
+ * University may not be used to endorse or promote products derived
+ * from this software without specific prior written permission.
+ * THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+ */
+```
+
+That notice asks that materials accompanying a distribution acknowledge the origin of the code,
+so, in its terms: the LZW code in libtiff was developed by the University of California,
+Berkeley. The same acknowledgement is made in `README.md` and in both copies of the pilot deck,
+which are the other materials that describe the OCR feature.
+
+**libpng.** The whole of `LICENSE`.
+
+```
+COPYRIGHT NOTICE, DISCLAIMER, and LICENSE
+=========================================
+
+PNG Reference Library License version 2
+---------------------------------------
+
+ * Copyright (c) 1995-2020 The PNG Reference Library Authors.
+ * Copyright (c) 2018-2020 Cosmin Truta.
+ * Copyright (c) 2000-2002, 2004, 2006-2018 Glenn Randers-Pehrson.
+ * Copyright (c) 1996-1997 Andreas Dilger.
+ * Copyright (c) 1995-1996 Guy Eric Schalnat, Group 42, Inc.
+
+The software is supplied "as is", without warranty of any kind,
+express or implied, including, without limitation, the warranties
+of merchantability, fitness for a particular purpose, title, and
+non-infringement.  In no event shall the Copyright owners, or
+anyone distributing the software, be liable for any damages or
+other liability, whether in contract, tort or otherwise, arising
+from, out of, or in connection with the software, or the use or
+other dealings in the software, even if advised of the possibility
+of such damage.
+
+Permission is hereby granted to use, copy, modify, and distribute
+this software, or portions hereof, for any purpose, without fee,
+subject to the following restrictions:
+
+ 1. The origin of this software must not be misrepresented; you
+    must not claim that you wrote the original software.  If you
+    use this software in a product, an acknowledgment in the product
+    documentation would be appreciated, but is not required.
+
+ 2. Altered source versions must be plainly marked as such, and must
+    not be misrepresented as being the original software.
+
+ 3. This Copyright notice may not be removed or altered from any
+    source or altered source distribution.
+
+
+PNG Reference Library License version 1 (for libpng 0.5 through 1.6.35)
+-----------------------------------------------------------------------
+
+libpng versions 1.0.7, July 1, 2000, through 1.6.35, July 15, 2018 are
+Copyright (c) 2000-2002, 2004, 2006-2018 Glenn Randers-Pehrson, are
+derived from libpng-1.0.6, and are distributed according to the same
+disclaimer and license as libpng-1.0.6 with the following individuals
+added to the list of Contributing Authors:
+
+    Simon-Pierre Cadieux
+    Eric S. Raymond
+    Mans Rullgard
+    Cosmin Truta
+    Gilles Vollant
+    James Yu
+    Mandar Sahastrabuddhe
+    Google Inc.
+    Vadim Barkov
+
+and with the following additions to the disclaimer:
+
+    There is no warranty against interference with your enjoyment of
+    the library or against infringement.  There is no warranty that our
+    efforts or the library will fulfill any of your particular purposes
+    or needs.  This library is provided with all faults, and the entire
+    risk of satisfactory quality, performance, accuracy, and effort is
+    with the user.
+
+Some files in the "contrib" directory and some configure-generated
+files that are distributed with libpng have other copyright owners, and
+are released under other open source licenses.
+
+libpng versions 0.97, January 1998, through 1.0.6, March 20, 2000, are
+Copyright (c) 1998-2000 Glenn Randers-Pehrson, are derived from
+libpng-0.96, and are distributed according to the same disclaimer and
+license as libpng-0.96, with the following individuals added to the
+list of Contributing Authors:
+
+    Tom Lane
+    Glenn Randers-Pehrson
+    Willem van Schaik
+
+libpng versions 0.89, June 1996, through 0.96, May 1997, are
+Copyright (c) 1996-1997 Andreas Dilger, are derived from libpng-0.88,
+and are distributed according to the same disclaimer and license as
+libpng-0.88, with the following individuals added to the list of
+Contributing Authors:
+
+    John Bowler
+    Kevin Bracey
+    Sam Bushell
+    Magnus Holmgren
+    Greg Roelofs
+    Tom Tanner
+
+Some files in the "scripts" directory have other copyright owners,
+but are released under this license.
+
+libpng versions 0.5, May 1995, through 0.88, January 1996, are
+Copyright (c) 1995-1996 Guy Eric Schalnat, Group 42, Inc.
+
+For the purposes of this copyright and license, "Contributing Authors"
+is defined as the following set of individuals:
+
+    Andreas Dilger
+    Dave Martindale
+    Guy Eric Schalnat
+    Paul Schmidt
+    Tim Wegner
+
+The PNG Reference Library is supplied "AS IS".  The Contributing
+Authors and Group 42, Inc. disclaim all warranties, expressed or
+implied, including, without limitation, the warranties of
+merchantability and of fitness for any purpose.  The Contributing
+Authors and Group 42, Inc. assume no liability for direct, indirect,
+incidental, special, exemplary, or consequential damages, which may
+result from the use of the PNG Reference Library, even if advised of
+the possibility of such damage.
+
+Permission is hereby granted to use, copy, modify, and distribute this
+source code, or portions hereof, for any purpose, without fee, subject
+to the following restrictions:
+
+ 1. The origin of this source code must not be misrepresented.
+
+ 2. Altered versions must be plainly marked as such and must not
+    be misrepresented as being the original source.
+
+ 3. This Copyright notice may not be removed or altered from any
+    source or altered source distribution.
+
+The Contributing Authors and Group 42, Inc. specifically permit,
+without fee, and encourage the use of this source code as a component
+to supporting the PNG file format in commercial products.  If you use
+this source code in a product, acknowledgment is not required but would
+be appreciated.
+```
+
+**zlib.** zlib 1.2.12 has no separate licence file; the licence is the notice at the head of
+`zlib.h`, reproduced from its copyright line to the authors' addresses.
+
+```
+  Copyright (C) 1995-2022 Jean-loup Gailly and Mark Adler
+
+  This software is provided 'as-is', without any express or implied
+  warranty.  In no event will the authors be held liable for any damages
+  arising from the use of this software.
+
+  Permission is granted to anyone to use this software for any purpose,
+  including commercial applications, and to alter it and redistribute it
+  freely, subject to the following restrictions:
+
+  1. The origin of this software must not be misrepresented; you must not
+     claim that you wrote the original software. If you use this software
+     in a product, an acknowledgment in the product documentation would be
+     appreciated but is not required.
+  2. Altered source versions must be plainly marked as such, and must not be
+     misrepresented as being the original software.
+  3. This notice may not be removed or altered from any source distribution.
+
+  Jean-loup Gailly        Mark Adler
+```
+
 ---
 
-*Ten items in §9 remain unresolved. Do not describe this file as a finished attribution
+*Four items in §9 remain unresolved. Do not describe this file as a finished attribution
 record until each is resolved or consciously accepted.*

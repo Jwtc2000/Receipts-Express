@@ -51,7 +51,7 @@ Independent personal project — no affiliation with, endorsement from, or appro
 *A fast, private utility running entirely on your device*
 
 #### Key Pilot Features:
-* **On-Device OCR**: [Tesseract.js](https://tesseract.projectnaptha.com/) scans receipts and extracts fields locally. No external APIs, no cloud processing.
+* **On-Device OCR**: [Tesseract.js](https://tesseract.projectnaptha.com/) scans receipts and extracts fields locally. No external APIs, no cloud processing. The OCR engine includes LZW code from libtiff that was developed by the University of California, Berkeley.
     > **What is OCR?** OCR (Optical Character Recognition) is the automated technology that reads the text inside receipt images (merchant names, dates, and amounts) and converts it into editable digital text. Running it fully on-device via WebAssembly means no images or transcripts are ever sent over the network to external systems.
 * **Photo or PDF Capture**: Receipts can be added as a camera photo or an uploaded PDF (single- or multi-page, e.g. an emailed invoice). PDFs are rasterized on-device via a self-hosted PDF.js, then flow through the same on-device OCR, storage, and export path as a photographed receipt.
 * **Reports Manager**: Create, name, and drag-and-drop receipts to reorder. Group expenses easily by business trip.
