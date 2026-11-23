@@ -32,7 +32,7 @@ const commitHash = (() => {
 // they *are* meta-compatible and cost nothing for a single-page app with no
 // external forms; see SECURITY.md for the frame-ancestors gap itself.
 const CSP =
-  "default-src 'self'; connect-src 'self'; img-src 'self' blob: data:; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; worker-src 'self' blob:; base-uri 'self'; form-action 'self'"
+  "default-src 'self'; connect-src 'self'; img-src 'self' blob: data:; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; worker-src 'self' blob:; object-src 'none'; frame-src 'none'; base-uri 'self'; form-action 'self'"
 
 // The same policy, adjusted for the standalone pages under docs/ — derived from
 // CSP above rather than written out again, so the two cannot drift apart.
@@ -55,14 +55,20 @@ const CSP =
 // by any other route has no matching hash. Only pilot-deck.html has one; the
 // three legal pages have none and so keep inline script blocked outright,
 // which src/legalPages.test.ts independently holds them to.
+//
+// And three grants the app needs and these pages do not are taken away:
+// WebAssembly ('wasm-unsafe-eval'), workers, and blob:/data: images. None of
+// the four pages compiles WebAssembly, starts a worker or shows an image that
+// is not a file of its own, so nothing is lost, and a page that is only text
+// keeps only the permissions text needs.
 function docsCsp(html: string): string {
   const hashes = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)].map(
     ([, body]) => `'sha256-${createHash('sha256').update(body, 'utf-8').digest('base64')}'`,
   )
-  return CSP.replace("style-src 'self'", () => "style-src 'self' 'unsafe-inline'").replace(
-    "script-src 'self'",
-    () => ["script-src 'self'", ...hashes].join(' '),
-  )
+  return CSP.replace("style-src 'self'", () => "style-src 'self' 'unsafe-inline'")
+    .replace("script-src 'self' 'wasm-unsafe-eval'", () => ["script-src 'self'", ...hashes].join(' '))
+    .replace("img-src 'self' blob: data:", () => "img-src 'self'")
+    .replace("worker-src 'self' blob:", () => "worker-src 'none'")
 }
 
 // Build-only: Vite's dev server injects CSS via inline <style> tags for

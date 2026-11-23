@@ -105,3 +105,59 @@ describe('renderPdfPages', () => {
     expect(failTask.destroy).toHaveBeenCalledOnce()
   })
 })
+
+/**
+ * PDF.js does no error handling for a worker it is handed, so a wrapper that
+ * failed to load would leave every PDF import waiting forever. startWorker
+ * hands one over only after it has posted its first message.
+ */
+describe('startWorker', () => {
+  class FakeWorker extends EventTarget {
+    static last: FakeWorker
+    terminated = false
+    constructor(public url: string, public options: WorkerOptions) {
+      super()
+      FakeWorker.last = this
+    }
+    terminate() {
+      this.terminated = true
+    }
+  }
+
+  beforeEach(() => {
+    vi.stubGlobal('Worker', FakeWorker)
+    URL.createObjectURL = vi.fn(() => 'blob:wrapper')
+    URL.revokeObjectURL = vi.fn()
+  })
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('returns the module worker once it reports ready', async () => {
+    const { startWorker } = await import('./pdfReceipt')
+    const started = startWorker()
+    FakeWorker.last.dispatchEvent(new MessageEvent('message', { data: { action: 'ready' } }))
+    expect(await started).toBe(FakeWorker.last)
+    expect(FakeWorker.last.options).toEqual({ type: 'module' })
+    expect(FakeWorker.last.terminated).toBe(false)
+  })
+
+  it('gives up and terminates it if the worker fails to load', async () => {
+    const { startWorker } = await import('./pdfReceipt')
+    const started = startWorker()
+    FakeWorker.last.dispatchEvent(new Event('error'))
+    expect(await started).toBeNull()
+    expect(FakeWorker.last.terminated).toBe(true)
+  })
+
+  it('gives up and terminates it if the worker never reports', async () => {
+    vi.useFakeTimers()
+    try {
+      const { startWorker } = await import('./pdfReceipt')
+      const started = startWorker(1000)
+      vi.advanceTimersByTime(1000)
+      expect(await started).toBeNull()
+      expect(FakeWorker.last.terminated).toBe(true)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
