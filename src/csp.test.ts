@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { build } from 'vite'
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -132,5 +132,52 @@ describe('production build', () => {
     expect(urls).toContain('index.html')
     expect(urls.some((u) => /^assets\/index-.*\.js$/.test(u))).toBe(true)
     expect(urls.some((u) => /^assets\/index-.*\.css$/.test(u))).toBe(true)
+  })
+
+  /*
+   * Third-party licence headers, asserted against the chunks that were actually
+   * emitted. THIRD_PARTY_NOTICES.md describes these headers as shipping inside
+   * the chunks they cover, and MIT and BSD-3-Clause condition their grants on
+   * the notice travelling with the code.
+   *
+   * This exists for the same reason as the precache test above. A Vite major
+   * stopped keeping licence comments, every chunk shipped without one, and the
+   * notices went on saying otherwise for three months while the build and the
+   * suite stayed green. One option in vite.config.ts (`comments.legal`) keeps
+   * them now, and reading the config would only prove the option is spelled
+   * the way it is today. Reading the artifact proves the headers are there.
+   *
+   * The strings are the ones the notices file quotes. If a dependency update
+   * changes one of them, this fails, and that is the prompt to recompile the
+   * notices rather than a reason to loosen the assertion.
+   */
+  it('keeps third-party licence headers in the emitted chunks', () => {
+    const assets = join(outDir, 'assets')
+    const chunk = (pattern: RegExp) => {
+      const names = readdirSync(assets).filter((f) => pattern.test(f))
+      expect(names, `exactly one chunk matching ${pattern}`).toHaveLength(1)
+      return readFileSync(join(assets, names[0]), 'utf-8')
+    }
+
+    // The precached main bundle: React's own headers.
+    const main = chunk(/^index-.*\.js$/)
+    expect(main).toContain('@license React')
+    expect(main).toContain('Copyright (c) Meta Platforms, Inc. and affiliates.')
+
+    // The precached jsPDF chunk: jsPDF's banner, and the BSD-3-Clause text of
+    // the Adobe JPEG encoder it vendors, whose second clause is the one that
+    // requires a binary redistribution to reproduce it.
+    const jspdf = chunk(/^jspdf\.es\.min-.*\.js$/)
+    expect(jspdf).toContain('James Hall')
+    expect(jspdf).toContain('Copyright (c) 2008, Adobe Systems Incorporated')
+    expect(jspdf).toContain('Redistributions in binary form must reproduce the above copyright')
+    expect(jspdf).toContain('Joseph Myers does not specify a particular license for his work.')
+
+    // The served-but-unreachable .html() chunks: DOMPurify's header, on which
+    // the Apache-2.0 election in the notices rests, and tslib's banner in both
+    // of the bundles that vendor it.
+    expect(chunk(/^purify\.es-.*\.js$/)).toContain('(c) Cure53 and other contributors')
+    expect(chunk(/^html2canvas-.*\.js$/)).toContain('Copyright (c) Microsoft Corporation.')
+    expect(chunk(/^index\.es-.*\.js$/)).toContain('Copyright (c) Microsoft Corporation.')
   })
 })
