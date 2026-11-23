@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdtempSync, readdirSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -20,10 +20,25 @@ import { fileURLToPath } from 'node:url'
  * fails silently in both directions: upstream renames a file and it stops
  * matching, or upstream adds a font and it ships without anyone having read
  * its licence. The second test is for the second case.
+ *
+ * The destination is not empty when the script runs. `public/pdfjs` on a
+ * machine that has built before still holds whatever an earlier copy put
+ * there, and a recursive copy adds and overwrites but never deletes, so the
+ * script clears `standard_fonts` first. Starting from an empty directory would
+ * leave that step untested: the excluded files would be absent whether or not
+ * anything removed them.
  */
 describe('PDF.js asset copy', () => {
   const script = fileURLToPath(new URL('../scripts/copy-pdfjs-assets.mjs', import.meta.url))
   let dest = ''
+
+  const LEFT_BY_AN_EARLIER_COPY = [
+    'LiberationSans-Regular.ttf',
+    'LiberationSans-Bold.ttf',
+    'LiberationSans-Italic.ttf',
+    'LiberationSans-BoldItalic.ttf',
+    'LICENSE_LIBERATION',
+  ]
 
   const allFiles = (dir: string): string[] =>
     readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
@@ -32,6 +47,10 @@ describe('PDF.js asset copy', () => {
 
   beforeAll(() => {
     dest = mkdtempSync(join(tmpdir(), 'pdfjs-assets-'))
+    mkdirSync(join(dest, 'standard_fonts'))
+    for (const name of LEFT_BY_AN_EARLIER_COPY) {
+      writeFileSync(join(dest, 'standard_fonts', name), 'left by an earlier copy')
+    }
     execFileSync(process.execPath, [script, dest], { stdio: 'pipe' })
   })
 
