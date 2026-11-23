@@ -344,7 +344,7 @@ function pickTotal(lines: string[]): { total?: number; totalIsLabelled: boolean 
   const totals: { value: number; at: number }[] = []
   const totalReadings: { readings: number[]; at: number }[] = []
   const subtotals: number[] = []
-  const taxParts: number[] = []
+  const taxParts: { value: number; line: string }[] = []
   let taxTotal: number | undefined
   const paid: number[] = []
   let fallbackMax = 0
@@ -372,7 +372,7 @@ function pickTotal(lines: string[]): { total?: number; totalIsLabelled: boolean 
     const isTotal = TOTAL_KEYWORDS.some((k) => lower.includes(k)) || TOTAL_MISREAD.test(line)
     if (!isTotal && TAX_LINE.test(line)) {
       const r = readingsOf(line)
-      if (r.length) taxParts.push(r[0])
+      if (r.length) taxParts.push({ value: r[0], line: line.replace(/\s+/g, ' ').trim().toLowerCase() })
       return
     }
     if (!isTotal && CARD_LINE.test(line)) {
@@ -393,13 +393,14 @@ function pickTotal(lines: string[]): { total?: number; totalIsLabelled: boolean 
 
   const near = (a: number, b: number) => Math.abs(cents(a) - cents(b)) <= 1
   // The tax is a "Total Tax" line when there is one, otherwise all the tax
-  // lines added up ("State Tax", "Local Tax"). A tax printed twice (in the
-  // body and again in the summary) is also checked once: adding both copies
-  // would double it. Distinct lines are only ever checked together, or
+  // lines added up ("State Tax", "Local Tax"). A tax line printed twice, word
+  // for word (in the body and again in the summary), is also checked once:
+  // adding both copies would double it. Other lines, even of equal amounts
+  // ("State Tax 4.00", "Local Tax 4.00"), are only ever checked together, or
   // subtotal plus one of them could agree with a misread total.
-  const tax = taxTotal ?? (taxParts.length ? taxParts.reduce((sum, t) => (cents(sum) + cents(t)) / 100, 0) : undefined)
+  const tax = taxTotal ?? (taxParts.length ? taxParts.reduce((sum, t) => (cents(sum) + cents(t.value)) / 100, 0) : undefined)
   const sums = tax === undefined ? [] : subtotals.map((s) => (cents(s) + cents(tax)) / 100)
-  const repeated = taxParts.filter((t, i) => taxParts.findIndex((u) => cents(u) === cents(t)) !== i)
+  const repeated = taxParts.filter((t, i) => taxParts.findIndex((u) => u.line === t.line) !== i).map((t) => t.value)
   const checks = [...sums, ...subtotals.flatMap((s) => repeated.map((t) => (cents(s) + cents(t)) / 100)), ...paid]
   const agrees = (n: number) => checks.some((c) => near(n, c))
   // A larger total printed after the one that agrees is the total once a tip

@@ -346,6 +346,16 @@ describe('parseReceiptText total, checked against the other lines', () => {
     expect(total(lines)).toBe(108)
   })
 
+  it('does not take two different taxes of the same amount for one printed twice', () => {
+    const lines = ['Corner Bakery', 'Total 104.00', 'Subtotal 100.00', 'State Tax 4.00', 'Local Tax 4.00', 'TOTAL 10800']
+    expect(total(lines)).toBe(108)
+  })
+
+  it('checks a tax line printed twice, word for word, once', () => {
+    // 100 + 8 + 8 agrees with nothing; 100 + 8 agrees with the total.
+    expect(total(['Corner Bakery', 'Subtotal 100.00', 'Tax 8.00', 'Tax 8.00', 'Total 300.00', 'TOTAL 10800'])).toBe(108)
+  })
+
   it('checks a total against a tax of 0.00', () => {
     expect(total(['Corner Bakery', 'Subtotal 9.91', 'Tax 0.00', 'TOTAL 49.91'])).toBe(9.91)
   })
