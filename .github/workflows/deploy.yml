@@ -5,13 +5,23 @@ on:
       - main
   pull_request:
   workflow_dispatch:
+  # Once a day, with nothing pushed. A new advisory against a dependency
+  # already on main changes no file here, so without this `npm audit` only
+  # ran when someone happened to push, and a high-severity advisory sat on
+  # the live site's lockfile for eleven weeks. Only `test` runs: `build` and
+  # `deploy` are limited to push and workflow_dispatch by their own `if`.
+  schedule:
+    - cron: '17 5 * * *'
 permissions:
   contents: read
 jobs:
   test:
     runs-on: ubuntu-latest
     concurrency:
-      group: test-${{ github.workflow }}-${{ github.ref }}
+      # The scheduled run gets a group of its own. It runs on main, so in the
+      # shared group it would cancel the test of a push to main that happened
+      # to be in flight, and `build` and `deploy` for that push would never run.
+      group: test-${{ github.workflow }}-${{ github.ref }}${{ github.event_name == 'schedule' && '-schedule' || '' }}
       cancel-in-progress: true
     steps:
       # No authenticated git operations happen after checkout, so the token never needs to persist.

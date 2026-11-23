@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { listReports } from '../db'
 
 const SNOOZE_KEY = 'br.storageWarningDismissedAt'
@@ -81,6 +81,14 @@ export default function StorageWarning() {
     }
   }, [])
 
+  // The warning sits at the top of the page. When it first appears the user
+  // may already have scrolled down a long report, where it would be above
+  // the screen and unseen; bring it into view once.
+  const boxRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (show) boxRef.current?.scrollIntoView?.({ block: 'start' })
+  }, [show])
+
   if (!show) return null
 
   const dismiss = () => {
@@ -89,7 +97,7 @@ export default function StorageWarning() {
   }
 
   return (
-    <div className="storage-warning" role="alert">
+    <div className="storage-warning" role="alert" ref={boxRef}>
       <div className="storage-warning-body">
         <strong>This browser may erase your receipts.</strong>
         {/* Backing up comes first, and installing second, because only the

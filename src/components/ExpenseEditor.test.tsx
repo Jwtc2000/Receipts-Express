@@ -148,6 +148,52 @@ describe('ExpenseEditor save() image argument computation', () => {
  * draft looks like, and pressing it produces a message that names what is
  * wrong, marks the field it is about, and sends focus there.
  */
+describe('ExpenseEditor and a scan that finishes late', () => {
+  // A scan takes 10-20 seconds and the fields stay usable while it runs.
+  it('does not replace an amount the user typed while the scan was running', async () => {
+    const { extractReceipt } = await import('../ocr')
+    type Scan = Awaited<ReturnType<typeof extractReceipt>>
+    let finishScan: (value: Scan) => void = () => {}
+    vi.mocked(extractReceipt).mockReturnValueOnce(
+      new Promise<Scan>((resolve) => {
+        finishScan = resolve
+      }),
+    )
+    const user = userEvent.setup()
+    const { container } = render(<ExpenseEditor reportId="report-1" onDone={vi.fn()} />)
+
+    await user.upload(pickFileInput(container), new File(['photo'], 'receipt.jpg', { type: 'image/jpeg' }))
+    await screen.findByAltText('Receipt, page 1')
+    await user.type(screen.getByLabelText('Amount'), '42.10')
+
+    finishScan({ merchant: 'Corner Market', total: 999.99, date: '2026-07-01', rawText: '' })
+
+    // The untouched merchant field is filled in; the typed amount stands.
+    await waitFor(() => expect(screen.getByPlaceholderText("e.g. Joe's Diner")).toHaveValue('Corner Market'))
+    expect(screen.getByLabelText('Amount')).toHaveValue(42.1)
+  })
+
+  it('does not replace saved values when the photo on an existing expense is replaced', async () => {
+    const { extractReceipt } = await import('../ocr')
+    vi.mocked(extractReceipt).mockResolvedValueOnce({
+      merchant: 'Wrong Guess',
+      total: 999.99,
+      date: '2020-01-01',
+      rawText: '',
+    })
+    getExpense.mockResolvedValue(baseExpense({ imageId: 'img-1' }))
+    const user = userEvent.setup()
+    const { container } = render(<ExpenseEditor reportId="report-1" expenseId="expense-1" onDone={vi.fn()} />)
+    await screen.findByAltText('Receipt, page 1')
+
+    await user.upload(pickFileInput(container), new File(['photo'], 'new.jpg', { type: 'image/jpeg' }))
+    await screen.findByText(/Details extracted/)
+
+    expect(screen.getByLabelText('Amount')).toHaveValue(12.5)
+    expect(screen.getByPlaceholderText("e.g. Joe's Diner")).toHaveValue('Cafe')
+  })
+})
+
 describe('ExpenseEditor submit-time validation', () => {
   const SAVE = { name: /^save$/i } as const
 
