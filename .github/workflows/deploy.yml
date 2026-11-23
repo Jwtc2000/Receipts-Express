@@ -18,7 +18,10 @@ jobs:
   test:
     runs-on: ubuntu-latest
     concurrency:
-      group: test-${{ github.workflow }}-${{ github.ref }}
+      # The scheduled run gets a group of its own. It runs on main, so in the
+      # shared group it would cancel the test of a push to main that happened
+      # to be in flight, and `build` and `deploy` for that push would never run.
+      group: test-${{ github.workflow }}-${{ github.ref }}${{ github.event_name == 'schedule' && '-schedule' || '' }}
       cancel-in-progress: true
     steps:
       # No authenticated git operations happen after checkout, so the token never needs to persist.

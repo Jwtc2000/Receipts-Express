@@ -24,7 +24,23 @@ pipeline {
             steps {
                 sh '''
                     git fetch --no-tags origin "+refs/heads/${CHANGE_TARGET}:refs/remotes/origin/${CHANGE_TARGET}"
-                    git log --no-merges --format='%h %ae %ce' "origin/${CHANGE_TARGET}..HEAD" | awk '
+                    # The checkout of a pull request can be a merge that the
+                    # build itself made, of the pull request into its target.
+                    # That one commit is not the contributor's and carries the
+                    # build's own identity, so the range stops at the pull
+                    # request's side of it. Merge commits the contributor made
+                    # are checked like any other.
+                    head=HEAD
+                    p1=$(git rev-parse -q --verify 'HEAD^1' || true)
+                    p2=$(git rev-parse -q --verify 'HEAD^2' || true)
+                    if [ -n "$p2" ]; then
+                        if git merge-base --is-ancestor "$p1" "origin/${CHANGE_TARGET}"; then
+                            head=$p2
+                        elif git merge-base --is-ancestor "$p2" "origin/${CHANGE_TARGET}"; then
+                            head=$p1
+                        fi
+                    fi
+                    git log --format='%h %ae %ce' "origin/${CHANGE_TARGET}..${head}" | awk '
                         {
                             ok = 1
                             for (i = 2; i <= 3; i++) {

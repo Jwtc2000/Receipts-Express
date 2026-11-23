@@ -9,8 +9,10 @@
 #
 # The tag is pinned together with its digest. A tag can be moved to a
 # different image; a digest cannot, so a rebuild gets the same base bytes
-# until this line is changed. Dependabot's docker ecosystem watches this
-# directory and proposes tag and digest together (.github/dependabot.yml).
+# until this line is changed. Dependabot's docker ecosystem is pointed at
+# this directory (.github/dependabot.yml), but this image's tag form may not
+# be one it can compare, so do not rely on it: check for a newer tag by hand
+# when rebuilding, and change tag and digest together.
 FROM jenkins/inbound-agent:3383.vc8881d4b_0e76-1-jdk21@sha256:ca8ce040ee03bb42c7b4440edb84126ddd4a30aeaeb532510b004e9c59b80b18
 USER root
 # Each downloaded binary has its SHA-256 beside its version and is checked
