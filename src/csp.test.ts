@@ -94,8 +94,11 @@ describe('production build', () => {
   // files was answered with the app shell. They must be left to the network.
   it('does not answer a navigation to the licence and notice files with the app', () => {
     const sw = readFileSync(join(outDir, 'sw.js'), 'utf-8')
-    const denylist = /denylist:\s*\[([^\]]*)\]/.exec(sw)?.[1] ?? ''
-    const patterns = [...denylist.matchAll(/\/((?:\\\/|[^/])+)\/[a-z]*/g)].map((m) => new RegExp(m[1]))
+    // Each entry is a regular-expression literal, which may itself contain
+    // `[...]` classes, so the list is read literal by literal.
+    const REGEX_LITERAL = String.raw`/((?:\\.|\[(?:\\.|[^\]])*\]|[^/\\\n])+)/[a-z]*`
+    const list = new RegExp(String.raw`denylist:\s*\[((?:\s*` + REGEX_LITERAL + String.raw`\s*,?)+)\]`).exec(sw)?.[1] ?? ''
+    const patterns = [...list.matchAll(new RegExp(REGEX_LITERAL, 'g'))].map((m) => new RegExp(m[1]))
     expect(patterns.length).toBeGreaterThan(0)
     // Workbox matches the path and the query string together.
     for (const path of [
