@@ -52,7 +52,17 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
       if (!updated) return
       reportRef.current = updated
       setReport(updated)
-      await saveReport(updated)
+      try {
+        await saveReport(updated)
+      } catch (err) {
+        // Put back what is actually stored, so the screen does not show a
+        // change that was never saved and the same edit can be tried again.
+        if (reportRef.current === updated) {
+          reportRef.current = latest
+          setReport(latest)
+        }
+        throw err
+      }
     }
     const next = saveChain.current.then(run, run)
     saveChain.current = next.catch(() => {})
