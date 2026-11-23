@@ -304,20 +304,21 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
       // loading, and would then treat a saved expense as a new one.
       const mayFill = (key: keyof Draft, current: string) =>
         !typed.has(key) && (expenseId ? current === '' : true)
+      const previousAutoTitle = autoTitleRef.current
       setDraft((d) => ({
         ...d,
         merchant: extracted.merchant && mayFill('merchant', d.merchant) ? extracted.merchant : d.merchant,
-        title: (() => {
-          if (typed.has('title')) return d.title
-          const ownTitle = d.title === '' || d.title === autoTitleRef.current
-          if (!ownTitle || !extracted.merchant) return d.title
-          autoTitleRef.current = extracted.merchant
-          return extracted.merchant
-        })(),
+        // Pure: React may run this updater twice, so the ref is read from
+        // the value captured above and written only after setDraft.
+        title:
+          !typed.has('title') && extracted.merchant && (d.title === '' || d.title === previousAutoTitle)
+            ? extracted.merchant
+            : d.title,
         amount:
           extracted.total !== undefined && mayFill('amount', d.amount) ? extracted.total.toFixed(2) : d.amount,
         date: extracted.date && mayFill('date', d.date) ? extracted.date : d.date,
       }))
+      if (extracted.merchant && !typed.has('title')) autoTitleRef.current = extracted.merchant
       setScanState('done')
     } catch {
       // The receipt is already attached; OCR failing just means manual entry.
