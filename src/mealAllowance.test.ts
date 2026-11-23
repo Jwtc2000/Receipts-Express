@@ -75,6 +75,36 @@ describe('foodBalanceForDate', () => {
   })
 })
 
+describe('a day with meals in more than one currency', () => {
+  const day = [
+    makeExpense({ id: 'a', amount: 12, currency: 'USD' }),
+    makeExpense({ id: 'b', amount: 40, currency: 'EUR' }),
+  ]
+
+  it('is marked mixed and never flagged as over', () => {
+    const balance = foodBalanceForDate(day, '2026-07-18', 30)
+    expect(balance.mixed).toBe(true)
+    expect(balance.over).toBe(false)
+  })
+
+  it('prints no figure, because 12 dollars plus 40 euros is not 52 of anything', () => {
+    const text = formatFoodBalance(foodBalanceForDate(day, '2026-07-18', 30))
+    expect(text).toBe('Food not totalled · meals in more than one currency')
+    expect(text).not.toMatch(/\d/)
+  })
+
+  it('reads a blank currency as USD, as the rest of the app does', () => {
+    const balance = foodBalanceForDate([day[0], makeExpense({ id: 'c', amount: 8, currency: '' })], '2026-07-18', 30)
+    expect(balance.mixed).toBe(false)
+  })
+
+  it('still totals a day whose meals share one currency', () => {
+    const balance = foodBalanceForDate([day[0], makeExpense({ id: 'c', amount: 8 })], '2026-07-18', 30)
+    expect(balance.mixed).toBe(false)
+    expect(balance.used).toBe(20)
+  })
+})
+
 describe('formatFoodBalance', () => {
   it('formats an under-budget day', () => {
     const balance = foodBalanceForDate([makeExpense({ amount: 20 })], '2026-07-18', 50)

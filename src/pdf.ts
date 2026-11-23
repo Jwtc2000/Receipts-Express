@@ -7,6 +7,7 @@ import { getProfile, profileSummaryLines } from './profile'
 import { dayColor, contrastText } from './colors'
 import { foodBalanceForDate, formatFoodBalance, formatPersonalTotal } from './mealAllowance'
 import { shareOrDownloadFile } from './share'
+import { pdfSafeText } from './pdfText'
 
 const PAGE_W = 595.28 // A4 portrait, points
 const PAGE_H = 841.89
@@ -60,6 +61,16 @@ export async function exportReportPdf(report: Report, expenses: Expense[]): Prom
   // exports a PDF that session.
   const { jsPDF } = await import('jspdf')
   const doc = new jsPDF({ unit: 'pt', format: 'a4' })
+  // Every string drawn or measured below goes through pdfSafeText first. It
+  // is done here, at the two entry points, rather than at each call, so that
+  // a line added later cannot forget it (see pdfText.ts for what goes wrong).
+  const drawText = doc.text.bind(doc) as (...args: unknown[]) => jsPDF
+  const safe = (t: unknown): unknown =>
+    typeof t === 'string' ? pdfSafeText(t) : Array.isArray(t) ? t.map(safe) : t
+  ;(doc as { text: unknown }).text = (text: unknown, ...rest: unknown[]) => drawText(safe(text), ...rest)
+  const splitText = doc.splitTextToSize.bind(doc) as (...args: unknown[]) => unknown
+  ;(doc as { splitTextToSize: unknown }).splitTextToSize = (text: unknown, ...rest: unknown[]) =>
+    splitText(safe(text), ...rest)
   const totalDisplay = formatTotal(expenses)
 
   // ---------- Summary page ----------

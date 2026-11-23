@@ -204,6 +204,26 @@ describe('resolveDateAfterMove', () => {
     expect(resolveDateAfterMove(list, 0)).toBe('2026-07-20')
   })
 
+  it('keeps its own date when it is still next to an expense of the same day', () => {
+    // Day 18, then two expenses on day 19, with the second moved up one place.
+    const list = [
+      makeExpense({ id: 'a', date: '2026-07-18' }),
+      makeExpense({ id: 'moved', date: '2026-07-19' }),
+      makeExpense({ id: 'c', date: '2026-07-19' }),
+    ]
+    expect(resolveDateAfterMove(list, 1)).toBe('2026-07-19')
+  })
+
+  it('adopts the neighbouring day when moved fully across a day boundary', () => {
+    const list = [
+      makeExpense({ id: 'a', date: '2026-07-18' }),
+      makeExpense({ id: 'moved', date: '2026-07-19' }),
+      makeExpense({ id: 'b', date: '2026-07-18' }),
+      makeExpense({ id: 'c', date: '2026-07-19' }),
+    ]
+    expect(resolveDateAfterMove(list, 1)).toBe('2026-07-18')
+  })
+
   it('keeps its own date when there is no dated neighbor', () => {
     const list = [makeExpense({ id: 'only', date: '2026-07-19' })]
     expect(resolveDateAfterMove(list, 0)).toBe('2026-07-19')

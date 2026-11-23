@@ -191,8 +191,15 @@ export function dayNumbersByDate(expenses: { date: string }[], tripStartDate?: s
  * next to (preferring the one before it), so moving an expense across a
  * day boundary reassigns which day it belongs to. Falls back to its
  * current date if there's no dated neighbor to adopt.
+ *
+ * An expense that is still next to one of its own day has not crossed a
+ * boundary, and keeps its date. Without that check, swapping two expenses
+ * within a day handed the moved one the date of whatever sat above it: "Move
+ * up" on the second expense of a day put it into the previous day.
  */
 export function resolveDateAfterMove(list: Expense[], index: number): string {
+  const own = list[index].date
+  if (own && (list[index - 1]?.date === own || list[index + 1]?.date === own)) return own
   const before = list[index - 1]
   if (before?.date) return before.date
   const after = list[index + 1]

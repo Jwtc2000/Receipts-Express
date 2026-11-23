@@ -34,8 +34,12 @@ function Root() {
   return (
     <>
       <div ref={behindRef} style={{ display: 'contents' }}>
-        <App />
+        {/* Above the app, not below it. The app column is a full viewport
+            tall, so a warning mounted after it sat just past the bottom of
+            the screen and was only ever seen by someone who scrolled to the
+            end of the page. */}
         <StorageWarning />
+        <App />
         <UpdateBanner />
         <GlobalErrorToast />
       </div>
