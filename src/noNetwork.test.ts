@@ -27,12 +27,14 @@ import { fileURLToPath } from 'node:url'
  * describes. What is flagged is any API whose purpose is to send or receive
  * data on the app's own initiative.
  */
-const FORBIDDEN: { pattern: RegExp; label: string }[] = [
+const FORBIDDEN: { pattern: RegExp; label: string; codeOnly?: boolean }[] = [
   { pattern: /\bfetch\s*\(/, label: 'fetch(' },
   // `fetch` passed around as a value rather than called: `const get = fetch`
   // or `fetch.bind(window)` used to pass. `.fetch` (a method on something
   // else) is not matched, nor the word in running text.
-  { pattern: /(?<![.\w])fetch\s*(?=[),;\]}.]|$)/m, label: 'fetch as a value' },
+  // Matched against code only, with string contents blanked: "Tap to fetch."
+  // in a label is prose, not a network call.
+  { pattern: /(?<![.\w])fetch\s*(?=[),;\]}.]|$)/m, label: 'fetch as a value', codeOnly: true },
   { pattern: /\bXMLHttpRequest\b/, label: 'XMLHttpRequest' },
   { pattern: /\bsendBeacon\b/, label: 'sendBeacon' },
   { pattern: /\bWebSocket\b/, label: 'WebSocket' },
@@ -127,12 +129,22 @@ function stripComments(source: string): string {
 }
 
 /** Every forbidden name in `source`, as "line N: <the line>" strings. */
+/**
+ * The line with the contents of its string literals removed. Template
+ * literals keep their `${...}` expressions, which are code.
+ */
+function codeOnly(line: string): string {
+  return line
+    .replace(/(["'])(?:\\.|(?!\1)[^\\])*\1/g, '""')
+    .replace(/`[^`]*`/g, (t) => '`' + [...t.matchAll(/\$\{[^}]*\}/g)].map((m) => m[0]).join(' ') + '`')
+}
+
 function findNetworkCalls(source: string): string[] {
   const hits: string[] = []
   const lines = stripComments(source).split('\n')
   lines.forEach((line, index) => {
-    for (const { pattern, label } of FORBIDDEN) {
-      if (pattern.test(line)) hits.push(`line ${index + 1} (${label}): ${line.trim()}`)
+    for (const { pattern, label, codeOnly: onlyCode } of FORBIDDEN) {
+      if (pattern.test(onlyCode ? codeOnly(line) : line)) hits.push(`line ${index + 1} (${label}): ${line.trim()}`)
     }
   })
   return hits
@@ -193,10 +205,13 @@ describe('the app opens no network connection of its own', () => {
     it('catches fetch passed around as a value', () => {
       expect(findNetworkCalls('const get = fetch;')).toHaveLength(1)
       expect(findNetworkCalls('const get = fetch.bind(window)')).toHaveLength(1)
+      expect(findNetworkCalls('const s = `${fetch}`')).toHaveLength(1)
     })
 
     it('leaves the word alone in running text', () => {
       expect(findNetworkCalls('const note = "no live rate to fetch automatically"')).toEqual([])
+      expect(findNetworkCalls('const note = "Tap to fetch."')).toEqual([])
+      expect(findNetworkCalls('const note = `Tap to fetch.`')).toEqual([])
     })
 
     it('leaves import() alone — loading the app is not sending data', () => {

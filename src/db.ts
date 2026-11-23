@@ -71,7 +71,7 @@ export async function deleteReport(id: string): Promise<void> {
   const tx = db.transaction(['reports', 'expenses', 'images'], 'readwrite')
   for (const expense of expenses) {
     quiet(tx.objectStore('expenses').delete(expense.id))
-    for (const imageId of expenseImageIds(expense)) void tx.objectStore('images').delete(imageId)
+    for (const imageId of expenseImageIds(expense)) quiet(tx.objectStore('images').delete(imageId))
   }
   quiet(tx.objectStore('reports').delete(id))
   await tx.done
@@ -128,7 +128,7 @@ export async function deleteExpense(id: string): Promise<void> {
   const expense = await db.get('expenses', id)
   const tx = db.transaction(['expenses', 'images'], 'readwrite')
   quiet(tx.objectStore('expenses').delete(id))
-  if (expense) for (const imageId of expenseImageIds(expense)) void tx.objectStore('images').delete(imageId)
+  if (expense) for (const imageId of expenseImageIds(expense)) quiet(tx.objectStore('images').delete(imageId))
   await tx.done
 }
 

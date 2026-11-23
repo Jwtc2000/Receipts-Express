@@ -60,13 +60,19 @@ function storageKeysInSource(): string[] {
     }
   }
   walk(srcDir)
+  // The value of each constant a storage call is given, read from the file
+  // that defines it. A key in any other form fails here, rather than being
+  // left out of the list the policy is checked against.
   const keys = new Set<string>()
   for (const file of files) {
     const code = readFileSync(file, 'utf-8')
-    for (const m of code.matchAll(/['"`](br\.[A-Za-z]+)['"`]/g)) keys.add(m[1])
+    const constants = new Map([...code.matchAll(/const\s+([A-Z_]+_KEY)\s*=\s*['"`]([^'"`]+)['"`]/g)].map((m) => [m[1], m[2]]))
     for (const m of code.matchAll(/localStorage\.(?:get|set|remove)Item\(\s*([^,)]+)/g)) {
       const arg = m[1].trim()
-      if (!/^[A-Z_]+_KEY$/.test(arg)) throw new Error(`${file}: localStorage key ${arg} is not a named br.* constant`)
+      const value = constants.get(arg)
+      if (value === undefined) throw new Error(`${file}: localStorage key ${arg} is not a constant defined in that file`)
+      if (!/^br\.[A-Za-z]+$/.test(value)) throw new Error(`${file}: localStorage key ${value} does not use the br. form`)
+      keys.add(value)
     }
   }
   return [...keys].sort()

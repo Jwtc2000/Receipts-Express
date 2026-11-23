@@ -29,9 +29,16 @@ describe('Tesseract asset copy', () => {
 
   it('copies every core an LSTM-only worker can request', () => {
     const loader = readFileSync(join(root, 'node_modules/tesseract.js/src/worker-script/browser/getCore.js'), 'utf8')
-    const requested = [...new Set([...loader.matchAll(/(tesseract-core[\w-]*-lstm\.wasm\.js)/g)].map((m) => m[1]))]
+    // The file name each LSTM-only branch of the loader asks for, whatever it
+    // is called: not only names ending in -lstm, which is the copy filter's
+    // own assumption and so cannot be what checks it.
+    const requested = [
+      ...new Set(
+        [...loader.matchAll(/lstmOnly\)\s*\{\s*corePathImportFile\s*=\s*`[^`]*\/([\w.-]+\.js)`/g)].map((m) => m[1]),
+      ),
+    ]
     // Guards the scan: the loader names three LSTM builds today.
-    expect(requested.length).toBeGreaterThan(0)
+    expect(requested.length).toBe(3)
     const copied = readdirSync(dest)
     for (const name of requested) expect(copied, name).toContain(name)
   })

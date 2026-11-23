@@ -40,7 +40,11 @@ function directives(csp: string): Record<string, string[]> {
   const out: Record<string, string[]> = {}
   for (const part of csp.split(';')) {
     const [name, ...sources] = part.trim().split(/\s+/)
-    if (name) out[name] = sources
+    if (!name) continue
+    // A browser keeps the first of two same-named directives and ignores the
+    // rest, so a loose one placed first would hide behind a strict one.
+    if (name in out) throw new Error(`CSP repeats the ${name} directive`)
+    out[name] = sources
   }
   return out
 }
