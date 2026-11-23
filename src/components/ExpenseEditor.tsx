@@ -87,6 +87,12 @@ function captureErrorMessage(err: unknown, isPdf: boolean): string {
 
 export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
   const [draft, setDraft] = useState<Draft>(() => ({ ...emptyDraft, date: todayIso() }))
+  // The draft as last rendered, for code that runs after an await and must
+  // decide something before calling setDraft (see the scan title below).
+  const draftRef = useRef(draft)
+  useEffect(() => {
+    draftRef.current = draft
+  }, [draft])
   const [existing, setExisting] = useState<Expense | null>(null)
   const [imageBlob, setImageBlob] = useState<Blob | null>(null)
   const [imageUrl, setImageUrl] = useState<string | null>(null)
@@ -304,21 +310,23 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
       // loading, and would then treat a saved expense as a new one.
       const mayFill = (key: keyof Draft, current: string) =>
         !typed.has(key) && (expenseId ? current === '' : true)
-      const previousAutoTitle = autoTitleRef.current
+      // Decided once, outside the updater, so the title and the record of who
+      // filled it cannot disagree: only a title this scan actually fills in
+      // is recorded as automatic, and so open to a later scan.
+      const currentTitle = draftRef.current.title
+      const fillTitle =
+        !typed.has('title') &&
+        !!extracted.merchant &&
+        (currentTitle === '' || currentTitle === autoTitleRef.current)
       setDraft((d) => ({
         ...d,
         merchant: extracted.merchant && mayFill('merchant', d.merchant) ? extracted.merchant : d.merchant,
-        // Pure: React may run this updater twice, so the ref is read from
-        // the value captured above and written only after setDraft.
-        title:
-          !typed.has('title') && extracted.merchant && (d.title === '' || d.title === previousAutoTitle)
-            ? extracted.merchant
-            : d.title,
+        title: fillTitle && extracted.merchant ? extracted.merchant : d.title,
         amount:
           extracted.total !== undefined && mayFill('amount', d.amount) ? extracted.total.toFixed(2) : d.amount,
         date: extracted.date && mayFill('date', d.date) ? extracted.date : d.date,
       }))
-      if (extracted.merchant && !typed.has('title')) autoTitleRef.current = extracted.merchant
+      if (fillTitle && extracted.merchant) autoTitleRef.current = extracted.merchant
       setScanState('done')
     } catch {
       // The receipt is already attached; OCR failing just means manual entry.
