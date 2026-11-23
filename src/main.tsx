@@ -27,8 +27,8 @@ function Root() {
   // that node. display:contents generates no box, so it changes no layout,
   // while inert still applies to the whole subtree beneath it.
   //
-  // React 18's JSX types have no `inert` attribute — it arrives in the React 19
-  // types — so it is toggled on the element rather than passed as a prop.
+  // Toggled on the element rather than passed as a prop. That was needed when
+  // React 18's types had no `inert`; React 19's do, and this still works.
   useEffect(() => {
     behindRef.current?.toggleAttribute('inert', gateOpen)
   }, [gateOpen])

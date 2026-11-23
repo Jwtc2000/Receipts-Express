@@ -324,7 +324,7 @@ from an audit of the whole project.
 
 ### Fixed
 - Test suite honesty pass (remaining findings from the full repository
-  audit, `~/full-repo-audit.md`, not already covered by 1.10.1): added
+  audit (internal notes, not published), not already covered by 1.10.1): added
   jsdom + React Testing Library infrastructure, and closed every previously
   zero-coverage gap it named — `share.ts`'s success/failure branches,
   `pdf.ts`'s multi-page export/pagination logic, the `ExpenseEditor`
@@ -353,7 +353,7 @@ from an audit of the whole project.
 ## [1.10.1] - 2026-07-27
 
 ### Fixed
-- Confirmed bugs from a full repository audit (`~/full-repo-audit.md`), in
+- Confirmed bugs from a full repository audit (internal notes, not published), in
   priority order:
   - Picking a receipt (photo or PDF) now shows a "Processing file…" banner
     and disables Retake/Replace/Remove/capture/Save while the file is being
