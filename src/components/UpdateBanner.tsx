@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { registerSW } from 'virtual:pwa-register'
-import { confirmDiscard, hasUnsavedWork } from '../unsavedWork'
+import { confirmDiscard, hasUnsavedWork, isDiscardConfirmed } from '../unsavedWork'
 
 // How often a long-running session asks whether a new version exists. The
 // browser only checks on its own at a cold start or once a day, so a window
@@ -49,8 +49,18 @@ export default function UpdateBanner() {
       // only the one where Refresh was pressed. Left to the library, every
       // other tab reloaded at once, past the unsaved-work check below.
       onNeedReload: () => {
-        if (requestedHere.current || !hasUnsavedWork()) {
+        if (!hasUnsavedWork()) {
           window.location.reload()
+          return
+        }
+        // Refresh was pressed here and the draft has not changed since the
+        // user agreed to lose it: go ahead.
+        if (requestedHere.current && isDiscardConfirmed()) {
+          window.location.reload()
+          return
+        }
+        if (requestedHere.current) {
+          reloadAfterAsking()
           return
         }
         setReloadWhenReady(true)
@@ -64,6 +74,19 @@ export default function UpdateBanner() {
       clearInterval(timer)
     }
   }, [])
+
+  // Asked again whenever there is unsaved work the user has not already
+  // agreed to lose, which includes anything typed after an earlier "yes".
+  const reloadAfterAsking = () => {
+    if (hasUnsavedWork() && !isDiscardConfirmed()) {
+      if (!window.confirm('You have an unsaved expense in progress. Reloading now will discard it. Reload anyway?')) {
+        setReloading(false)
+        return
+      }
+      confirmDiscard()
+    }
+    window.location.reload()
+  }
 
   const confirmLosingWork = () =>
     !hasUnsavedWork() ||
@@ -98,12 +121,13 @@ export default function UpdateBanner() {
     // alone.
     if (!confirmLosingWork()) return
     // Answered here, so the browser's own leave-page prompt is not shown on
-    // top of it during the reload.
-    confirmDiscard()
+    // top of it during the reload. Only when there was something to answer
+    // for: with no unsaved work there is nothing to agree to yet.
+    if (hasUnsavedWork()) confirmDiscard()
     requestedHere.current = true
     setReloading(true)
     void updateRef.current?.(true)
-    setTimeout(() => window.location.reload(), RELOAD_FALLBACK_MS)
+    setTimeout(reloadAfterAsking, RELOAD_FALLBACK_MS)
   }
 
   return (

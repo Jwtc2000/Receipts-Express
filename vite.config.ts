@@ -282,7 +282,7 @@ export default defineConfig({
         // The licence and notice files are exempt for the same reason. With
         // the worker installed, opening LICENSE.txt or THIRD_PARTY_NOTICES.md
         // by URL showed the app instead of the file.
-        navigateFallbackDenylist: [/\/docs\//, /\.(?:txt|md)$/],
+        navigateFallbackDenylist: [/\/docs\//, /\.(?:txt|md)(?:\?|$)/],
         runtimeCaching: [
           {
             urlPattern: /\/tesseract\//,

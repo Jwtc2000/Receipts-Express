@@ -5,7 +5,7 @@ import { getExpense, saveExpenseWithImage, getImage, nextPosition } from '../db'
 import { compressImage } from '../image'
 import { isPdfFile } from '../pdfDetect'
 import { extractReceipt } from '../ocr'
-import { setHasUnsavedWork, isDiscardConfirmed } from '../unsavedWork'
+import { setHasUnsavedWork, isDiscardConfirmed, noteEdit } from '../unsavedWork'
 import Icon from './icons'
 import { HeaderPlanes } from './decorative'
 
@@ -190,6 +190,7 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
   const set = (patch: Partial<Draft>) => {
     for (const key of Object.keys(patch)) typedRef.current.add(key as keyof Draft)
     setDirty(true)
+    noteEdit()
     // Typing is the user answering the message, so clear it rather than
     // leaving a complaint on screen about a value they have since changed.
     setInvalid(null)
@@ -236,6 +237,7 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
     if (gen !== pickGenRef.current) return
     const [firstPage, ...restPages] = pages
     setDirty(true)
+    noteEdit()
     setImageBlob(firstPage)
     setImageChanged(true)
     setImageUrl((old) => {
@@ -289,6 +291,7 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
     pickGenRef.current++
     setPicking(false)
     setDirty(true)
+    noteEdit()
     setImageBlob(null)
     setImageChanged(true)
     setExtraImageBlobs([])

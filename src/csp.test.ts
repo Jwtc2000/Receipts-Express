@@ -97,7 +97,12 @@ describe('production build', () => {
     const denylist = /denylist:\s*\[([^\]]*)\]/.exec(sw)?.[1] ?? ''
     const patterns = [...denylist.matchAll(/\/((?:\\\/|[^/])+)\/[a-z]*/g)].map((m) => new RegExp(m[1]))
     expect(patterns.length).toBeGreaterThan(0)
-    for (const path of ['/Receipts-Express/LICENSE.txt', '/Receipts-Express/THIRD_PARTY_NOTICES.md']) {
+    // Workbox matches the path and the query string together.
+    for (const path of [
+      '/Receipts-Express/LICENSE.txt',
+      '/Receipts-Express/THIRD_PARTY_NOTICES.md',
+      '/Receipts-Express/LICENSE.txt?v=2',
+    ]) {
       expect(patterns.some((re) => re.test(path)), path).toBe(true)
     }
   })

@@ -55,6 +55,23 @@ describe('UpdateBanner', () => {
     expect(screen.getByText(/Reload when you have saved/)).toBeInTheDocument()
   })
 
+  // The user agreed to lose the draft, then kept typing while the update
+  // loaded. The reload must ask again rather than take the new edits too.
+  it('asks again before reloading when the draft changed after the user agreed', () => {
+    unsaved.setHasUnsavedWork(true)
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    render(<UpdateBanner />)
+    act(() => options.onNeedRefresh?.())
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }))
+    expect(confirm).toHaveBeenCalledTimes(1)
+
+    unsaved.noteEdit()
+    confirm.mockReturnValue(false)
+    act(() => options.onNeedReload?.())
+    expect(confirm).toHaveBeenCalledTimes(2)
+    expect(reload).not.toHaveBeenCalled()
+  })
+
   it('can be put off with Later', () => {
     render(<UpdateBanner />)
     act(() => options.onNeedRefresh?.())
