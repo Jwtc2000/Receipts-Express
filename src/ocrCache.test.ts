@@ -54,6 +54,14 @@ describe('forgetOldModelCopies', () => {
     expect(await keys()).toEqual([CURRENT])
   })
 
+  it('works in a browser that cannot list databases', async () => {
+    await seed({ './eng.traineddata': 'old model', [CURRENT]: 'new model' })
+    Object.defineProperty(indexedDB, 'databases', { value: undefined, configurable: true })
+    const { forgetOldModelCopies } = await import('./ocr')
+    await forgetOldModelCopies(CURRENT)
+    expect(await keys()).toEqual([CURRENT])
+  })
+
   it('does not create the database on a device that has never scanned', async () => {
     const { forgetOldModelCopies } = await import('./ocr')
     await forgetOldModelCopies(CURRENT)

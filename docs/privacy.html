@@ -374,7 +374,7 @@
         IndexedDB database so that later scans do not have to fetch it again. The stored copy
         is roughly 5&nbsp;MB and sits under a single entry whose key ends in
         <code>eng.traineddata</code> and names the engine version, so an update stores a new
-        copy and the app deletes the old one. The engine caches through the <code>idb-keyval</code>
+        copy and the app deletes the old one at the next scan. The engine caches through the <code>idb-keyval</code>
         library and takes that library's default names rather than anything this app chose, so
         the database is called <code>keyval-store</code> and its one collection
         <code>keyval</code>. It holds the recognition model and nothing else: no receipt data,

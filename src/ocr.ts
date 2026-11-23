@@ -47,19 +47,20 @@ function getWorker(): Promise<Worker> {
  * creates; the old "./eng.traineddata" copy of the larger model is about
  * 22 MB that nothing reads any more.
  *
- * Only done where the browser can list databases, so that checking never
- * creates the database on a device that has none.
+ * Opening the database to look never creates it on a device that has none.
  */
 export async function forgetOldModelCopies(currentKey: string): Promise<void> {
   try {
-    if (typeof indexedDB === 'undefined' || typeof indexedDB.databases !== 'function') return
-    const dbs = await indexedDB.databases()
-    if (!dbs.some((d) => d.name === 'keyval-store')) return
-    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+    if (typeof indexedDB === 'undefined') return
+    const db = await new Promise<IDBDatabase | null>((resolve, reject) => {
       const req = indexedDB.open('keyval-store')
+      // Opening a database that does not exist would create it. An upgrade
+      // here means exactly that, so it is aborted and nothing is left behind.
+      req.onupgradeneeded = () => req.transaction?.abort()
       req.onsuccess = () => resolve(req.result)
-      req.onerror = () => reject(req.error)
+      req.onerror = () => (req.error?.name === 'AbortError' ? resolve(null) : reject(req.error))
     })
+    if (!db) return
     try {
       if (!db.objectStoreNames.contains('keyval')) return
       const store = db.transaction('keyval', 'readwrite').objectStore('keyval')
