@@ -30,7 +30,8 @@ merge to `main` that changes app behavior gets a version bump and a tag.
   one, and from the offline copy only without a connection. Served from the
   offline copy first, someone returning after an amendment could open the
   earlier text from the acceptance prompt while "I Agree" recorded the new
-  version.
+  version. They stay in the same offline cache, so copies stored before the
+  update are still there offline.
 - The Privacy Policy lists the straightened copy alongside the other
   in-memory copies. It and the Terms are dated "23 November 2026 (revision
   4)", and existing users are asked to accept again once.

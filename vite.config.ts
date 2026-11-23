@@ -321,11 +321,15 @@ export default defineConfig({
             // amendment was shown the copy stored on an earlier visit while
             // "I Agree" recorded the new version. Listed before that rule:
             // Workbox uses the first route that matches.
+            //
+            // Same cache as that rule, and the same expiry: the copies stored
+            // there before this route existed are the ones read offline, so
+            // nothing has to move when the app updates.
             urlPattern: /\/docs\/(?:terms|privacy|consumer-health-data)\.html(?:[?#]|$)/,
             handler: 'NetworkFirst',
             options: {
-              cacheName: 'legal-pages',
-              expiration: { maxEntries: 4, maxAgeSeconds: 365 * 24 * 60 * 60 }
+              cacheName: 'docs-pages',
+              expiration: { maxEntries: 8, maxAgeSeconds: 30 * 24 * 60 * 60 }
             }
           },
           {
