@@ -5,8 +5,15 @@ import { HeaderPlanes, SeasonGreeting } from './decorative'
 
 afterEach(cleanup)
 
+// Each flight's glyph name, after checking it is actually drawn: an <svg>
+// with at least one shape in it. A flight that kept its name but lost its
+// drawing would leave the header empty while the names still matched.
 const glyphs = (container: HTMLElement) =>
-  [...container.querySelectorAll<HTMLElement>('.topbar-plane')].map((el) => el.dataset.glyph)
+  [...container.querySelectorAll<HTMLElement>('.topbar-plane')].map((el) => {
+    const shapes = el.querySelectorAll('svg path, svg circle, svg rect, svg line')
+    expect(shapes.length, `glyph "${el.dataset.glyph}" has no drawing`).toBeGreaterThan(0)
+    return el.dataset.glyph
+  })
 
 describe('HeaderPlanes', () => {
   it('flies travel glyphs most of the year, with no snow', () => {
@@ -50,9 +57,13 @@ describe('SeasonGreeting', () => {
     expect(container.textContent).toBe('')
   })
 
-  it('wishes a happy Thanksgiving, then happy holidays', () => {
-    expect(render(<SeasonGreeting season="harvest" />).container.textContent).toMatch(/Happy Thanksgiving/)
+  it('wishes a happy Thanksgiving, then happy holidays, each with its glyph drawn', () => {
+    const harvest = render(<SeasonGreeting season="harvest" />).container
+    expect(harvest.textContent).toMatch(/Happy Thanksgiving/)
+    expect(harvest.querySelectorAll('.season-greeting-glyph svg path').length).toBeGreaterThan(0)
     cleanup()
-    expect(render(<SeasonGreeting season="winter" />).container.textContent).toMatch(/Happy holidays/)
+    const winter = render(<SeasonGreeting season="winter" />).container
+    expect(winter.textContent).toMatch(/Happy holidays/)
+    expect(winter.querySelectorAll('.season-greeting-glyph svg path').length).toBeGreaterThan(0)
   })
 })
