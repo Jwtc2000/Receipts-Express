@@ -24,6 +24,10 @@ export async function renderPdfPages(file: Blob): Promise<Blob[]> {
     data,
     cMapUrl: `${ASSET_BASE}/cmaps/`,
     cMapPacked: true,
+    // Holds the Foxit fonts only. PDF.js's Helvetica fallback, Liberation
+    // Sans, is deliberately not copied (see scripts/copy-pdfjs-assets.mjs),
+    // so on a device with no Helvetica-like font of its own that text is
+    // drawn in the browser's generic sans-serif.
     standardFontDataUrl: `${ASSET_BASE}/standard_fonts/`,
     wasmUrl: `${ASSET_BASE}/wasm/`,
     iccUrl: `${ASSET_BASE}/iccs/`,

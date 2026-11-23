@@ -455,15 +455,16 @@ pasted in.
 
 `scripts/copy-pdfjs-assets.mjs` copies the `standard_fonts`, `cmaps`, `wasm` and `iccs`
 directories recursively, so **PDF.js's own licence files travel with the assets they cover**.
-Twelve licence files ship under `pdfjs/`, each byte-identical to the one in
-`node_modules/pdfjs-dist/`. This table is a map and the shipped file is authoritative.
+One thing in those directories is left behind on purpose: the Liberation Sans fonts and their
+licence file, for the reason given below the table. Eleven licence files ship under `pdfjs/`,
+each byte-identical to the one in `node_modules/pdfjs-dist/`. This table is a map and the
+shipped file is authoritative.
 
 | Sub-component | Copyright (verbatim from the shipped file) | Shipped licence file |
 |---|---|---|
 | Adobe CMap resources | `%%Copyright: Copyright 1990-2009 Adobe Systems Incorporated.` | `pdfjs/cmaps/LICENSE` |
 | ICC colour profiles | `CC0 1.0 Universal` — public-domain dedication, no attribution duty | `pdfjs/iccs/LICENSE` |
 | Foxit standard fonts | `// Copyright 2014 PDFium Authors. All rights reserved.` | `pdfjs/standard_fonts/LICENSE_FOXIT` |
-| Liberation fonts | `Copyright © 2007-2011 Red Hat, Inc. All rights reserved. LIBERATION is a trademark of Red Hat, Inc.` — GPL v2 with two exceptions, see below | `pdfjs/standard_fonts/LICENSE_LIBERATION` |
 | JBIG2 (PDFium) | `// Copyright 2014 The PDFium Authors` | `pdfjs/wasm/LICENSE_JBIG2` |
 | OpenJPEG | `Copyright (c) 2002-2014, Universite catholique de Louvain (UCL), Belgium` and others | `pdfjs/wasm/LICENSE_OPENJPEG` |
 | QCMS | `Copyright (C) 2009-2024 Mozilla Corporation` | `pdfjs/wasm/LICENSE_QCMS` |
@@ -473,8 +474,8 @@ Twelve licence files ship under `pdfjs/`, each byte-identical to the one in
 | QuickJS engine — `pdfjs/wasm/quickjs-eval.wasm` (469,105 bytes) and `quickjs-eval.js` | `Copyright (c) 2017-2021 Fabrice Bellard` / `Copyright (c) 2017-2021 Charlie Gordon` — MIT | `pdfjs/wasm/LICENSE_QUICKJS` |
 | PDF.js QuickJS wrapper | `Copyright (c) 2026 Mozilla Foundation` — MIT | `pdfjs/wasm/LICENSE_PDFJS_QUICKJS` |
 
-Four rows read differently from the last edition of this file, and in each case it is the
-shipped licence file that changed, between `pdfjs-dist` 6.2.108 and 6.5.438.
+Three rows read differently from the last edition of this file and one row is gone, and in
+each case it is a licence file that changed, between `pdfjs-dist` 6.2.108 and 6.5.438.
 
 **QuickJS is no longer undetermined.** 6.2.108 shipped a `LICENSE_*` file beside every binary
 it vendored except QuickJS, the largest of them, and the binary carries no copyright string of
@@ -487,9 +488,11 @@ travel with the binary. The item is off §9.
 Foundation` in 6.2.108. In 6.5.438 it is the MIT text under the heading `MIT License` with no
 holder named, and the row says so rather than carrying the old line forward.
 
-**The Liberation fonts' licence file was replaced, and the fonts were not.** The four
-`LiberationSans-*.ttf` files are byte-identical between the two versions. What changed is the
-file beside them. 6.2.108 shipped the SIL Open Font License 1.1 there, opening
+**The Liberation Sans fonts are no longer shipped.** `pdfjs-dist` carries four
+`LiberationSans-*.ttf` files as its fallback for Helvetica, and until this edition the build
+copied them and this table listed them. The four files are byte-identical between the two
+versions. What changed is the file beside them. 6.2.108 shipped the SIL Open Font License 1.1
+there, opening
 `Digitized data copyright (c) 2010 Google Corporation`. 6.5.438 ships Red Hat's `LICENSE
 AGREEMENT AND LIMITED PRODUCT WARRANTY` / `LIBERATION FONT SOFTWARE`, which grants a licence
 `pursuant to the GNU General Public License v.2 with the exceptions set forth below` — one for
@@ -497,16 +500,24 @@ embedding the font in a document, one for object code in a physical product — 
 by the full GPL v2 text. The fonts' own metadata agrees with the new file, not the old one:
 `strings -a` over `LiberationSans-Regular.ttf` gives `Copyright (c) 2007 Red Hat, Inc. All
 rights reserved. LIBERATION is a trademark of Red Hat, Inc.`, `Version 1.07.4` and `Licensed
-under the Liberation Fonts license`. On that evidence these were never OFL fonts, and until
-now they shipped beside a licence file that did not describe them.
+under the Liberation Fonts license`. On that evidence these were never OFL fonts, and they
+shipped beside a licence file that did not describe them.
 
-The shipped file is authoritative and it travels with the fonts, which is the part this
-distribution controls. What it leaves open is what GPL v2 §3 — the section on distributing
-`object code or executable form` — asks of a site that serves the four `.ttf` files
-unmodified: whether a font file is object code in that section's sense, and what would count
-as its source. That is not answered here from a guess. It is item 11 in §9. The fonts are not
-dead weight the way QuickJS is: `src/pdfReceipt.ts` passes `standardFontDataUrl`, which is the
-option that tells PDF.js where to fetch them.
+Shipping the right file would have left a question open: what GPL v2 §3 — the section on
+distributing `object code or executable form` — asks of a site that serves four `.ttf` files
+unmodified, whether a font file is object code in that section's sense, and what would count
+as its source. That is not something to answer from a guess, and everything else under
+`pdfjs/` is under permissive terms or CC0. So the fonts were taken out instead.
+`scripts/copy-pdfjs-assets.mjs` skips the four `.ttf` files and `LICENSE_LIBERATION`, nothing
+under `pdfjs/` is theirs, and they are in §10 with the other things that are installed but not
+distributed.
+
+What that gives up is narrow. PDF.js reaches for those files only when a PDF names Helvetica,
+or a font PDF.js substitutes it for, without embedding it, and the device has none of the
+eighteen local fonts it tries first — `Helvetica`, `Arial`, `Liberation Sans` and `DejaVu Sans`
+among them. On such a device the request for the font file now fails, PDF.js logs `Cannot load
+system font` and carries on, and the text is drawn in the browser's generic `sans-serif`. The
+Foxit fonts beside them are unaffected.
 
 QuickJS ships because `scripts/copy-pdfjs-assets.mjs` copies `wasm/` recursively, and it is
 reached by nothing. Its only loader inside `pdfjs-dist` is `build/pdf.sandbox.mjs`, the PDF
@@ -611,7 +622,6 @@ consciously accepted.**
 | 8 | ieee754 | Its own BSD-3-Clause text for §11.4; not in `node_modules/` (§5.1) | `feross/ieee754` |
 | 9 | Feather Icons | The copyright line, and the glyph comparisons in §8; Feather is not installed | `feathericons/feather` |
 | 10 | base64-js | Licence and copyright holder; bundled into `tesseract/worker.min.js`, not installed, no header in its source (§5.1) | `beatgammit/base64-js` |
-| 11 | Liberation Sans fonts (in `pdfjs/standard_fonts/`) | What GPL v2 §3 requires of serving the four `.ttf` files unmodified, and whether shipping the licence file beside them is all of it (§6) | The shipped `LICENSE_LIBERATION`; the page the fonts' own metadata names, https://fedoraproject.org/wiki/Licensing/LiberationFontLicense |
 
 Two items that were on this list are off it, both because the answer was sitting in
 `node_modules/` the whole time. `idb-keyval` 6.3.0 was recorded as shipping no licence file; it
@@ -621,10 +631,11 @@ question. Both were answered by opening the file.
 
 A third came off for a different reason. QuickJS was item 11 while `pdfjs-dist` shipped no
 licence file for it; 6.5.438 ships two (§6), and upstream answered what no amount of reading
-the old package could. The number did not stay vacant. The same upgrade replaced the licence
-file beside the Liberation fonts, and the question that raises is the new item 11.
+the old package could. The same upgrade replaced the licence file beside the Liberation Sans
+fonts, which would have put a new item in its place; the fonts were removed from the build
+instead (§6), so there is nothing to list.
 
-`is-url` 1.2.4 is a milder twelfth case: its `LICENSE-MIT` genuinely contains no copyright
+`is-url` 1.2.4 is a milder eleventh case: its `LICENSE-MIT` genuinely contains no copyright
 line, so there is nothing to reproduce and nothing to fix. It is recorded in §2.4 instead. The
 three non-standard headers in §2.6 — "Use it if you like it", the MD5 header stating that no
 licence was specified, and FPDF's — are likewise not listed here: each ships verbatim in the
@@ -645,11 +656,15 @@ listed above despite the label: the two `@fontsource-variable` packages (§7), w
 files are served to every reader, and `vite-plugin-pwa`, whose generated Workbox runtime
 ships as the service worker (§2.5).
 
-One more that the dependency graph lists but that does not reach users:
+Two more that are installed but do not reach users:
 
 - **`@napi-rs/canvas`**, an optional dependency of `pdfjs-dist`. The browser bundle contains
   only the module specifier inside a Node-only code path; the native module is never bundled
   or served.
+- **The Liberation Sans fonts** inside `pdfjs-dist`: four `LiberationSans-*.ttf` files and
+  `LICENSE_LIBERATION`, in `node_modules/pdfjs-dist/standard_fonts/`.
+  `scripts/copy-pdfjs-assets.mjs` copies everything else in that directory and leaves these
+  where they are (§6).
 
 `loose-envify` and `js-tokens` used to be listed beside it, as dependencies of `react`,
 `react-dom` and `scheduler` that never reached the bundle. At React 19.3.1 they are not
@@ -775,5 +790,5 @@ headers, all in §2.6. §11 is not a complete inventory on its own; §2.6 is par
 
 ---
 
-*Eleven items in §9 remain unresolved. Do not describe this file as a finished attribution
+*Ten items in §9 remain unresolved. Do not describe this file as a finished attribution
 record until each is resolved or consciously accepted.*
