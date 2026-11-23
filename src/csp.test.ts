@@ -105,6 +105,9 @@ describe('production build', () => {
     ]) {
       expect(patterns.some((re) => re.test(path)), path).toBe(true)
     }
+    // The extension is matched in the path only: the app with a query that
+    // happens to end in .txt must still get the cached app offline.
+    expect(patterns.some((re) => re.test('/Receipts-Express/?file=receipt.txt'))).toBe(false)
   })
 
   /*

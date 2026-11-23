@@ -28,6 +28,13 @@ export default function UpdateBanner() {
   const updateRef = useRef<((reload?: boolean) => Promise<void>) | null>(null)
   // True once Refresh was pressed and confirmed in this tab.
   const requestedHere = useRef(false)
+  // The fallback reload. Cancelled once the takeover is handled, and when the
+  // banner unmounts, so it cannot ask again or reload after that.
+  const fallbackTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const cancelFallback = () => {
+    if (fallbackTimer.current !== undefined) clearTimeout(fallbackTimer.current)
+    fallbackTimer.current = undefined
+  }
 
   useEffect(() => {
     let lastCheck = Date.now()
@@ -49,6 +56,7 @@ export default function UpdateBanner() {
       // only the one where Refresh was pressed. Left to the library, every
       // other tab reloaded at once, past the unsaved-work check below.
       onNeedReload: () => {
+        cancelFallback()
         if (!hasUnsavedWork()) {
           window.location.reload()
           return
@@ -72,6 +80,7 @@ export default function UpdateBanner() {
     return () => {
       document.removeEventListener('visibilitychange', checkForUpdate)
       clearInterval(timer)
+      cancelFallback()
     }
   }, [])
 
@@ -127,7 +136,10 @@ export default function UpdateBanner() {
     requestedHere.current = true
     setReloading(true)
     void updateRef.current?.(true)
-    setTimeout(reloadAfterAsking, RELOAD_FALLBACK_MS)
+    fallbackTimer.current = setTimeout(() => {
+      fallbackTimer.current = undefined
+      reloadAfterAsking()
+    }, RELOAD_FALLBACK_MS)
   }
 
   return (
