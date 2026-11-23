@@ -8,6 +8,66 @@ user-facing features, and `PATCH` for fixes with no visible feature change. The
 version lives in `package.json` and is shown in the app under Menu → About. Every
 merge to `main` that changes app behavior gets a version bump and a tag.
 
+## [1.15.0] - 2026-11-22
+
+Everything merged since 1.14.0, which went out over three months without a
+version of its own. The dependency upgrades came first and the rest follows
+from an audit of the whole project.
+
+### Added
+- A "Later" control on the update banner, which hides it for the session.
+  The banner also sits clear of the "+ New Report" / "+ Add Expense" button
+  now; on a phone it used to cover it completely.
+
+### Changed
+- React 19.2 → 19.3, pdfjs-dist 6.2 → 6.5 and idb 8.0.4, with Vitest 4 → 5,
+  jsdom 30 → 31 and `vite-plugin-pwa` 1.3 → 2.0 on the development side, and
+  the overrides that clear the advisories then open against the lockfile.
+- The OCR and PDF engines are served from directories named for their
+  package versions, and their caches no longer expire after 30 days. An
+  upgrade is now a new URL, and scanning keeps working offline for as long
+  as the files stay cached.
+- The Liberation Sans fonts that PDF.js carries as its Helvetica fallback
+  are no longer shipped. Their licence file upstream turned out to be GPL v2
+  with exceptions. A PDF that uses Helvetica without embedding it, on a
+  device with no similar font of its own, is drawn in the browser's
+  sans-serif.
+- Third-party licence headers are kept in the built JavaScript again. The
+  Vite 8 build had been dropping all of them.
+- `THIRD_PARTY_NOTICES.md` is recompiled against what is installed, and its
+  list of unresolved items goes from ten to one. The texts for the libraries
+  linked into the OCR engine are now reproduced, read from upstream at the
+  versions that ship; three of those libraries had not been listed at all.
+- The restore prompt says when the saved profile will be replaced.
+- The storage warning is at the top of the page, where it can be seen
+  without scrolling to the end.
+- CI: the Jenkins pipeline scans a pull request's history for secrets,
+  checks commit identities and has a timeout; the agent image's downloads
+  are checksum-verified; the test job also runs daily.
+
+### Fixed
+- PDF import failed after the PDF.js upgrade for anyone whose device had
+  cached the previous engine, and the app blamed the file. This is what the
+  versioned engine directories are for.
+- OCR dropped the leading digits of amounts of 1,000 or more printed
+  without a thousands separator: 1234.56 was read as 234.56.
+- A scan that finished late overwrote an amount, date or merchant typed
+  while it ran, and replacing the photo on a saved expense overwrote its
+  saved values.
+- Moving an expense up within its own day gave it the previous day's date.
+- The exported PDF corrupted any line containing a character outside
+  Windows-1252, such as a rupee or won sign. Those currency symbols are now
+  written as ISO codes; other characters the built-in font cannot draw show
+  as "?".
+- A day with meals in more than one currency had them added together as
+  one number against the allowance.
+- One expense left behind by a report deleted in another tab made every
+  backup from that device impossible to restore. Backups also now leave out
+  images that nothing references.
+- A library too large for one backup file failed with "Backup failed". It
+  is now refused with an explanation, and a file too large to read is no
+  longer reported as invalid JSON.
+
 ## [1.14.0] - 2026-08-09
 
 ### Added
