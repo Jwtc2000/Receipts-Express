@@ -3,6 +3,7 @@ import { build } from 'vite'
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { NAVIGATION_DENYLIST } from './navigationDenylist'
 
 // The four standalone pages copied out of docs/ by copyStaticDocsPlugin.
 const DOC_PAGES = [
@@ -88,6 +89,25 @@ describe('production build', () => {
     const sw = readFileSync(join(outDir, 'sw.js'), 'utf-8')
     expect(sw).toContain('registerRoute(/\\/docs\\//')
     expect(sw).toContain('docs-pages')
+  })
+
+  // With the worker installed, a navigation to one of the shipped licence
+  // files was answered with the app shell. They must be left to the network.
+  it('does not answer a navigation to the licence and notice files with the app', () => {
+    const sw = readFileSync(join(outDir, 'sw.js'), 'utf-8')
+    // The generated worker carries the same expressions the config was given.
+    for (const re of NAVIGATION_DENYLIST) expect(sw, String(re)).toContain(re.source)
+    // Workbox matches the path and the query string together.
+    for (const path of [
+      '/Receipts-Express/LICENSE.txt',
+      '/Receipts-Express/THIRD_PARTY_NOTICES.md',
+      '/Receipts-Express/LICENSE.txt?v=2',
+    ]) {
+      expect(NAVIGATION_DENYLIST.some((re) => re.test(path)), path).toBe(true)
+    }
+    // The extension is matched in the path only: the app with a query that
+    // happens to end in .txt must still get the cached app offline.
+    expect(NAVIGATION_DENYLIST.some((re) => re.test('/Receipts-Express/?file=receipt.txt'))).toBe(false)
   })
 
   /*

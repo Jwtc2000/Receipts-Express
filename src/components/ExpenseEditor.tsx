@@ -5,7 +5,7 @@ import { getExpense, saveExpenseWithImage, getImage, nextPosition } from '../db'
 import { compressImage } from '../image'
 import { isPdfFile } from '../pdfDetect'
 import { extractReceipt } from '../ocr'
-import { setHasUnsavedWork } from '../unsavedWork'
+import { setHasUnsavedWork, isDiscardConfirmed, noteEdit } from '../unsavedWork'
 import Icon from './icons'
 import { HeaderPlanes } from './decorative'
 
@@ -196,20 +196,35 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
   // Warn the browser before it unloads (tab close, refresh, PWA back-gesture, or
   // the service-worker update reload) while there's an unsaved draft — otherwise
   // the typed fields and captured photo are gone with no confirmation.
+  // Also while a picked file is still being processed: it is not in the
+  // draft yet, but a reload would lose it all the same.
   useEffect(() => {
-    if (!dirty) return
+    if (!dirty && !picking) return
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isDiscardConfirmed()) return
       e.preventDefault()
       e.returnValue = ''
     }
     window.addEventListener('beforeunload', onBeforeUnload)
     return () => window.removeEventListener('beforeunload', onBeforeUnload)
-  }, [dirty])
+  }, [dirty, picking])
+
+  // Leaving the editor abandons any pick still in flight, so its late result
+  // (or failure) cannot touch the unsaved-work signal another editor now owns.
+  useEffect(
+    () => () => {
+      pickGenRef.current++
+      scanGenRef.current++
+    },
+    [],
+  )
 
   // Mirrors `dirty` into a module-level signal UpdateBanner can check — it's
   // an unrelated sibling with no shared state, and beforeunload above isn't
   // reliable on iOS Safari (browser tab or installed Home Screen PWA).
+  const dirtyRef = useRef(dirty)
   useEffect(() => {
+    dirtyRef.current = dirty
     setHasUnsavedWork(dirty)
   }, [dirty])
   useEffect(() => {
@@ -233,6 +248,7 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
   const set = (patch: Partial<Draft>) => {
     for (const key of Object.keys(patch)) typedRef.current.add(key as keyof Draft)
     setDirty(true)
+    noteEdit()
     // Typing is the user answering the message, so clear it rather than
     // leaving a complaint on screen about a value they have since changed.
     setInvalid(null)
@@ -248,6 +264,10 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
     // of overwriting whatever the newer pick already applied.
     const gen = ++pickGenRef.current
     setPicking(true)
+    // Counted as an edit now, before the file is processed: a reload in that
+    // window must ask again rather than drop the receipt being attached.
+    setHasUnsavedWork(true)
+    noteEdit()
     // Rendering/compression can genuinely fail (an unsupported photo format
     // like HEIC on some browsers, a corrupt file, a password-protected or
     // malformed PDF, or canvas.toBlob returning null). Without this catch
@@ -270,6 +290,8 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
       }
     } catch (err) {
       if (gen !== pickGenRef.current) return
+      // Nothing was attached, so only earlier edits still count.
+      setHasUnsavedWork(dirtyRef.current)
       setPicking(false)
       setCaptureError(captureErrorMessage(err, isPdfFile(file)))
       return
@@ -277,6 +299,7 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
     if (gen !== pickGenRef.current) return
     const [firstPage, ...restPages] = pages
     setDirty(true)
+    noteEdit()
     setImageBlob(firstPage)
     setImageChanged(true)
     setImageUrl((old) => {
@@ -341,6 +364,7 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
     scanGenRef.current++
     setPicking(false)
     setDirty(true)
+    noteEdit()
     setImageBlob(null)
     setImageChanged(true)
     setExtraImageBlobs([])

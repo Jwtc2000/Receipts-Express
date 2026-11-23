@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { defineConfig, type Plugin, type ResolvedConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+import { NAVIGATION_DENYLIST } from './src/navigationDenylist'
 
 // package.json's "version" is the single source of truth for the app's
 // version — bump it there (semver) and it flows into the build and the
@@ -209,7 +210,8 @@ export default defineConfig({
         theme_color: '#0f766e',
         background_color: '#f8fafc',
         display: 'standalone',
-        orientation: 'portrait',
+        // No orientation lock: an installed app that refuses to turn is a
+        // problem for anyone whose device is mounted sideways (WCAG 1.3.4).
         icons: [
           {
             src: 'icons/icon-192.png',
@@ -270,14 +272,10 @@ export default defineConfig({
           'assets/purify*',
         ],
         // vite-plugin-pwa's generateSW registers an SPA navigation route that
-        // serves index.html (the app shell) for every navigation request. The
-        // pilot deck and the privacy/terms pages are real, standalone pages
-        // under docs/, so without this their links keep the URL bar at e.g.
-        // docs/privacy.html but render the app instead. Exempt docs/ so the
-        // browser fetches the real page.
-        // Matched against the full pathname, which includes the /<repo>/ base
-        // on GitHub Pages, so this stays unanchored rather than /^\/docs\//.
-        navigateFallbackDenylist: [/\/docs\//],
+        // serves index.html (the app shell) for every navigation request.
+        // These are the navigations that must reach the real file instead;
+        // see src/navigationDenylist.ts for each one and why.
+        navigateFallbackDenylist: NAVIGATION_DENYLIST,
         runtimeCaching: [
           {
             urlPattern: /\/tesseract\//,

@@ -5,6 +5,7 @@ import UpdateBanner from './components/UpdateBanner'
 import StorageWarning from './components/StorageWarning'
 import GlobalErrorToast from './components/GlobalErrorToast'
 import FirstRunNotice from './components/FirstRunNotice'
+import ErrorBoundary from './components/ErrorBoundary'
 import { DB_VERSION_CHANGE_EVENT } from './db'
 import './styles.css'
 
@@ -53,7 +54,9 @@ function Root() {
             the screen and was only ever seen by someone who scrolled to the
             end of the page. */}
         <StorageWarning />
-        <App />
+        <ErrorBoundary>
+          <App />
+        </ErrorBoundary>
         <UpdateBanner />
         <GlobalErrorToast />
       </div>
