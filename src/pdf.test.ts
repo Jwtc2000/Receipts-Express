@@ -109,8 +109,14 @@ describe('exportReportPdf', () => {
     await exportReportPdf(makeReport(), [makeExpense({ imageId: undefined, title: long, amount: 1234.56 })])
     const calls = (shareOrDownloadFile as ReturnType<typeof vi.fn>).mock.calls
     const text = await pdfText(calls[calls.length - 1][0] as File)
-    // Too long for any line it is drawn on, so nowhere does it appear whole.
+    // Too long for any line it is drawn on, so nowhere does it appear whole,
+    // but its start is still drawn: it is shortened, not left out.
     expect(text).not.toContain(`(${long})`)
+    // The receipt-page draws: a longer start of the title, then the
+    // ellipsis (one Windows-1252 byte, which reads back as U+FFFD here).
+    const shortened = [...text.matchAll(/\((Team dinner with the regional sales group[^)]*)\)/g)].map((m) => m[1])
+    expect(shortened.length).toBeGreaterThan(0)
+    for (const line of shortened) expect(line.endsWith('\ufffd')).toBe(true)
   })
 
   // The built-in font encodes Windows-1252 only. Anything else used to go

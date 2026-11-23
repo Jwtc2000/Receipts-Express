@@ -166,9 +166,15 @@ function isValidExpense(v: unknown): v is Expense {
   )
 }
 
-/** A yyyy-mm-dd date, or blank: the only two things the editor can store. */
+/** A real yyyy-mm-dd date, or blank: the only two things the editor can store. */
 function isDateOrBlank(v: unknown): v is string {
-  return typeof v === 'string' && (v === '' || ISO_DATE_RE.test(v))
+  if (typeof v !== 'string') return false
+  if (v === '') return true
+  if (!ISO_DATE_RE.test(v)) return false
+  // The shape alone lets 2026-02-30 and 2026-13-01 through.
+  const [y, m, d] = v.split('-').map(Number)
+  const date = new Date(Date.UTC(y, m - 1, d))
+  return date.getUTCFullYear() === y && date.getUTCMonth() === m - 1 && date.getUTCDate() === d
 }
 
 // The importer used to store the parsed objects as they came, so any extra

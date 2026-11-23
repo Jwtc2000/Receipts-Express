@@ -85,6 +85,7 @@ describe('validateBackup', () => {
     ['a negative amount', { amount: -5 }],
     ['a personal amount above the total', { personalAmount: 20 }],
     ['a date that is not yyyy-mm-dd', { date: 'yesterday' }],
+    ['a day the month does not have', { date: '2026-02-30' }],
   ])('rejects an expense with %s', async (_label, change) => {
     const { validateBackup } = await import('./backup')
     const backup = validBackup()
@@ -612,6 +613,23 @@ describe('importBackup', () => {
     )
     expect(await db.getImage('newer-photo')).toBeUndefined()
     expect(await db.getImage('older-photo')).toBeDefined()
+  })
+
+  it('keeps a receipt page that an expense outside the restore still points at', async () => {
+    const db = await import('./db')
+    const base = validBackup().expenses[0]
+    await db.importBackupData(
+      [{ id: 'r1', name: 'Trip', createdAt: 1 }],
+      [
+        { ...base, id: 'a', imageId: 'shared' },
+        { ...base, id: 'b', imageId: 'shared' },
+      ],
+      [{ id: 'shared', blob: new Blob(['s']) }],
+    )
+    await db.importBackupData([{ id: 'r1', name: 'Trip', createdAt: 1 }], [{ ...base, id: 'a', imageId: 'other' }], [
+      { id: 'other', blob: new Blob(['o']) },
+    ])
+    expect(await db.getImage('shared')).toBeDefined()
   })
 
   it('writes nothing at all when one record in the file is invalid', async () => {

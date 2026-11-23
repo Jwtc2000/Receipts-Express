@@ -84,6 +84,10 @@ export async function exportReportPdf(report: Report, expenses: Expense[]): Prom
   const splitText = doc.splitTextToSize.bind(doc) as (...args: unknown[]) => unknown
   ;(doc as { splitTextToSize: unknown }).splitTextToSize = (text: unknown, ...rest: unknown[]) =>
     splitText(safe(text), ...rest)
+  // Measured as it will be drawn: "₹1,234.56" is drawn as the wider
+  // "INR 1,234.56", and a title fitted against the narrower one overlapped it.
+  const textWidth = doc.getTextWidth.bind(doc) as (text: string) => number
+  ;(doc as { getTextWidth: unknown }).getTextWidth = (text: string) => textWidth(pdfSafeText(text))
   const totalDisplay = formatTotal(expenses)
 
   // ---------- Summary page ----------

@@ -34,6 +34,30 @@ interface Props {
 
 export default function ReportView({ reportId, onBack, onAddExpense, onEditExpense }: Props) {
   const [report, setReport] = useState<Report | null>(null)
+  // The latest report, including changes whose write has not finished. Each
+  // save replaces the whole record, so two saves started from the same
+  // render (a rate and the meal allowance, both committed as the drawer
+  // closes) used to have the second write put the first one's field back.
+  // Saves now run one after another, each applied to the latest report.
+  const reportRef = useRef<Report | null>(null)
+  const saveChain = useRef<Promise<void>>(Promise.resolve())
+  useEffect(() => {
+    reportRef.current = report
+  }, [report])
+  const updateReport = (change: (latest: Report) => Report | null): Promise<void> => {
+    const run = async () => {
+      const latest = reportRef.current
+      if (!latest) return
+      const updated = change(latest)
+      if (!updated) return
+      reportRef.current = updated
+      setReport(updated)
+      await saveReport(updated)
+    }
+    const next = saveChain.current.then(run, run)
+    saveChain.current = next.catch(() => {})
+    return next
+  }
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [thumbs, setThumbs] = useState<Map<string, string>>(new Map())
   const [otherReports, setOtherReports] = useState<Report[]>([])
@@ -243,11 +267,8 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
   const saveRename = async () => {
     if (!report) return
     const name = nameDraft.trim()
-    if (name && name !== report.name) {
-      await saveReport({ ...report, name })
-      setReport({ ...report, name })
-    }
     setRenaming(false)
+    await updateReport((latest) => (name && name !== latest.name ? { ...latest, name } : null))
   }
 
   const openMenu = () => {
@@ -269,24 +290,22 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
   const saveExchangeRate = async (currency: string, value: string) => {
     if (!report) return
     const rate = parseFloat(value)
-    const current = { ...report.exchangeRates }
-    if (Number.isFinite(rate) && rate > 0) {
-      current[currency] = rate
-    } else {
-      // An empty/invalid entry clears the rate rather than storing 0/NaN —
-      // that currency's total goes back to "missing" instead of $0.
-      delete current[currency]
-    }
-    const updated = { ...report, exchangeRates: current }
-    await saveReport(updated)
-    setReport(updated)
+    await updateReport((latest) => {
+      const current = { ...latest.exchangeRates }
+      if (Number.isFinite(rate) && rate > 0) {
+        current[currency] = rate
+      } else {
+        // An empty/invalid entry clears the rate rather than storing 0/NaN —
+        // that currency's total goes back to "missing" instead of $0.
+        delete current[currency]
+      }
+      return { ...latest, exchangeRates: current }
+    })
   }
 
   const saveProjectNumber = async (projectNumber: string) => {
     if (!report) return
-    const updated = { ...report, projectNumber }
-    await saveReport(updated)
-    setReport(updated)
+    await updateReport((latest) => ({ ...latest, projectNumber }))
   }
 
   const saveTripSettings = async () => {
@@ -294,16 +313,14 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
     const startDate = tripStartDraft
     const endDate = tripEndDraft < startDate ? startDate : tripEndDraft
     const dailyMealAllowance = Math.max(0, parseFloat(mealAllowanceDraft)) || 0
-    if (
-      startDate !== report.startDate ||
-      endDate !== report.endDate ||
-      dailyMealAllowance !== (report.dailyMealAllowance ?? 0)
-    ) {
-      const updated = { ...report, startDate, endDate, dailyMealAllowance }
-      await saveReport(updated)
-      setReport(updated)
-    }
     setTripEndDraft(endDate)
+    await updateReport((latest) =>
+      startDate !== latest.startDate ||
+      endDate !== latest.endDate ||
+      dailyMealAllowance !== (latest.dailyMealAllowance ?? 0)
+        ? { ...latest, startDate, endDate, dailyMealAllowance }
+        : null,
+    )
   }
 
   if (!report) return <p className="muted center">Loading…</p>

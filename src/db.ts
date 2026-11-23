@@ -42,9 +42,13 @@ function getDB() {
       // Another tab wants to upgrade: close this connection so it is not
       // blocked forever, forget it so the next call reopens, and say so.
       blocking() {
-        void opening.then((db) => db.close())
         dbPromise = null
-        window.dispatchEvent(new Event(DB_VERSION_CHANGE_EVENT))
+        // Closed before the prompt is raised: an unanswered prompt must not
+        // keep the other tab's upgrade waiting.
+        void opening.then((db) => {
+          db.close()
+          window.dispatchEvent(new Event(DB_VERSION_CHANGE_EVENT))
+        })
       },
       // The browser closed the connection underneath the app. Without this
       // the dead connection stayed cached and every later read and write
@@ -205,11 +209,18 @@ export async function importBackupData(
   // backup was taken. Nothing would reference those pages afterwards, and
   // nothing in the app could ever delete them. Read each one inside this
   // transaction and drop the pages only it pointed at.
-  const incoming = new Set(expenses.flatMap((e) => expenseImageIds(e)))
-  const existing = await Promise.all(expenses.map((e) => expenseStore.get(e.id)))
-  for (const old of existing) {
-    if (!old) continue
-    for (const id of expenseImageIds(old)) if (!incoming.has(id)) void imageStore.delete(id)
+  //
+  // Kept: every page the restored expenses point at, and every page an
+  // expense the restore does not touch points at. Two expenses can share a
+  // page id (the app never makes them, but a backup file can carry them),
+  // and restoring one must not take the other's receipt away.
+  const restoredIds = new Set(expenses.map((e) => e.id))
+  const stored = await expenseStore.getAll()
+  const keep = new Set(expenses.flatMap((e) => expenseImageIds(e)))
+  for (const e of stored) if (!restoredIds.has(e.id)) for (const id of expenseImageIds(e)) keep.add(id)
+  for (const old of stored) {
+    if (!restoredIds.has(old.id)) continue
+    for (const id of expenseImageIds(old)) if (!keep.has(id)) void imageStore.delete(id)
   }
   for (const image of images) void imageStore.put(image)
   for (const report of reports) void tx.objectStore('reports').put(report)
