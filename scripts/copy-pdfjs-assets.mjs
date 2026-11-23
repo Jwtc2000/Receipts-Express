@@ -3,14 +3,19 @@
 // self-hosted — no CDN calls at runtime, matching the Tesseract setup.
 import fs from 'node:fs'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { PDFJS_DIR, root } from './engine-dirs.mjs'
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const pkgRoot = path.join(root, 'node_modules', 'pdfjs-dist')
 // The destination can be given as an argument so that a test can run this
 // exact copy into a scratch directory and read what comes out of it
 // (src/pdfAssets.test.ts). The build never passes one.
-const dest = process.argv[2] ? path.resolve(process.argv[2]) : path.join(root, 'public', 'pdfjs')
+//
+// Without one, the files go into a directory named for the installed
+// pdfjs-dist version (see scripts/engine-dirs.mjs for why), and everything
+// already under public/pdfjs is removed first: a directory left over from the
+// previous version would otherwise be copied into the build and served.
+const dest = process.argv[2] ? path.resolve(process.argv[2]) : path.join(root, 'public', PDFJS_DIR)
+if (!process.argv[2]) fs.rmSync(path.join(root, 'public', 'pdfjs'), { recursive: true, force: true })
 fs.mkdirSync(dest, { recursive: true })
 
 // pdfjs-dist carries four LiberationSans-*.ttf files as its fallback for
@@ -47,4 +52,4 @@ copyDir('cmaps', 'cmaps')
 copyDir('wasm', 'wasm')
 copyDir('iccs', 'iccs')
 
-console.log('Copied PDF.js worker + assets to public/pdfjs/')
+console.log(`Copied PDF.js worker + assets to ${path.relative(root, dest)}/`)

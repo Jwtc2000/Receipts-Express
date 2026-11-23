@@ -60,12 +60,12 @@ same as for `frame-ancestors`: a host that can set response headers.
 
 **Disclosure: two unused CDN URLs inside the vendored OCR worker.** The
 "never a CDN" claim above is about what the app does, not about every
-string in the shipped bytes. `public/tesseract/worker.min.js` contains two
+string in the shipped bytes. The vendored `worker.min.js` under `public/tesseract/` contains two
 `https://cdn.jsdelivr.net/...` URLs — tesseract.js's own built-in defaults
 for where to fetch its WASM core and its language data — and a third of
 the same kind, the default worker script URL, is compiled into the app
 bundle from tesseract.js's entry point. All three are overridden at
-`src/ocr.ts:20-22`, which passes explicit `workerPath`, `corePath` and
+`src/ocr.ts:21-23`, which passes explicit `workerPath`, `corePath` and
 `langPath` pointing at this app's own origin; the library spreads the
 caller's options over its defaults, and the two inside the worker are read
 as `corePath || <default>` and `langPath || <default>`, so with values
