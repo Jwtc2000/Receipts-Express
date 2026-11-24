@@ -81,16 +81,80 @@ describe('validateBackup', () => {
     expect(plan.expenses[0]).not.toHaveProperty('junk')
   })
 
+  // Values no release has written. Anything a release could write is
+  // restored: see the tests after these, and backupCompat.test.ts.
   it.each([
-    ['a negative amount', { amount: -5 }],
     ['a personal amount above the total', { personalAmount: 20 }],
+    ['a personal amount below a refund', { amount: -5, personalAmount: -6 }],
+    ['a positive personal amount on a refund', { amount: -5, personalAmount: 1 }],
     ['a date that is not yyyy-mm-dd', { date: 'yesterday' }],
     ['a day the month does not have', { date: '2026-02-30' }],
+    ['29 February in a year that is not a leap year', { date: '1900-02-29' }],
+    ['year 0', { date: '0000-07-18' }],
+    ['a seven-digit year', { date: '2026000-07-18' }],
   ])('rejects an expense with %s', async (_label, change) => {
     const { validateBackup } = await import('./backup')
     const backup = validBackup()
     backup.expenses[0] = { ...backup.expenses[0], ...change }
     await expect(validateBackup(asFile(backup))).rejects.toThrow(/expense #0 is malformed/)
+  })
+
+  // Save took any number before 1.13.0, and the personal portion was clamped
+  // to the amount, so a refund was saved negative with a personal portion
+  // equal to it.
+  it('restores a refund saved as a negative amount before 1.13.0, as it was saved', async () => {
+    const { validateBackup } = await import('./backup')
+    const backup = validBackup()
+    backup.expenses[0] = { ...backup.expenses[0], amount: -40, personalAmount: -40 }
+    const { expenses } = await validateBackup(asFile(backup))
+    expect(expenses[0]).toMatchObject({ amount: -40, personalAmount: -40 })
+  })
+
+  // Chrome's date field stores a year typed as two digits as 0026, and takes
+  // years of up to six digits. A check built on Date.UTC read 0026 as 1926.
+  it.each(['0026-07-18', '20266-07-18', '2028-02-29', '2000-02-29'])(
+    'restores the date %s, which a date field can write',
+    async (date) => {
+      const { validateBackup } = await import('./backup')
+      const backup = validBackup({
+        reports: [{ id: 'r1', name: 'Trip', createdAt: 1, startDate: date, endDate: date }],
+      })
+      backup.expenses[0] = { ...backup.expenses[0], date }
+      const { reports, expenses } = await validateBackup(asFile(backup))
+      expect(reports[0]).toMatchObject({ startDate: date, endDate: date })
+      expect(expenses[0].date).toBe(date)
+    },
+  )
+
+  // "1e999" typed before 1.13.0 was saved as Infinity, which JSON writes as
+  // null. Refusing it refused the whole file.
+  it('restores an amount the file holds as null as 0, without its personal portion, and counts it', async () => {
+    const { validateBackup } = await import('./backup')
+    const backup = validBackup()
+    const raw = backup.expenses[0] as unknown as Record<string, unknown>
+    raw.amount = null
+    raw.personalAmount = 5
+    const plan = await validateBackup(asFile(backup))
+    expect(plan.expenses[0].amount).toBe(0)
+    expect(plan.expenses[0]).not.toHaveProperty('personalAmount')
+    expect(plan.counts.unreadableAmounts).toBe(1)
+  })
+
+  it('restores a personal portion the file holds as null as unset', async () => {
+    const { validateBackup } = await import('./backup')
+    const backup = validBackup()
+    ;(backup.expenses[0] as unknown as Record<string, unknown>).personalAmount = null
+    const plan = await validateBackup(asFile(backup))
+    expect(plan.expenses[0]).not.toHaveProperty('personalAmount')
+    expect(plan.counts.unreadableAmounts).toBe(0)
+  })
+
+  it('restores a meal allowance the file holds as null as unset', async () => {
+    const { validateBackup } = await import('./backup')
+    const backup = validBackup()
+    ;(backup.reports[0] as unknown as Record<string, unknown>).dailyMealAllowance = null
+    const { reports } = await validateBackup(asFile(backup))
+    expect(reports[0]).not.toHaveProperty('dailyMealAllowance')
   })
 
   it('rejects two expenses with the same id', async () => {
@@ -106,11 +170,15 @@ describe('validateBackup', () => {
     await expect(validateBackup(asFile(backup))).rejects.toThrow(/newer version/)
   })
 
-  it('rejects an exchange-rate key that is not a currency code', async () => {
+  // A report's rates are keyed by its expenses' currency text, and the
+  // currency field took any three characters until 1.23.1. A check for three
+  // letters, added in 1.16.0, refused every backup holding one of these.
+  it('keeps an exchange rate under any currency text the currency field could hold', async () => {
     const { validateBackup } = await import('./backup')
     const backup = validBackup()
-    backup.reports[0] = { ...backup.reports[0], exchangeRates: { 'not a code': 1.1 } }
-    await expect(validateBackup(asFile(backup))).rejects.toThrow(/report #0 is malformed/)
+    backup.reports[0] = { ...backup.reports[0], exchangeRates: { '€': 1.08, EU: 1.09, C$: 0.73 } }
+    const { reports } = await validateBackup(asFile(backup))
+    expect(reports[0].exchangeRates).toEqual({ '€': 1.08, EU: 1.09, C$: 0.73 })
   })
 
   it('counts receipt pages the expenses point at that the file does not carry', async () => {
@@ -252,18 +320,39 @@ describe('validateBackup', () => {
     await expect(validateBackup(asFile(bad))).rejects.toThrow(/malformed/i)
   })
 
-  it('rejects an expense whose reportId is not in this backup (regression)', async () => {
+  // Exports before 1.16.0 carried an expense a second tab had saved into a
+  // report the first had just deleted. Refusing it refused the whole file;
+  // restoring it would store an expense nothing in the app can show.
+  it('leaves out an expense whose report is not in the file, with its receipt pages, and counts it', async () => {
     const { validateBackup } = await import('./backup')
-    const bad = validBackup()
-    bad.expenses[0].reportId = 'some-other-report-not-in-this-file'
-    await expect(validateBackup(asFile(bad))).rejects.toThrow(/references a report/i)
+    const backup = validBackup({
+      images: [{ id: 'orphan-page', dataUrl: `data:image/png;base64,${TINY_PNG_BASE64}` }],
+    })
+    backup.expenses.push({
+      ...backup.expenses[0],
+      id: 'e2',
+      reportId: 'some-other-report-not-in-this-file',
+      imageId: 'orphan-page',
+    })
+    const plan = await validateBackup(asFile(backup))
+    expect(plan.expenses.map((e) => e.id)).toEqual(['e1'])
+    expect(plan.images).toEqual([])
+    expect(plan.counts).toMatchObject({ expenses: 1, skippedExpenses: 1, missingImages: 0 })
+  })
+
+  it('does not restore a receipt page that no expense points at', async () => {
+    const { validateBackup } = await import('./backup')
+    const plan = await validateBackup(
+      asFile(validBackup({ images: [{ id: 'img1', dataUrl: `data:image/png;base64,${TINY_PNG_BASE64}` }] })),
+    )
+    expect(plan.images).toEqual([])
   })
 
   it('decodes a valid data:image;base64 image', async () => {
     const { validateBackup } = await import('./backup')
-    const { images } = await validateBackup(
-      asFile(validBackup({ images: [{ id: 'img1', dataUrl: `data:image/png;base64,${TINY_PNG_BASE64}` }] })),
-    )
+    const backup = validBackup({ images: [{ id: 'img1', dataUrl: `data:image/png;base64,${TINY_PNG_BASE64}` }] })
+    backup.expenses[0].imageId = 'img1'
+    const { images } = await validateBackup(asFile(backup))
     expect(images).toHaveLength(1)
     expect(images[0].blob.type).toBe('image/png')
     expect(images[0].blob.size).toBeGreaterThan(0)
@@ -306,11 +395,19 @@ describe('validateBackup / commitBackup split', () => {
     const db = await import('./db')
     const { validateBackup } = await import('./backup')
 
-    const plan = await validateBackup(
-      asFile(validBackup({ images: [{ id: 'img1', dataUrl: `data:image/png;base64,${TINY_PNG_BASE64}` }] })),
-    )
+    const backup = validBackup({ images: [{ id: 'img1', dataUrl: `data:image/png;base64,${TINY_PNG_BASE64}` }] })
+    backup.expenses[0].imageId = 'img1'
+    const plan = await validateBackup(asFile(backup))
 
-    expect(plan.counts).toEqual({ reports: 1, expenses: 1, overwrites: 0, missingImages: 0 })
+    expect(plan.images).toHaveLength(1)
+    expect(plan.counts).toEqual({
+      reports: 1,
+      expenses: 1,
+      overwrites: 0,
+      missingImages: 0,
+      skippedExpenses: 0,
+      unreadableAmounts: 0,
+    })
     expect(await db.getReport('r1')).toBeUndefined()
     expect(await db.getExpense('e1')).toBeUndefined()
     expect(await db.getImage('img1')).toBeUndefined()
@@ -398,17 +495,17 @@ describe('validateBackup record and text ceilings', () => {
     ).rejects.toThrow(/more than 10000 expenses/)
   })
 
-  it('rejects a report carrying a string over the 2000-character limit', async () => {
+  it('rejects a report carrying a string over the 100000-character limit', async () => {
     const { validateBackup } = await import('./backup')
-    const bad = validBackup({ reports: [{ id: 'r1', name: 'x'.repeat(2001), createdAt: 1 }] })
-    await expect(validateBackup(asFile(bad))).rejects.toThrow(/text longer than the 2000-character limit/)
+    const bad = validBackup({ reports: [{ id: 'r1', name: 'x'.repeat(100_001), createdAt: 1 }] })
+    await expect(validateBackup(asFile(bad))).rejects.toThrow(/text longer than the 100000-character limit/)
   })
 
-  it('rejects an expense carrying a string over the 2000-character limit', async () => {
+  it('rejects an expense carrying a string over the 100000-character limit', async () => {
     const { validateBackup } = await import('./backup')
     const bad = validBackup()
-    bad.expenses[0].notes = 'x'.repeat(2001)
-    await expect(validateBackup(asFile(bad))).rejects.toThrow(/text longer than the 2000-character limit/)
+    bad.expenses[0].notes = 'x'.repeat(100_001)
+    await expect(validateBackup(asFile(bad))).rejects.toThrow(/text longer than the 100000-character limit/)
   })
 
   // exchangeRates keeps currency codes in its object keys, and the shape
@@ -417,17 +514,26 @@ describe('validateBackup record and text ceilings', () => {
   it('rejects an overlong string hiding in an object key', async () => {
     const { validateBackup } = await import('./backup')
     const bad = validBackup({
-      reports: [{ id: 'r1', name: 'Trip', createdAt: 1, exchangeRates: { ['E'.repeat(2001)]: 1.08 } }],
+      reports: [{ id: 'r1', name: 'Trip', createdAt: 1, exchangeRates: { ['E'.repeat(100_001)]: 1.08 } }],
     })
-    // Refused either way: a key that long is not a currency code either.
-    await expect(validateBackup(asFile(bad))).rejects.toThrow(/text longer than the 2000-character limit|malformed/)
+    await expect(validateBackup(asFile(bad))).rejects.toThrow(/text longer than the 100000-character limit/)
   })
 
-  it('accepts a string of exactly 2000 characters', async () => {
+  it('accepts a string of exactly 100000 characters', async () => {
     const { validateBackup } = await import('./backup')
-    const backup = validBackup({ reports: [{ id: 'r1', name: 'x'.repeat(2000), createdAt: 1 }] })
+    const backup = validBackup({ reports: [{ id: 'r1', name: 'x'.repeat(100_000), createdAt: 1 }] })
     const { reports } = await validateBackup(asFile(backup))
-    expect(reports[0].name).toHaveLength(2000)
+    expect(reports[0].name).toHaveLength(100_000)
+  })
+
+  // The screens cap text at 2,000 characters from 1.13.0; before that nothing
+  // did, and 1.13.0's restore refused every file holding a longer note.
+  it('restores a note longer than the screens now allow, as typed before 1.13.0', async () => {
+    const { validateBackup, MAX_STRING_LENGTH } = await import('./backup')
+    const backup = validBackup()
+    backup.expenses[0].notes = 'n'.repeat(MAX_STRING_LENGTH + 1000)
+    const { expenses } = await validateBackup(asFile(backup))
+    expect(expenses[0].notes).toHaveLength(MAX_STRING_LENGTH + 1000)
   })
 
   // The string cap limits how long each id is, not how many there are, so the
@@ -497,11 +603,11 @@ describe('the profile in a backup', () => {
     await expect(validateBackup(asFile(bad))).rejects.toThrow(/more than 50 project numbers/)
   })
 
-  it('rejects a profile carrying a string over the 2000-character limit', async () => {
+  it('rejects a profile carrying a string over the 100000-character limit', async () => {
     const { validateBackup } = await import('./backup')
-    const bad = validBackup({ profile: makeProfile({ name: 'x'.repeat(2001) }) })
+    const bad = validBackup({ profile: makeProfile({ name: 'x'.repeat(100_001) }) })
     await expect(validateBackup(asFile(bad))).rejects.toThrow(
-      /profile has text longer than the 2000-character limit/,
+      /profile has text longer than the 100000-character limit/,
     )
   })
 
@@ -637,7 +743,7 @@ describe('importBackup', () => {
     const { importBackup } = await import('./backup')
     const backup = validBackup()
     // A second, malformed expense alongside an otherwise-valid one.
-    backup.expenses.push({ ...backup.expenses[0], id: 'e2', amount: NaN })
+    backup.expenses.push({ ...backup.expenses[0], id: 'e2', amount: 'twelve' as unknown as number })
     const file = asFile(backup)
 
     await expect(importBackup(file)).rejects.toThrow()

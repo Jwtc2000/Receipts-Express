@@ -1,0 +1,108 @@
+{
+  "app": "receipts-express",
+  "version": 1,
+  "exportedAt": "2026-07-30T18:30:00.000Z",
+  "reports": [
+    {
+      "id": "fx1-r1",
+      "name": "Sample sales visit",
+      "createdAt": 1785000000000,
+      "startDate": "0026-07-20",
+      "endDate": "2026-07-24",
+      "dailyMealAllowance": null,
+      "exchangeRates": {
+        "€": 1.08,
+        "EU": 1.09
+      }
+    }
+  ],
+  "expenses": [
+    {
+      "title": "Dinner",
+      "merchant": "Example Bistro",
+      "amount": 64.2,
+      "currency": "€",
+      "date": "2026-07-21",
+      "category": "Meals",
+      "notes": "",
+      "createdAt": 1784340000000,
+      "id": "fx1-e1",
+      "reportId": "fx1-r1",
+      "position": 0,
+      "personalAmount": 10,
+      "imageId": "fx1-i1",
+      "extraImageIds": [
+        "fx1-i2"
+      ]
+    },
+    {
+      "title": "Hotel deposit returned",
+      "merchant": "Sample Inn",
+      "amount": -40,
+      "currency": "EU",
+      "date": "0026-07-22",
+      "category": "Lodging",
+      "notes": "",
+      "createdAt": 1784340000000,
+      "id": "fx1-e2",
+      "reportId": "fx1-r1",
+      "position": 1,
+      "personalAmount": -40
+    },
+    {
+      "title": "Train",
+      "merchant": "Example Rail",
+      "amount": 31,
+      "currency": "USD",
+      "date": "2026-07-20",
+      "category": "Travel",
+      "notes": "Sample itinerary pasted from a made-up booking email: depart 08:10, arrive 11:45, seat 14C. Sample itinerary pasted from a made-up booking email: depart 08:10, arrive 11:45, seat 14C. Sample itinerary pasted from a made-up booking email: depart 08:10, arrive 11:45, seat 14C. Sample itinerary pasted from a made-up booking email: depart 08:10, arrive 11:45, seat 14C. Sample itinerary pasted from a made-up booking email: depart 08:10, arrive 11:45, seat 14C. Sample itinerary pasted from a made-up booking email: depart 08:10, arrive 11:45, seat 14C. Sample itinerary pasted from a made-up booking email: depart 08:10, arrive 11:45, seat 14C. Sample itinerary pasted from a made-up booking email: depart 08:10, arrive 11:45, seat 14C. Sample itinerary pasted from a made-up booking email: depart 08:10, arrive 11:45, seat 14C. Sample itinerary pasted from a made-up booking email: depart 08:10, arrive 11:45, seat 14C. Sample itinerary pasted from a made-up booking email: depart 08:10, arrive 11:45, seat 14C. Sample itinerary pasted from a made-up booking email: depart 08:10, arrive 11:45, seat 14C. Sample itinerary pasted from a made-up booking email: depart 08:10, arrive 11:45, seat 14C. Sample itinerary pasted from a made-up booking email: depart 08:10, arrive 11:45, seat 14C. Sample itinerary pasted from a made-up booking email: depart 08:10, arrive 11:45, seat 14C. Sample itinerary pasted from a made-up booking email: depart 08:10, arrive 11:45, seat 14C. Sample itinerary pasted from a made-up booking email: depart 08:10, arrive 11:45, seat 14C. Sample itinerary pasted from a made-up booking email: depart 08:10, arrive 11:45, seat 14C. Sample itinerary pasted from a made-up booking email: depart 08:10, arrive 11:45, seat 14C. Sample itinerary pasted from a made-up booking email: depart 08:10, arrive 11:45, seat 14C. Sample itinerary pasted from a made-up booking email: depart 08:10, arrive 11:45, seat 14C. Sample itinerary pasted from a made-up booking email: depart 08:10, arrive 11:45, seat 14C. Sample itinerary pasted from a made-up booking email: depart 08:10, arrive 11:45, seat 14C. Sample itinerary pasted from a made-up booking email: depart 08:10, arrive 11:45, seat 14C. Sample itinerary pasted from a made-up booking email: depart 08:10, arrive 11:45, seat 14C. Sample itinerary pasted from a made-up booking email: depart 08:10, arrive 11:45, seat 14C. Sample itinerary pasted from a made-up booking email: depart 08:10, arrive 11:45, seat 14C. Sample itinerary pasted from a made-up booking email: depart 08:10, arrive 11:45, seat 14C. Sample itinerary pasted from a made-up booking email: depart 08:10, arrive 11:45, seat 14C. Sample itinerary pasted from a made-up booking email: depart 08:10, arrive 11:45, seat 14C. Sample itinerary pasted from a made-up booking email: depart 08:10, arrive 11:45, seat 14C. Sample itinerary pasted from a made-up booking email: depart 08:10, arrive 11:45, seat 14C. Sample itinerary pasted from a made-up booking email: de",
+      "createdAt": 1784340000000,
+      "id": "fx1-e3",
+      "reportId": "fx1-r1",
+      "position": 2
+    },
+    {
+      "title": "Parking",
+      "merchant": "Sample Garage",
+      "amount": null,
+      "currency": "USD",
+      "date": "2026-07-23",
+      "category": "Transport",
+      "notes": "",
+      "createdAt": 1784340000000,
+      "id": "fx1-e4",
+      "reportId": "fx1-r1",
+      "position": 3,
+      "personalAmount": null
+    },
+    {
+      "title": "Coffee",
+      "merchant": "Example Cafe",
+      "amount": 4.5,
+      "currency": "USD",
+      "date": "2026-07-21",
+      "category": "Meals",
+      "notes": "",
+      "createdAt": 1784340000000,
+      "id": "fx1-e5",
+      "reportId": "fx1-deleted-report",
+      "position": 0,
+      "imageId": "fx1-i3"
+    }
+  ],
+  "images": [
+    {
+      "id": "fx1-i1",
+      "dataUrl": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAMCAgICAgMCAgIDAwMDBAYEBAQEBAgGBgUGCQgKCgkICQkKDA8MCgsOCwkJDRENDg8QEBEQCgwSExIQEw8QEBD/2wBDAQMDAwQDBAgEBAgQCwkLEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBD/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k="
+    },
+    {
+      "id": "fx1-i2",
+      "dataUrl": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAMCAgICAgMCAgIDAwMDBAYEBAQEBAgGBgUGCQgKCgkICQkKDA8MCgsOCwkJDRENDg8QEBEQCgwSExIQEw8QEBD/2wBDAQMDAwQDBAgEBAgQCwkLEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBD/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k="
+    },
+    {
+      "id": "fx1-i3",
+      "dataUrl": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAMCAgICAgMCAgIDAwMDBAYEBAQEBAgGBgUGCQgKCgkICQkKDA8MCgsOCwkJDRENDg8QEBEQCgwSExIQEw8QEBD/2wBDAQMDAwQDBAgEBAgQCwkLEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBD/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k="
+    }
+  ]
+}

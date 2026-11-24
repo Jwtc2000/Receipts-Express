@@ -1,6 +1,17 @@
-import { Fragment, useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useId, useRef, useState } from 'react'
 import type { Report, Expense } from '../types'
-import { formatMoney, formatTotal, formatDate, dayLabel, dayNumbersByDate, resolveDateAfterMove, todayIso, usdTotal } from '../types'
+import {
+  ENTRY_YEAR_MESSAGE,
+  formatMoney,
+  formatTotal,
+  formatDate,
+  dayLabel,
+  dayNumbersByDate,
+  isEntryDate,
+  resolveDateAfterMove,
+  todayIso,
+  usdTotal,
+} from '../types'
 import {
   getReport,
   saveReport,
@@ -85,6 +96,11 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
   const [tripStartDraft, setTripStartDraft] = useState('')
   const [tripEndDraft, setTripEndDraft] = useState('')
   const [mealAllowanceDraft, setMealAllowanceDraft] = useState('')
+  // A trip date with a year outside what the app takes (see isEntryDate).
+  const [tripDateError, setTripDateError] = useState<string | null>(null)
+  const tripDateErrorId = useId()
+  const tripStartBad = !!tripDateError && !!tripStartDraft && !isEntryDate(tripStartDraft)
+  const tripEndBad = !!tripDateError && !!tripEndDraft && !isEntryDate(tripEndDraft)
   const [profile, setProfile] = useState<Profile>(() => getProfile())
   const [exchangeRateDrafts, setExchangeRateDrafts] = useState<Record<string, string>>({})
   const dragIndex = useRef<number | null>(null)
@@ -287,6 +303,7 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
     setTripStartDraft(report.startDate || todayIso())
     setTripEndDraft(report.endDate || todayIso())
     setMealAllowanceDraft(report.dailyMealAllowance ? String(report.dailyMealAllowance) : '')
+    setTripDateError(null)
     // Re-read in case the saved project list was edited since this screen opened.
     setProfile(getProfile())
     const drafts: Record<string, string> = {}
@@ -321,9 +338,21 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
 
   const saveTripSettings = async () => {
     if (!report) return
+    const dailyMealAllowance = Math.max(0, parseFloat(mealAllowanceDraft)) || 0
+    // A mistyped year is not saved, and the message stays until it is
+    // corrected. The allowance beside it still saves. A trip date saved with
+    // such a year by an earlier version shows the same message here, which is
+    // where it can be put right.
+    const datesOk = [tripStartDraft, tripEndDraft].every((d) => !d || isEntryDate(d))
+    setTripDateError(datesOk ? null : ENTRY_YEAR_MESSAGE)
+    if (!datesOk) {
+      await updateReport((latest) =>
+        dailyMealAllowance !== (latest.dailyMealAllowance ?? 0) ? { ...latest, dailyMealAllowance } : null,
+      )
+      return
+    }
     const startDate = tripStartDraft
     const endDate = tripEndDraft < startDate ? startDate : tripEndDraft
-    const dailyMealAllowance = Math.max(0, parseFloat(mealAllowanceDraft)) || 0
     setTripEndDraft(endDate)
     await updateReport((latest) =>
       startDate !== latest.startDate ||
@@ -352,8 +381,8 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
             }}
           >
             {/* Capped like every other free-text field that reaches a stored
-                record: without it, a name longer than MAX_STRING_LENGTH
-                produces a backup file this app's own importer then refuses. */}
+                record, at the app's limit on typed text, which is kept below
+                what a restore accepts. */}
             <input
               autoFocus
               aria-label="Report name"
@@ -499,6 +528,8 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
                     <span>Trip start</span>
                     <input
                       type="date"
+                      aria-invalid={tripStartBad || undefined}
+                      aria-describedby={tripStartBad ? tripDateErrorId : undefined}
                       value={tripStartDraft}
                       onChange={(e) => {
                         setTripStartDraft(e.target.value)
@@ -512,6 +543,8 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
                     <input
                       type="date"
                       min={tripStartDraft}
+                      aria-invalid={tripEndBad || undefined}
+                      aria-describedby={tripEndBad ? tripDateErrorId : undefined}
                       value={tripEndDraft}
                       onChange={(e) => setTripEndDraft(e.target.value)}
                       onBlur={() => void saveTripSettings()}
@@ -531,6 +564,11 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
                     />
                   </label>
                 </div>
+                {tripDateError && (
+                  <div className="scan-banner warn" role="alert" id={tripDateErrorId}>
+                    {tripDateError}
+                  </div>
+                )}
               </DrawerSection>
 
               <DrawerSection title="Project Number">

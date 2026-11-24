@@ -149,13 +149,41 @@ export function sortExpensesByDate(expenses: Expense[]): Expense[] {
   })
 }
 
+/**
+ * The years a date typed into the app may have. A date field is easy to
+ * mistype: Chrome stores a year typed as two digits as 0026, takes years of up
+ * to six digits, and keeps whatever was typed. Earlier versions saved such
+ * dates, and a restore still takes them (see backup.ts); this is the check on
+ * a date typed now. An expense report's receipts fall well inside it, and the
+ * receipt scanner already keeps to 2000 to 2100.
+ */
+export const FIRST_ENTRY_YEAR = 1900
+export const LAST_ENTRY_YEAR = 2099
+export const ENTRY_YEAR_MESSAGE = `Check the year in the date: it has to be between ${FIRST_ENTRY_YEAR} and ${LAST_ENTRY_YEAR}.`
+
+/** True for a yyyy-mm-dd date with a year the app takes when one is typed. */
+export function isEntryDate(iso: string): boolean {
+  const match = /^(\d{4})-\d{2}-\d{2}$/.exec(iso)
+  if (!match) return false
+  const year = Number(match[1])
+  return year >= FIRST_ENTRY_YEAR && year <= LAST_ENTRY_YEAR
+}
+
 function parseIsoDate(iso: string): Date {
   const [y, m, d] = iso.split('-').map(Number)
-  return new Date(y, m - 1, d)
+  // Set rather than passed to the constructor, which reads years 0 to 99 as
+  // 1900 to 1999: a year saved as 0026 was shown, and counted, as 1926.
+  const date = new Date(2000, m - 1, d)
+  date.setFullYear(y, m - 1, d)
+  return date
 }
 
 export function formatDate(iso: string): string {
   if (!iso) return '—'
+  // A mistyped year from an earlier version (0026, 20266) is shown as it is
+  // stored. Formatted, 0026 reads "Jul 22, 26", which passes for this year and
+  // hides the mistake from the one person who can correct it.
+  if (!isEntryDate(iso)) return iso
   return parseIsoDate(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
@@ -182,7 +210,11 @@ export function dayLabel(dayNumber: number): string {
 export function dayNumbersByDate(expenses: { date: string }[], tripStartDate?: string): Map<string, number> {
   const uniqueDates = [...new Set(expenses.map((e) => e.date).filter(Boolean))]
   const map = new Map<string, number>()
-  if (tripStartDate) {
+  // A trip start with a mistyped year, saved by an earlier version, numbered
+  // the trip's days from that year: "Day 36526" with 0026 read as 1926. The
+  // days are ranked instead, as for a report with no trip dates, until the
+  // start is corrected.
+  if (tripStartDate && isEntryDate(tripStartDate)) {
     const start = parseIsoDate(tripStartDate)
     for (const date of uniqueDates) {
       const offsetDays = Math.round((parseIsoDate(date).getTime() - start.getTime()) / MS_PER_DAY)

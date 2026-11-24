@@ -1,0 +1,66 @@
+{
+  "app": "receipts-express",
+  "version": 1,
+  "exportedAt": "2026-08-12T09:00:00.000Z",
+  "reports": [
+    {
+      "id": "fx2-r1",
+      "name": "Sample site survey",
+      "createdAt": 1786000000000,
+      "startDate": "2026-08-03",
+      "endDate": "20266-08-07",
+      "dailyMealAllowance": 55,
+      "projectNumber": "PRJ-SAMPLE-2",
+      "exchangeRates": {
+        "C$": 0.73
+      }
+    }
+  ],
+  "expenses": [
+    {
+      "title": "Lunch",
+      "merchant": "Example Deli",
+      "amount": 18.75,
+      "currency": "C$",
+      "date": "2026-08-04",
+      "category": "Meals",
+      "notes": "",
+      "createdAt": 1784340000000,
+      "id": "fx2-e1",
+      "reportId": "fx2-r1",
+      "position": 0,
+      "personalAmount": 0,
+      "imageId": "fx2-i1"
+    },
+    {
+      "title": "Fuel",
+      "merchant": "Sample Fuel",
+      "amount": 52.1,
+      "currency": "USD",
+      "date": "2026-08-05",
+      "category": "Travel",
+      "notes": "",
+      "createdAt": 1784340000000,
+      "id": "fx2-e2",
+      "reportId": "fx2-r1",
+      "position": 1,
+      "personalAmount": 0
+    }
+  ],
+  "images": [
+    {
+      "id": "fx2-i1",
+      "dataUrl": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAMCAgICAgMCAgIDAwMDBAYEBAQEBAgGBgUGCQgKCgkICQkKDA8MCgsOCwkJDRENDg8QEBEQCgwSExIQEw8QEBD/2wBDAQMDAwQDBAgEBAgQCwkLEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBD/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k="
+    }
+  ],
+  "profile": {
+    "name": "Sample Person",
+    "employeeId": "E-0000",
+    "costCenter": "CC-SAMPLE",
+    "projectNumber": "PRJ-SAMPLE-1",
+    "projects": [
+      "PRJ-SAMPLE-1",
+      "PRJ-SAMPLE-2"
+    ]
+  }
+}

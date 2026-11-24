@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Expense, Report } from './types'
+import { sortExpensesByDate } from './types'
+import { SAMPLE_EXPENSES, SAMPLE_REPORT } from './test/sampleReport'
 
 // A minimal but structurally valid JPEG (287 bytes, real SOI/APP0/SOF
 // markers) — jsPDF's addImage() parses real JPEG bytes to build the PDF
@@ -84,6 +86,20 @@ async function summaryPageProse(file: File): Promise<string> {
     .replace(/\s+/g, ' ')
 }
 
+/**
+ * Every string drawn on the summary page, in draw order. Decoded as
+ * Windows-1252, the encoding jsPDF's built-in fonts write: read as UTF-8, as
+ * `file.text()` does, "€", "£" and "·" all come out as the same replacement
+ * character, and a pinned figure could not tell them apart.
+ */
+async function summaryPageStrings(file: File): Promise<string[]> {
+  const raw = new TextDecoder('windows-1252').decode(await file.arrayBuffer())
+  const streams = [...raw.matchAll(/stream\r?\n([\s\S]*?)endstream/g)].map((m) => m[1])
+  const summary = streams.find((s) => s.includes('(Expense Report)'))
+  if (summary === undefined) throw new Error('no summary page found in the exported PDF')
+  return [...summary.matchAll(/\(((?:\\.|[^()\\])*)\)/g)].map((m) => m[1].replace(/\\(.)/g, '$1'))
+}
+
 beforeEach(() => {
   // jsdom doesn't implement these, and jsPDF elsewhere calls `new URL(...)`
   // internally — replacing the whole URL global (rather than patching just
@@ -101,6 +117,41 @@ afterEach(() => {
 })
 
 describe('exportReportPdf', () => {
+  // The figures one report prints, pinned exactly; reportNumbers.test.ts pins
+  // the same report's figures on screen and in the CSV. A change that moves
+  // any of them changes what someone files, so it has to be meant: update the
+  // lines here in the same pull request, and say what changed in CHANGELOG.md.
+  it('prints these lines on the summary page of the sample report', async () => {
+    const { exportReportPdf } = await import('./pdf')
+    const { shareOrDownloadFile } = await import('./share')
+
+    await exportReportPdf(SAMPLE_REPORT, sortExpensesByDate(SAMPLE_EXPENSES))
+
+    const file = (shareOrDownloadFile as ReturnType<typeof vi.fn>).mock.calls[0][0] as File
+    const strings = await summaryPageStrings(file)
+    // From the table's headings on: above them are the report's name, the
+    // date it was generated and the accuracy note.
+    expect(strings.slice(strings.indexOf('DATE'))).toEqual([
+      'DATE', 'EXPENSE', 'CATEGORY', 'PAY BACK', 'AMOUNT',
+      'PRE-TRIP', 'Sep 12, 2026', 'Food $0.00 used · $50.00 left',
+      'Sep 12, 2026', 'Flight', 'Travel', '—', '$412.30',
+      'DAY 1', 'Sep 14, 2026', 'Food $51.25 used · $1.25 over',
+      'Sep 14, 2026', 'Breakfast', 'Meals', '$3.40', '$18.40',
+      'Sep 14, 2026', 'Dinner', 'Meals', '—', '$36.25',
+      'DAY 2', 'Sep 15, 2026', 'Food €22.00 used · €28.00 left',
+      'Sep 15, 2026', 'Lunch', 'Meals', '—', '€22.00',
+      'Sep 15, 2026', 'Hotel', 'Lodging', '€20.00', '€189.00',
+      'DAY 3', 'Sep 16, 2026', 'Food not totalled · meals in more than one currency',
+      'Sep 16, 2026', 'Coffee', 'Meals', '—', '£4.50',
+      'Sep 16, 2026', 'Lunch', 'Meals', '—', '$5.02',
+      '—', 'Travel adapter', 'Supplies', '—', '$12.99',
+      'TOTAL', '$484.96 + €211.00 + £4.50',
+      'Employee pays credit card company', '$3.40 + €20.00',
+      'TOTAL (USD)', '$717.06',
+      'Excludes GBP — no exchange rate set',
+    ])
+  })
+
   it('shortens a title too long to fit beside the amount instead of running into it', async () => {
     const { exportReportPdf } = await import('./pdf')
     const { shareOrDownloadFile } = await import('./share')
