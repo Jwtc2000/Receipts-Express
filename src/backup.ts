@@ -55,27 +55,48 @@ export class BackupTooLargeError extends Error {
   }
 }
 
-// Record and text ceilings. Without them a corrupt or hostile file can hold
-// millions of records, or a handful of records carrying megabyte-long
-// strings, and the restore exhausts the origin's storage quota (or wedges
-// the tab building the transaction) before anything catches it. The numbers
-// are far above any real expense library — 10,000 expenses is more receipts
-// than the 5,000-image cap can even illustrate — so a genuine backup never
-// meets them. Worst case they still admit is on the order of the 500MB total
-// image ceiling above, which is the point: no single limit is the only thing
-// standing between a bad file and a full disk.
+// What a restore accepts.
+//
+// Once the phone a backup came from is gone, the file is someone's only copy
+// of their reports, and people keep these files for years. So this build has
+// to restore every file any earlier release wrote, including values an
+// earlier release let people save and this one no longer does. A check below
+// may be loosened, never tightened. Where an old value cannot be stored as it
+// is, it is repaired and the user is told before anything is written; the
+// file is not refused. backupCompat.test.ts restores a file from each release
+// that changed what a backup can hold.
+//
+// What earlier releases could write, that later checks refused:
+// - Before 1.13.0, Save took any number: a refund went in as a negative
+//   amount, with a personal portion clamped to it, and "1e999" was Infinity,
+//   which JSON writes as null. Text had no length limit.
+// - Until 1.23.1 the currency field took any three characters ("€", "EU",
+//   "C$"), and a report's exchange rates are keyed by it.
+// - Chrome's date field stores a year typed as two digits as 0026, and takes
+//   years of up to six digits.
+// - Before 1.16.0 an export carried any expense whose report another tab had
+//   just deleted.
+//
+// Record and size ceilings. Without them a corrupt or hostile file can hold
+// millions of records, and the restore exhausts the origin's storage quota (or
+// wedges the tab building the transaction) before anything catches it. The
+// numbers are far above any real expense library — 10,000 expenses is more
+// receipts than the 5,000-image cap can even illustrate — so a genuine backup
+// never meets them. Worst case they still admit is on the order of the 500MB
+// total image ceiling above, which is the point: no single limit is the only
+// thing standing between a bad file and a full disk.
+//
+// Text has no ceiling of its own. Releases before 1.13.0 capped nothing, so a
+// note of any length can be on someone's phone and in their backups, and any
+// limit here would refuse one of them. Fields the app does not know are
+// dropped (see pickReport), and the file-size ceiling bounds the rest.
 const MAX_REPORTS = 1000
 const MAX_EXPENSES = 10000
 /**
- * Longest string any record may carry. The screens that take text cap their
- * fields at this same number — ReportList.tsx imports it; ExpenseEditor.tsx
- * repeats it as MAX_FIELD_LENGTH rather than pull this module into the editor
- * for one number — so the two ends agree: without a cap at entry a long note
- * produced a backup this importer then refused, leaving someone holding a
- * file their own app had written and would not read. Capped at entry rather
- * than raised here, because this limit is what stops a hostile file carrying
- * megabyte-long strings into storage, and no receipt field a person types
- * comes near 2,000 characters.
+ * Longest text the screens let anyone type into a field. ReportList.tsx and
+ * ReportView.tsx import it; ExpenseEditor.tsx repeats it as MAX_FIELD_LENGTH
+ * rather than pull this module into the editor for one number. A restore
+ * takes text of any length, so whatever can be typed can be restored.
  */
 export const MAX_STRING_LENGTH = 2000
 // A file this large cannot be a backup the app wrote: the export refuses past
@@ -84,8 +105,11 @@ export const MAX_STRING_LENGTH = 2000
 const MAX_FILE_BYTES = 600 * 1024 * 1024
 // More exchange rates than there are currencies is not a real report.
 const MAX_EXCHANGE_RATES = 300
-const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/
-const CURRENCY_KEY_RE = /^[A-Za-z]{3}$/
+/**
+ * A date as a browser's date field writes it: a year of four to six digits
+ * (Chrome and Firefox go up to 275760), then month and day.
+ */
+const DATE_RE = /^(\d{4,6})-(\d{2})-(\d{2})$/
 /** The newest backup format this build reads, which is the one it writes. */
 const BACKUP_VERSION = 1
 
@@ -93,62 +117,57 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v)
 }
 
-/**
- * True when any string anywhere in `value` is longer than MAX_STRING_LENGTH —
- * object keys included, since a report's `exchangeRates` map keeps currency
- * codes in its keys. Walked recursively rather than field by field so a field
- * added later can't quietly escape the cap. Depth-limited because the shape
- * checks below accept unknown extra properties, and a deeply nested one would
- * otherwise recurse until the stack overflows.
- */
-function hasOverlongString(value: unknown, depth = 0): boolean {
-  if (typeof value === 'string') return value.length > MAX_STRING_LENGTH
-  if (depth >= 6) return false
-  if (Array.isArray(value)) return value.some((v) => hasOverlongString(v, depth + 1))
-  if (isPlainObject(value)) {
-    return Object.entries(value).some(
-      ([key, v]) => key.length > MAX_STRING_LENGTH || hasOverlongString(v, depth + 1),
-    )
-  }
-  return false
+function isFiniteNumber(v: unknown): v is number {
+  return typeof v === 'number' && Number.isFinite(v)
 }
 
-function isValidReport(v: unknown): v is Report {
+/**
+ * Records as a backup file can hold them. A number typed as "1e999" before
+ * 1.13.0 was saved as Infinity, which JSON writes as null, so an amount, a
+ * personal portion or a meal allowance can arrive as null. pickReport and
+ * pickExpense turn these into the stored shapes.
+ */
+type FileReport = Omit<Report, 'dailyMealAllowance'> & { dailyMealAllowance?: number | null }
+type FileExpense = Omit<Expense, 'amount' | 'personalAmount'> & {
+  amount: number | null
+  personalAmount?: number | null
+}
+
+function isValidReport(v: unknown): v is FileReport {
   return (
     isPlainObject(v) &&
     typeof v.id === 'string' &&
     v.id.length > 0 &&
     typeof v.name === 'string' &&
-    typeof v.createdAt === 'number' &&
-    Number.isFinite(v.createdAt) &&
+    isFiniteNumber(v.createdAt) &&
     (v.startDate === undefined || isDateOrBlank(v.startDate)) &&
     (v.endDate === undefined || isDateOrBlank(v.endDate)) &&
     (v.dailyMealAllowance === undefined ||
-      (typeof v.dailyMealAllowance === 'number' && Number.isFinite(v.dailyMealAllowance) && v.dailyMealAllowance >= 0)) &&
+      v.dailyMealAllowance === null ||
+      (isFiniteNumber(v.dailyMealAllowance) && v.dailyMealAllowance >= 0)) &&
     (v.projectNumber === undefined || typeof v.projectNumber === 'string') &&
+    // Keyed by whatever an expense's currency field held, so only the rates
+    // themselves are checked: see the list at the top of this section. A key
+    // that no expense uses does nothing.
     (v.exchangeRates === undefined ||
       (isPlainObject(v.exchangeRates) &&
         Object.keys(v.exchangeRates).length <= MAX_EXCHANGE_RATES &&
-        Object.entries(v.exchangeRates).every(
-          ([code, r]) => CURRENCY_KEY_RE.test(code) && typeof r === 'number' && Number.isFinite(r) && r > 0,
-        )))
+        Object.values(v.exchangeRates).every((r) => isFiniteNumber(r) && r > 0)))
   )
 }
 
-function isValidExpense(v: unknown): v is Expense {
+function isValidExpense(v: unknown): v is FileExpense {
   return (
     isPlainObject(v) &&
     typeof v.id === 'string' &&
     v.id.length > 0 &&
     typeof v.reportId === 'string' &&
     v.reportId.length > 0 &&
-    typeof v.position === 'number' &&
-    Number.isFinite(v.position) &&
+    isFiniteNumber(v.position) &&
     typeof v.title === 'string' &&
     typeof v.merchant === 'string' &&
-    typeof v.amount === 'number' &&
-    Number.isFinite(v.amount) &&
-    v.amount >= 0 &&
+    // Negative: a refund, from before 1.13.0.
+    (v.amount === null || isFiniteNumber(v.amount)) &&
     typeof v.currency === 'string' &&
     isDateOrBlank(v.date) &&
     typeof v.category === 'string' &&
@@ -156,52 +175,79 @@ function isValidExpense(v: unknown): v is Expense {
     (v.imageId === undefined || typeof v.imageId === 'string') &&
     (v.extraImageIds === undefined ||
       (Array.isArray(v.extraImageIds) && v.extraImageIds.every((x) => typeof x === 'string'))) &&
-    typeof v.createdAt === 'number' &&
-    Number.isFinite(v.createdAt) &&
-    (v.personalAmount === undefined ||
-      (typeof v.personalAmount === 'number' &&
-        Number.isFinite(v.personalAmount) &&
-        v.personalAmount >= 0 &&
-        v.personalAmount <= v.amount))
+    isFiniteNumber(v.createdAt) &&
+    isPersonalAmount(v.personalAmount, v.amount)
   )
 }
 
-/** A real yyyy-mm-dd date, or blank: the only two things the editor can store. */
+/**
+ * The personal portion lies between zero and the amount. No release has
+ * written one outside that: before 1.13.0 it was clamped to the amount, which
+ * for a refund puts it between the (negative) amount and zero.
+ */
+function isPersonalAmount(personal: unknown, amount: unknown): boolean {
+  if (personal === undefined || personal === null) return true
+  if (!isFiniteNumber(personal)) return false
+  // An unreadable amount is restored as 0, and its personal portion dropped.
+  if (!isFiniteNumber(amount)) return true
+  return personal >= Math.min(0, amount) && personal <= Math.max(0, amount)
+}
+
+/**
+ * Blank, or a date that exists, in the form a browser's date field writes. A
+ * date field never writes 30 February, and neither does the receipt scanner.
+ */
 function isDateOrBlank(v: unknown): v is string {
   if (typeof v !== 'string') return false
   if (v === '') return true
-  if (!ISO_DATE_RE.test(v)) return false
-  // The shape alone lets 2026-02-30 and 2026-13-01 through.
-  const [y, m, d] = v.split('-').map(Number)
-  const date = new Date(Date.UTC(y, m - 1, d))
-  return date.getUTCFullYear() === y && date.getUTCMonth() === m - 1 && date.getUTCDate() === d
+  const match = DATE_RE.exec(v)
+  if (!match) return false
+  const [year, month, day] = match.slice(1).map(Number)
+  if (year < 1 || month < 1 || month > 12 || day < 1) return false
+  // Counted rather than built with Date.UTC, which reads years 0 to 99 as
+  // 1900 to 1999 and so refused 0026-07-18, the date a two-digit year gives.
+  const leap = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0
+  const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1]
+  return day <= days
 }
 
 // The importer used to store the parsed objects as they came, so any extra
 // property in the file, of any size and depth, went into IndexedDB unchecked,
 // never appeared in the app, and was written back out in every later backup.
 // Each record is now rebuilt from the fields this app knows and nothing else.
-function pickReport(r: Report): Report {
+//
+// A new field goes in four places: the type in types.ts, the check above, the
+// pick below, and the newest file in src/test/fixtures/backups/ (a new file,
+// never an edit to an old one). Left out of the pick, a restore drops the
+// field without a word.
+function pickReport(r: FileReport): Report {
   return {
     id: r.id,
     name: r.name,
     createdAt: r.createdAt,
     ...(r.startDate !== undefined ? { startDate: r.startDate } : {}),
     ...(r.endDate !== undefined ? { endDate: r.endDate } : {}),
-    ...(r.dailyMealAllowance !== undefined ? { dailyMealAllowance: r.dailyMealAllowance } : {}),
+    // null was an allowance of "1e999". Unset turns the allowance off, the
+    // closest the app can now come to no limit at all; the restore prompt
+    // says so (counts.clearedAllowances).
+    ...(isFiniteNumber(r.dailyMealAllowance) ? { dailyMealAllowance: r.dailyMealAllowance } : {}),
     ...(r.projectNumber !== undefined ? { projectNumber: r.projectNumber } : {}),
     ...(r.exchangeRates !== undefined ? { exchangeRates: { ...r.exchangeRates } } : {}),
   }
 }
 
-function pickExpense(e: Expense): Expense {
+function pickExpense(e: FileExpense): Expense {
+  // An amount of null was "1e999": restored as 0, which the restore prompt
+  // says, with no personal portion. There is no number to bring back.
+  const amount = e.amount ?? 0
+  const personalAmount = e.amount !== null && isFiniteNumber(e.personalAmount) ? e.personalAmount : undefined
   return {
     id: e.id,
     reportId: e.reportId,
     position: e.position,
     title: e.title,
     merchant: e.merchant,
-    amount: e.amount,
+    amount,
     currency: e.currency,
     date: e.date,
     category: e.category,
@@ -209,7 +255,7 @@ function pickExpense(e: Expense): Expense {
     createdAt: e.createdAt,
     ...(e.imageId !== undefined ? { imageId: e.imageId } : {}),
     ...(e.extraImageIds !== undefined ? { extraImageIds: [...e.extraImageIds] } : {}),
-    ...(e.personalAmount !== undefined ? { personalAmount: e.personalAmount } : {}),
+    ...(personalAmount !== undefined ? { personalAmount } : {}),
   }
 }
 
@@ -293,6 +339,18 @@ export interface BackupPlan {
     overwrites: number
     /** Receipt pages that expenses in the file point at but the file does not carry. */
     missingImages: number
+    /**
+     * Expenses in the file whose report is not in it, left out of the
+     * restore. Exports before 1.16.0 could carry one: saved by a second tab
+     * into a report the first had just deleted. Nothing in the app lists an
+     * expense without its report, so restoring it would store something no
+     * one could see or delete.
+     */
+    skippedExpenses: number
+    /** Expenses restored with an amount of 0 because the file holds it as null. */
+    unreadableAmounts: number
+    /** Reports whose daily meal allowance the file holds as null, restored with none. */
+    clearedAllowances: number
   }
 }
 
@@ -352,40 +410,37 @@ export async function validateBackup(file: File): Promise<BackupPlan> {
   }
   if (rawImages.length > MAX_IMAGES) throw new Error('Backup file has too many images')
 
+  let clearedAllowances = 0
   const reports = rawReports.map((r, i) => {
     if (!isValidReport(r)) throw new Error(`Backup report #${i} is malformed`)
-    if (hasOverlongString(r)) {
-      throw new Error(`Backup report #${i} has text longer than the ${MAX_STRING_LENGTH}-character limit`)
-    }
+    if (r.dailyMealAllowance === null) clearedAllowances++
     return pickReport(r)
   })
   rejectDuplicateIds(reports, 'reports')
   const reportIds = new Set(reports.map((r) => r.id))
-  const expenses = rawExpenses.map((e, i) => {
+  const expenses: Expense[] = []
+  let skippedExpenses = 0
+  let unreadableAmounts = 0
+  rawExpenses.forEach((e, i) => {
     if (!isValidExpense(e)) throw new Error(`Backup expense #${i} is malformed`)
-    if (hasOverlongString(e)) {
-      throw new Error(`Backup expense #${i} has text longer than the ${MAX_STRING_LENGTH}-character limit`)
-    }
     // The one unbounded list inside a record. An expense can't hold more
-    // receipt pages than the whole file is allowed to carry images, and the
-    // string cap above only limits how long each id is, not how many there
-    // are, so the count needs its own ceiling.
+    // receipt pages than the whole file is allowed to carry images, so the
+    // count has its own ceiling.
     if ((e.extraImageIds?.length ?? 0) > MAX_IMAGES) {
       throw new Error(`Backup expense #${i} lists more than ${MAX_IMAGES} receipt pages`)
     }
-    // Every export bundles all reports and expenses together, so a valid
-    // backup never references a report outside its own file. An expense
-    // that does would silently become permanently invisible in the UI
-    // (nothing ever lists it), so reject it up front instead.
+    // Left out rather than refusing the file: see `skippedExpenses`.
     if (!reportIds.has(e.reportId)) {
-      throw new Error(`Backup expense #${i} references a report that isn't in this backup`)
+      skippedExpenses++
+      return
     }
-    return pickExpense(e)
+    if (e.amount === null) unreadableAmounts++
+    expenses.push(pickExpense(e))
   })
   rejectDuplicateIds(expenses, 'expenses')
 
   let totalImageBytes = 0
-  const images = rawImages.map((img, i) => {
+  const decodedImages = rawImages.map((img, i) => {
     const decoded = decodeBackupImage(img, i)
     totalImageBytes += decoded.blob.size
     if (totalImageBytes > MAX_TOTAL_IMAGE_BYTES) {
@@ -393,7 +448,13 @@ export async function validateBackup(file: File): Promise<BackupPlan> {
     }
     return decoded
   })
-  rejectDuplicateIds(images, 'images')
+  rejectDuplicateIds(decodedImages, 'images')
+  // Only the pages a restored expense points at are written. Exports before
+  // 1.16.0 also carried pages nothing pointed at, and a left-out expense's
+  // pages are in the same position: stored, they could never be shown or
+  // deleted. Every page is still decoded and checked above.
+  const referenced = new Set(expenses.flatMap((e) => [e.imageId, ...(e.extraImageIds ?? [])]))
+  const images = decodedImages.filter((img) => referenced.has(img.id))
   // Receipt pages an expense points at that the file does not carry. Not
   // fatal: the expense restores without them. But the user is told how many,
   // rather than finding blank receipts later.
@@ -409,9 +470,6 @@ export async function validateBackup(file: File): Promise<BackupPlan> {
     if (!isValidProfile(parsed.profile)) throw new Error('Backup profile is malformed')
     if (parsed.profile.projects.length > MAX_PROJECTS) {
       throw new Error(`Backup profile has more than ${MAX_PROJECTS} project numbers`)
-    }
-    if (hasOverlongString(parsed.profile)) {
-      throw new Error(`Backup profile has text longer than the ${MAX_STRING_LENGTH}-character limit`)
     }
     profile = pickProfile(parsed.profile)
   }
@@ -429,7 +487,15 @@ export async function validateBackup(file: File): Promise<BackupPlan> {
     images,
     profile,
     exportedAt: typeof parsed.exportedAt === 'string' ? parsed.exportedAt : '',
-    counts: { reports: reports.length, expenses: expenses.length, overwrites, missingImages },
+    counts: {
+      reports: reports.length,
+      expenses: expenses.length,
+      overwrites,
+      missingImages,
+      skippedExpenses,
+      unreadableAmounts,
+      clearedAllowances,
+    },
   }
 }
 

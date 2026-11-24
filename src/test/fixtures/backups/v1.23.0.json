@@ -1,0 +1,72 @@
+{
+  "app": "receipts-express",
+  "version": 1,
+  "exportedAt": "2026-11-23T12:00:00.000Z",
+  "reports": [
+    {
+      "id": "fx3-r1",
+      "name": "Sample workshop",
+      "createdAt": 1795000000000,
+      "startDate": "2026-11-16",
+      "endDate": "2026-11-19",
+      "dailyMealAllowance": 60,
+      "projectNumber": "PRJ-SAMPLE-3",
+      "exchangeRates": {
+        "GBP": 1.27
+      }
+    }
+  ],
+  "expenses": [
+    {
+      "title": "Breakfast",
+      "merchant": "Example Kitchen",
+      "amount": 14.2,
+      "currency": "GBP",
+      "date": "2026-11-17",
+      "category": "Meals",
+      "notes": "Made-up sample note",
+      "createdAt": 1784340000000,
+      "id": "fx3-e1",
+      "reportId": "fx3-r1",
+      "position": 0,
+      "personalAmount": 2.5,
+      "imageId": "fx3-i1",
+      "extraImageIds": [
+        "fx3-i2"
+      ]
+    },
+    {
+      "title": "No-receipt bus fare",
+      "merchant": "Sample Transit",
+      "amount": 0,
+      "currency": "USD",
+      "date": "",
+      "category": "Transport",
+      "notes": "",
+      "createdAt": 1784340000000,
+      "id": "fx3-e2",
+      "reportId": "fx3-r1",
+      "position": 1,
+      "personalAmount": 0
+    }
+  ],
+  "images": [
+    {
+      "id": "fx3-i1",
+      "dataUrl": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAMCAgICAgMCAgIDAwMDBAYEBAQEBAgGBgUGCQgKCgkICQkKDA8MCgsOCwkJDRENDg8QEBEQCgwSExIQEw8QEBD/2wBDAQMDAwQDBAgEBAgQCwkLEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBD/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k="
+    },
+    {
+      "id": "fx3-i2",
+      "dataUrl": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAMCAgICAgMCAgIDAwMDBAYEBAQEBAgGBgUGCQgKCgkICQkKDA8MCgsOCwkJDRENDg8QEBEQCgwSExIQEw8QEBD/2wBDAQMDAwQDBAgEBAgQCwkLEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBD/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k="
+    }
+  ],
+  "profile": {
+    "name": "Sample Person",
+    "employeeId": "E-0000",
+    "costCenter": "CC-SAMPLE",
+    "projectNumber": "PRJ-SAMPLE-3",
+    "projects": [
+      "PRJ-SAMPLE-3"
+    ]
+  }
+}

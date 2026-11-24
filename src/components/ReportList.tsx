@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import type { Expense, Report } from '../types'
-import { formatMoney, formatTotal, newId, todayIso } from '../types'
+import { ENTRY_YEAR_MESSAGE, formatMoney, formatTotal, isEntryDate, newId, todayIso } from '../types'
 import { listReports, listExpenses, saveReport, deleteReport } from '../db'
 import {
   exportBackup,
@@ -42,6 +42,11 @@ export default function ReportList({ onOpenReport, onEditExpense }: Props) {
   const [newStartDate, setNewStartDate] = useState(todayIso)
   const [newEndDate, setNewEndDate] = useState(todayIso)
   const [newMealAllowance, setNewMealAllowance] = useState('')
+  // A trip date with a year outside what the app takes (see isEntryDate).
+  const [newDateError, setNewDateError] = useState<string | null>(null)
+  const newDateErrorId = useId()
+  const newStartDateBad = !!newDateError && !!newStartDate && !isEntryDate(newStartDate)
+  const newEndDateBad = !!newDateError && !!newEndDate && !isEntryDate(newEndDate)
   const [backupBusy, setBackupBusy] = useState(false)
   const [backupNote, setBackupNote] = useState<string | null>(null)
   const [backupTick, setBackupTick] = useState(0)
@@ -106,6 +111,10 @@ export default function ReportList({ onOpenReport, onEditExpense }: Props) {
   const createReport = async () => {
     const name = newName.trim()
     if (!name) return
+    if ([newStartDate, newEndDate].some((d) => d && !isEntryDate(d))) {
+      setNewDateError(ENTRY_YEAR_MESSAGE)
+      return
+    }
     const startDate = newStartDate
     const endDate = newEndDate < startDate ? startDate : newEndDate
     const dailyMealAllowance = Math.max(0, parseFloat(newMealAllowance)) || 0
@@ -124,6 +133,7 @@ export default function ReportList({ onOpenReport, onEditExpense }: Props) {
     setNewEndDate(todayIso())
     setNewMealAllowance('')
     setNewReportProject('')
+    setNewDateError(null)
     setCreating(false)
     onOpenReport(report.id)
   }
@@ -159,7 +169,8 @@ export default function ReportList({ onOpenReport, onEditExpense }: Props) {
     setBackupNote(null)
     try {
       const plan = await validateBackup(file)
-      const { reports, expenses, overwrites, missingImages } = plan.counts
+      const { reports, expenses, overwrites, missingImages, skippedExpenses, unreadableAmounts, clearedAllowances } =
+        plan.counts
       const exported = plan.exportedAt ? new Date(plan.exportedAt) : null
       const taken =
         exported && !Number.isNaN(exported.getTime())
@@ -174,6 +185,16 @@ export default function ReportList({ onOpenReport, onEditExpense }: Props) {
           : 'No report or expense already on this device will be replaced.',
         ...(missingImages > 0
           ? ['', `${missingImages} receipt page${missingImages === 1 ? '' : 's'} the expenses refer to ${missingImages === 1 ? 'is' : 'are'} not in this file, so ${missingImages === 1 ? 'it' : 'they'} will be missing after the restore.`]
+          : []),
+        // Both come only from files written by older versions; see backup.ts.
+        ...(skippedExpenses > 0
+          ? ['', `${skippedExpenses} expense${skippedExpenses === 1 ? '' : 's'} in this file belong${skippedExpenses === 1 ? 's' : ''} to a report the file doesn't have, so ${skippedExpenses === 1 ? 'it' : 'they'} will be left out. The app had no way to show ${skippedExpenses === 1 ? 'it' : 'them'}.`]
+          : []),
+        ...(unreadableAmounts > 0
+          ? ['', `${unreadableAmounts} expense${unreadableAmounts === 1 ? ' has an amount' : 's have amounts'} this file couldn't hold, so ${unreadableAmounts === 1 ? 'it' : 'they'} will be restored as 0. Check ${unreadableAmounts === 1 ? 'it' : 'them'} after the restore.`]
+          : []),
+        ...(clearedAllowances > 0
+          ? ['', `${clearedAllowances} report${clearedAllowances === 1 ? ' has a daily meal allowance' : 's have daily meal allowances'} this file couldn't hold, so ${clearedAllowances === 1 ? 'it' : 'they'} will be restored with none. Set ${clearedAllowances === 1 ? 'it' : 'them'} again in the report menu.`]
           : []),
         // The profile is not one of those records: it has no id to match on,
         // and the backup's copy simply takes the place of this device's.
@@ -304,9 +325,9 @@ export default function ReportList({ onOpenReport, onEditExpense }: Props) {
                   <label className="field span-2">
                     <span>Name</span>
                     {/* maxLength on every free-text field here, and on the
-                        report name below: MAX_STRING_LENGTH is the ceiling the
-                        backup importer enforces, so anything longer would
-                        produce a backup file this app refuses to read back. */}
+                        report name below: MAX_STRING_LENGTH is the app's limit
+                        on typed text, kept below what a restore accepts, so
+                        whatever is typed here can be restored. */}
                     <input
                       maxLength={MAX_STRING_LENGTH}
                       placeholder="Jane Doe"
@@ -640,8 +661,11 @@ export default function ReportList({ onOpenReport, onEditExpense }: Props) {
                   <span>Trip start</span>
                   <input
                     type="date"
+                    aria-invalid={newStartDateBad || undefined}
+                    aria-describedby={newStartDateBad ? newDateErrorId : undefined}
                     value={newStartDate}
                     onChange={(e) => {
+                      setNewDateError(null)
                       setNewStartDate(e.target.value)
                       if (newEndDate < e.target.value) setNewEndDate(e.target.value)
                     }}
@@ -652,8 +676,13 @@ export default function ReportList({ onOpenReport, onEditExpense }: Props) {
                   <input
                     type="date"
                     min={newStartDate}
+                    aria-invalid={newEndDateBad || undefined}
+                    aria-describedby={newEndDateBad ? newDateErrorId : undefined}
                     value={newEndDate}
-                    onChange={(e) => setNewEndDate(e.target.value)}
+                    onChange={(e) => {
+                      setNewDateError(null)
+                      setNewEndDate(e.target.value)
+                    }}
                   />
                 </label>
                 <label className="field span-2">
@@ -677,8 +706,20 @@ export default function ReportList({ onOpenReport, onEditExpense }: Props) {
                   />
                 )}
               </div>
+              {newDateError && (
+                <div className="scan-banner warn" role="alert" id={newDateErrorId}>
+                  {newDateError}
+                </div>
+              )}
               <div className="form-actions">
-                <button type="button" className="btn ghost" onClick={() => setCreating(false)}>
+                <button
+                  type="button"
+                  className="btn ghost"
+                  onClick={() => {
+                    setNewDateError(null)
+                    setCreating(false)
+                  }}
+                >
                   Cancel
                 </button>
                 <button type="submit" className="btn primary" disabled={!newName.trim()}>

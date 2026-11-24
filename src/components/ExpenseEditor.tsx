@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import type { Expense } from '../types'
-import { CATEGORIES, newId, todayIso } from '../types'
+import { CATEGORIES, ENTRY_YEAR_MESSAGE, isEntryDate, newId, todayIso } from '../types'
 import { getExpense, saveExpenseWithImage, getImage, nextPosition } from '../db'
 import { compressImage } from '../image'
 import { isPdfFile } from '../pdfDetect'
@@ -27,17 +27,17 @@ interface Draft {
 }
 
 /** The fields save() can reject, and so the fields it can send focus back to. */
-type InvalidField = 'title' | 'amount' | 'personalAmount'
+type InvalidField = 'title' | 'amount' | 'currency' | 'date' | 'personalAmount'
+
+/** A currency code: three letters, as in USD, EUR or GBP. */
+const CURRENCY_CODE_RE = /^[A-Z]{3}$/
 
 /**
- * Longest text any free-text field here may hold. It has to match
- * MAX_STRING_LENGTH in backup.ts, which is what the restore path enforces:
- * with no cap at entry, a long note produced a backup file the app's own
- * importer then refused, and the user's only copy of their data was
- * unreadable by the app that wrote it. Capping at entry rather than raising
- * the importer's limit, because the limit is what keeps a hostile file from
- * carrying megabyte-long strings into storage, and nothing a person types
- * into a receipt field comes near 2,000 characters anyway.
+ * Longest text any free-text field here may hold: MAX_STRING_LENGTH in
+ * backup.ts, the app's limit on typed text. A restore accepts longer, because
+ * releases before 1.13.0 had no limit, so whatever is typed here can always be
+ * restored. Nothing a person types into a receipt field comes near 2,000
+ * characters.
  *
  * Kept as a literal rather than imported from backup.ts so this screen
  * doesn't pull the whole export/restore module in for one number — if that
@@ -123,6 +123,8 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
   const fileInput = useRef<HTMLInputElement>(null)
   const titleInput = useRef<HTMLInputElement>(null)
   const amountInput = useRef<HTMLInputElement>(null)
+  const currencyInput = useRef<HTMLInputElement>(null)
+  const dateInput = useRef<HTMLInputElement>(null)
   const personalAmountInput = useRef<HTMLInputElement>(null)
   const errorId = useId()
   // Bumped on every pick; a still-in-flight pick whose generation no longer
@@ -242,6 +244,8 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
     const inputs: Record<InvalidField, typeof titleInput> = {
       title: titleInput,
       amount: amountInput,
+      currency: currencyInput,
+      date: dateInput,
       personalAmount: personalAmountInput,
     }
     inputs[invalid.field].current?.focus()
@@ -421,7 +425,13 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
     // all. Rejected rather than accepted because the rest of the app takes an
     // amount to be non-negative — the input carries min="0", the personal
     // portion is capped by it, and report totals sum them.
-    if (amount < 0) {
+    //
+    // Except a refund saved as a negative amount before 1.13.0, which keeps
+    // saving while its amount is left alone. Refusing it meant a typo in its
+    // notes could not be fixed without first deciding what the refund should
+    // have been.
+    const savedRefund = !!existing && existing.amount < 0 && amount === existing.amount
+    if (amount < 0 && !savedRefund) {
       setInvalid({
         field: 'amount',
         message: "The amount can't be negative — enter the total on the receipt.",
@@ -432,20 +442,47 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
       setInvalid({ field: 'title', message: 'Enter a title or a merchant before saving.' })
       return
     }
+    // The field took any three characters until 1.23.1, and "€" or "EU" can't
+    // be formatted as money or matched to the code on a statement. An expense
+    // saved back then keeps its currency as long as the field is left alone:
+    // only a currency typed now has to be a code.
+    const currency = draft.currency.trim().toUpperCase() || 'USD'
+    if (!CURRENCY_CODE_RE.test(currency) && currency !== existing?.currency.trim().toUpperCase()) {
+      setInvalid({
+        field: 'currency',
+        message: 'Enter the three-letter currency code, such as USD, EUR or GBP.',
+      })
+      return
+    }
+    // Only a date typed now is held to the year range: as with the currency,
+    // one saved by an earlier version keeps saving while it is left alone.
+    if (draft.date && !isEntryDate(draft.date) && draft.date !== existing?.date) {
+      setInvalid({ field: 'date', message: ENTRY_YEAR_MESSAGE })
+      return
+    }
     // The personal portion used to be clamped into [0, amount] silently, which
     // saved a number the user never typed — an entry of 80 against a $50
     // receipt became 50, and nothing said so. Reject it and let them decide
     // which of the two figures is wrong.
     const typedPersonal = draft.personalAmount.trim()
     const personalAmount = typedPersonal ? parseFloat(typedPersonal) : 0
-    if (!Number.isFinite(personalAmount) || personalAmount < 0) {
+    // A saved refund's personal portion was clamped to it, so it lies between
+    // the refund and zero.
+    if (savedRefund && !(Number.isFinite(personalAmount) && personalAmount >= amount && personalAmount <= 0)) {
+      setInvalid({
+        field: 'personalAmount',
+        message: `For this refund, the personal amount has to be between ${amount.toFixed(2)} and 0.00.`,
+      })
+      return
+    }
+    if (!savedRefund && (!Number.isFinite(personalAmount) || personalAmount < 0)) {
       setInvalid({
         field: 'personalAmount',
         message: 'The personal amount has to be a number, and not less than zero.',
       })
       return
     }
-    if (personalAmount > amount) {
+    if (!savedRefund && personalAmount > amount) {
       setInvalid({
         field: 'personalAmount',
         message: `The personal amount can't be more than the expense total of ${amount.toFixed(2)}.`,
@@ -499,7 +536,7 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
         title: draft.title.trim() || draft.merchant.trim(),
         merchant: draft.merchant.trim(),
         amount,
-        currency: draft.currency.trim().toUpperCase() || 'USD',
+        currency,
         date: draft.date,
         category: draft.category,
         notes: draft.notes.trim(),
@@ -702,8 +739,11 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
           <label className="field">
             <span>Currency</span>
             <input
+              ref={currencyInput}
               maxLength={3}
               placeholder="USD"
+              aria-invalid={invalid?.field === 'currency' || undefined}
+              aria-describedby={invalid?.field === 'currency' ? errorId : undefined}
               value={draft.currency}
               onChange={(e) => set({ currency: e.target.value.toUpperCase() })}
             />
@@ -726,7 +766,14 @@ export default function ExpenseEditor({ reportId, expenseId, onDone }: Props) {
           </label>
           <label className="field">
             <span>Date</span>
-            <input type="date" value={draft.date} onChange={(e) => set({ date: e.target.value })} />
+            <input
+              ref={dateInput}
+              type="date"
+              aria-invalid={invalid?.field === 'date' || undefined}
+              aria-describedby={invalid?.field === 'date' ? errorId : undefined}
+              value={draft.date}
+              onChange={(e) => set({ date: e.target.value })}
+            />
           </label>
           <label className="field">
             <span>Category</span>

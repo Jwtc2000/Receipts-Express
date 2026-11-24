@@ -1,5 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { formatTotal, usdTotal, dayLabel, dayNumbersByDate, sortExpensesByDate, resolveDateAfterMove, todayIso } from './types'
+import {
+  formatTotal,
+  usdTotal,
+  dayLabel,
+  dayNumbersByDate,
+  formatDate,
+  isEntryDate,
+  sortExpensesByDate,
+  resolveDateAfterMove,
+  todayIso,
+} from './types'
 import type { Expense } from './types'
 
 function makeExpense(overrides: Partial<Expense> = {}): Expense {
@@ -159,9 +169,71 @@ describe('dayNumbersByDate', () => {
     const map = dayNumbersByDate([{ date: '2026-07-17' }], '2026-07-18')
     expect(map.get('2026-07-17')).toBe(0)
   })
+
+  // Saved by an earlier version from a year typed as two digits. Counted from
+  // it, the trip's days were labelled "Day 36526".
+  it.each(['0026-07-18', '20266-07-18'])('ranks the days instead of counting from a trip start of %s', (start) => {
+    const map = dayNumbersByDate([{ date: '2026-07-20' }, { date: '2026-07-18' }], start)
+    expect(map.get('2026-07-18')).toBe(1)
+    expect(map.get('2026-07-20')).toBe(2)
+  })
+
+  // As text, "10000-07-18" sorts before "9999-07-18".
+  it('ranks a five-digit year after a four-digit one', () => {
+    const map = dayNumbersByDate([{ date: '10000-07-18' }, { date: '9999-07-18' }], '10000-07-18')
+    expect(map.get('9999-07-18')).toBe(1)
+    expect(map.get('10000-07-18')).toBe(2)
+  })
+})
+
+describe('isEntryDate', () => {
+  it.each(['1900-01-01', '2026-07-18', '2099-12-31'])('takes %s', (date) => {
+    expect(isEntryDate(date)).toBe(true)
+  })
+
+  // What Chrome's date field stores for a year typed as two or three digits,
+  // or with one digit too many.
+  it.each(['0026-07-18', '0202-07-18', '20266-07-18', '1899-12-31', '2100-01-01', '', 'yesterday'])(
+    'refuses %s',
+    (date) => {
+      expect(isEntryDate(date)).toBe(false)
+    },
+  )
+})
+
+describe('formatDate', () => {
+  it('formats a date', () => {
+    expect(formatDate('2026-07-18')).toBe(new Date(2026, 6, 18).toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    }))
+  })
+
+  // Formatted, 0026 came out as 1926; correctly formatted, "Jul 18, 26" would
+  // pass for this year. Shown as stored, the mistake is plain to see.
+  it.each(['0026-07-18', '20266-07-18'])('shows %s as it is stored', (date) => {
+    expect(formatDate(date)).toBe(date)
+  })
+
+  it('shows a dash for no date', () => {
+    expect(formatDate('')).toBe('—')
+  })
 })
 
 describe('sortExpensesByDate', () => {
+  // As text, "20266-07-18" sorts before "2027-01-01". In calendar order, and
+  // so in the same order as the day numbers, it comes after.
+  it('puts a five-digit year after every four-digit one, and an undated expense last', () => {
+    const sorted = sortExpensesByDate([
+      makeExpense({ id: 'undated', date: '' }),
+      makeExpense({ id: 'far', date: '20266-07-18' }),
+      makeExpense({ id: 'near', date: '2027-01-01' }),
+      makeExpense({ id: 'old', date: '0026-07-18' }),
+    ])
+    expect(sorted.map((e) => e.id)).toEqual(['old', 'near', 'far', 'undated'])
+  })
+
   it('sorts by date ascending', () => {
     const sorted = sortExpensesByDate([
       makeExpense({ id: 'b', date: '2026-07-19' }),

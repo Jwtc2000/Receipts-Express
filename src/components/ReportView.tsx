@@ -1,6 +1,17 @@
-import { Fragment, useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useId, useRef, useState } from 'react'
 import type { Report, Expense } from '../types'
-import { formatMoney, formatTotal, formatDate, dayLabel, dayNumbersByDate, resolveDateAfterMove, todayIso, usdTotal } from '../types'
+import {
+  ENTRY_YEAR_MESSAGE,
+  formatMoney,
+  formatTotal,
+  formatDate,
+  dayLabel,
+  dayNumbersByDate,
+  isEntryDate,
+  resolveDateAfterMove,
+  todayIso,
+  usdTotal,
+} from '../types'
 import {
   getReport,
   saveReport,
@@ -85,16 +96,43 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
   const [tripStartDraft, setTripStartDraft] = useState('')
   const [tripEndDraft, setTripEndDraft] = useState('')
   const [mealAllowanceDraft, setMealAllowanceDraft] = useState('')
+  // A trip date with a year outside what the app takes (see isEntryDate).
+  const [tripDateError, setTripDateError] = useState<string | null>(null)
+  const tripDateErrorId = useId()
+  // As on an expense, a date saved by an earlier version keeps saving while it
+  // is left alone, even with a year that could not be typed now; only a date
+  // typed here is held to the range. Otherwise an old mistyped start stopped a
+  // correction to the end from saving.
+  const tripDateOk = (draft: string, stored: string | undefined) => !draft || isEntryDate(draft) || draft === stored
+  const tripStartBad = !!tripDateError && !tripDateOk(tripStartDraft, report?.startDate)
+  const tripEndBad = !!tripDateError && !tripDateOk(tripEndDraft, report?.endDate)
   const [profile, setProfile] = useState<Profile>(() => getProfile())
   const [exchangeRateDrafts, setExchangeRateDrafts] = useState<Record<string, string>>({})
   const dragIndex = useRef<number | null>(null)
   const thumbsRef = useRef<Map<string, string>>(new Map())
+  const tripStartInput = useRef<HTMLInputElement>(null)
+  const tripEndInput = useRef<HTMLInputElement>(null)
   // Fields in the drawer save when they lose focus. Closing it with Escape,
   // the backdrop or the close button used to remove the field without it
   // ever losing focus, so the edit was dropped. Blur it first.
   const closeMenu = () => {
     const active = document.activeElement
     if (active instanceof HTMLElement && menuRef.current?.contains(active)) active.blur()
+    // Closing saves, and a trip date with a year that can't be used is not
+    // saved. The message saying so closed with the menu, and reopening showed
+    // the old date, so the change vanished without a word. Ask first; staying
+    // leaves the menu open on the date.
+    const startOk = tripDateOk(tripStartDraft, report?.startDate)
+    if (!startOk || !tripDateOk(tripEndDraft, report?.endDate)) {
+      const close = window.confirm(
+        `${ENTRY_YEAR_MESSAGE} Close the menu and keep the trip dates already saved?`,
+      )
+      if (!close) {
+        setTripDateError(ENTRY_YEAR_MESSAGE)
+        ;(startOk ? tripEndInput : tripStartInput).current?.focus()
+        return
+      }
+    }
     setMenuOpen(false)
   }
   const menuRef = useModal<HTMLElement>(menuOpen, () => closeMenu())
@@ -287,6 +325,7 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
     setTripStartDraft(report.startDate || todayIso())
     setTripEndDraft(report.endDate || todayIso())
     setMealAllowanceDraft(report.dailyMealAllowance ? String(report.dailyMealAllowance) : '')
+    setTripDateError(null)
     // Re-read in case the saved project list was edited since this screen opened.
     setProfile(getProfile())
     const drafts: Record<string, string> = {}
@@ -321,9 +360,23 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
 
   const saveTripSettings = async () => {
     if (!report) return
-    const startDate = tripStartDraft
-    const endDate = tripEndDraft < startDate ? startDate : tripEndDraft
     const dailyMealAllowance = Math.max(0, parseFloat(mealAllowanceDraft)) || 0
+    // A mistyped year is not saved, and the message stays until it is
+    // corrected. The allowance beside it still saves.
+    const datesOk = tripDateOk(tripStartDraft, report.startDate) && tripDateOk(tripEndDraft, report.endDate)
+    setTripDateError(datesOk ? null : ENTRY_YEAR_MESSAGE)
+    if (!datesOk) {
+      await updateReport((latest) =>
+        dailyMealAllowance !== (latest.dailyMealAllowance ?? 0) ? { ...latest, dailyMealAllowance } : null,
+      )
+      return
+    }
+    const startDate = tripStartDraft
+    // The end is held to the start only when both have years that can be
+    // typed. An old start of 20266 would otherwise drag a corrected end with
+    // it, and an old end of 0026 would be moved without anyone touching it.
+    const endDate =
+      isEntryDate(startDate) && isEntryDate(tripEndDraft) && tripEndDraft < startDate ? startDate : tripEndDraft
     setTripEndDraft(endDate)
     await updateReport((latest) =>
       startDate !== latest.startDate ||
@@ -352,8 +405,8 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
             }}
           >
             {/* Capped like every other free-text field that reaches a stored
-                record: without it, a name longer than MAX_STRING_LENGTH
-                produces a backup file this app's own importer then refuses. */}
+                record, at the app's limit on typed text, which is kept below
+                what a restore accepts. */}
             <input
               autoFocus
               aria-label="Report name"
@@ -498,11 +551,19 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
                   <label className="field">
                     <span>Trip start</span>
                     <input
+                      ref={tripStartInput}
                       type="date"
+                      aria-invalid={tripStartBad || undefined}
+                      aria-describedby={tripStartBad ? tripDateErrorId : undefined}
                       value={tripStartDraft}
                       onChange={(e) => {
                         setTripStartDraft(e.target.value)
-                        if (tripEndDraft < e.target.value) setTripEndDraft(e.target.value)
+                        // As on save: an end saved with a mistyped year by an
+                        // earlier version is not moved along with the start.
+                        const start = e.target.value
+                        if (isEntryDate(start) && isEntryDate(tripEndDraft) && tripEndDraft < start) {
+                          setTripEndDraft(start)
+                        }
                       }}
                       onBlur={() => void saveTripSettings()}
                     />
@@ -510,8 +571,11 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
                   <label className="field">
                     <span>Trip end</span>
                     <input
+                      ref={tripEndInput}
                       type="date"
                       min={tripStartDraft}
+                      aria-invalid={tripEndBad || undefined}
+                      aria-describedby={tripEndBad ? tripDateErrorId : undefined}
                       value={tripEndDraft}
                       onChange={(e) => setTripEndDraft(e.target.value)}
                       onBlur={() => void saveTripSettings()}
@@ -531,6 +595,11 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
                     />
                   </label>
                 </div>
+                {tripDateError && (
+                  <div className="scan-banner warn" role="alert" id={tripDateErrorId}>
+                    {tripDateError}
+                  </div>
+                )}
               </DrawerSection>
 
               <DrawerSection title="Project Number">

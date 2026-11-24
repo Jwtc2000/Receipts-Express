@@ -385,6 +385,139 @@ describe('ExpenseEditor submit-time validation', () => {
     expect(saveExpenseWithImage).not.toHaveBeenCalled()
   })
 
+  it.each(['EU', '€', 'C$'])('refuses %s as a currency, and marks the currency field', async (typed) => {
+    const user = userEvent.setup()
+    render(<ExpenseEditor reportId="report-1" onDone={vi.fn()} />)
+
+    await user.type(screen.getByPlaceholderText('e.g. Team lunch'), 'Dinner')
+    await user.type(screen.getByLabelText('Amount'), '50')
+    const currency = screen.getByLabelText('Currency')
+    await user.clear(currency)
+    await user.type(currency, typed)
+    await user.click(screen.getByRole('button', SAVE))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('Enter the three-letter currency code, such as USD, EUR or GBP.')
+    expect(currency).toHaveAttribute('aria-invalid', 'true')
+    expect(currency).toHaveAttribute('aria-describedby', alert.id)
+    expect(currency).toHaveFocus()
+    expect(saveExpenseWithImage).not.toHaveBeenCalled()
+  })
+
+  it('saves a currency code typed in lower case, in capitals', async () => {
+    const user = userEvent.setup()
+    render(<ExpenseEditor reportId="report-1" onDone={vi.fn()} />)
+
+    await user.type(screen.getByPlaceholderText('e.g. Team lunch'), 'Dinner')
+    await user.type(screen.getByLabelText('Amount'), '50')
+    const currency = screen.getByLabelText('Currency')
+    await user.clear(currency)
+    await user.type(currency, 'eur')
+    await user.click(screen.getByRole('button', SAVE))
+
+    await waitFor(() => expect(saveExpenseWithImage).toHaveBeenCalled())
+    expect(saveExpenseWithImage.mock.calls[0][0]).toMatchObject({ currency: 'EUR' })
+  })
+
+  // The field took any three characters until 1.23.1. Refusing such an
+  // expense's own currency would lock someone out of fixing a typo in its
+  // notes until they had worked out which code they meant months ago.
+  it('saves an expense whose currency an earlier version allowed, when the field is left alone', async () => {
+    const user = userEvent.setup()
+    getExpense.mockResolvedValue(baseExpense({ currency: '€' }))
+    render(<ExpenseEditor reportId="report-1" expenseId="expense-1" onDone={vi.fn()} />)
+
+    const notes = screen.getByPlaceholderText('Optional details for the report')
+    await waitFor(() => expect(screen.getByLabelText('Currency')).toHaveValue('€'))
+    await user.type(notes, 'Paid in cash')
+    await user.click(screen.getByRole('button', SAVE))
+
+    await waitFor(() => expect(saveExpenseWithImage).toHaveBeenCalled())
+    expect(saveExpenseWithImage.mock.calls[0][0]).toMatchObject({ currency: '€', notes: 'Paid in cash' })
+  })
+
+  // What Chrome's date field stores for a year typed as two digits, or with
+  // one too many. Set directly: a test cannot type into the field's segments.
+  it.each(['0026-07-18', '20266-07-18'])('refuses the date %s, and marks the date field', async (date) => {
+    const user = userEvent.setup()
+    render(<ExpenseEditor reportId="report-1" onDone={vi.fn()} />)
+
+    await user.type(screen.getByPlaceholderText('e.g. Team lunch'), 'Dinner')
+    await user.type(screen.getByLabelText('Amount'), '50')
+    const dateField = screen.getByLabelText('Date')
+    fireEvent.change(dateField, { target: { value: date } })
+    await user.click(screen.getByRole('button', SAVE))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('Check the year in the date: it has to be between 1900 and 2099.')
+    expect(dateField).toHaveAttribute('aria-invalid', 'true')
+    expect(dateField).toHaveAttribute('aria-describedby', alert.id)
+    expect(dateField).toHaveFocus()
+    expect(saveExpenseWithImage).not.toHaveBeenCalled()
+  })
+
+  it('saves an expense whose date an earlier version allowed, when the field is left alone', async () => {
+    const user = userEvent.setup()
+    getExpense.mockResolvedValue(baseExpense({ date: '0026-07-18' }))
+    render(<ExpenseEditor reportId="report-1" expenseId="expense-1" onDone={vi.fn()} />)
+
+    await waitFor(() => expect(screen.getByPlaceholderText('e.g. Team lunch')).toHaveValue('Lunch'))
+    await user.type(screen.getByPlaceholderText('Optional details for the report'), 'Paid in cash')
+    await user.click(screen.getByRole('button', SAVE))
+
+    await waitFor(() => expect(saveExpenseWithImage).toHaveBeenCalled())
+    expect(saveExpenseWithImage.mock.calls[0][0]).toMatchObject({ date: '0026-07-18' })
+  })
+
+  // Before 1.13.0 a refund was saved as a negative amount, with its personal
+  // portion clamped to it. It keeps saving while the amount is left alone.
+  it('saves a refund an earlier version stored as a negative amount, when the amount is left alone', async () => {
+    const user = userEvent.setup()
+    getExpense.mockResolvedValue(baseExpense({ amount: -40, personalAmount: -40 }))
+    render(<ExpenseEditor reportId="report-1" expenseId="expense-1" onDone={vi.fn()} />)
+
+    await waitFor(() => expect(screen.getByLabelText('Amount')).toHaveValue(-40))
+    await user.type(screen.getByPlaceholderText('Optional details for the report'), 'Deposit returned')
+    await user.click(screen.getByRole('button', SAVE))
+
+    await waitFor(() => expect(saveExpenseWithImage).toHaveBeenCalled())
+    expect(saveExpenseWithImage.mock.calls[0][0]).toMatchObject({
+      amount: -40,
+      personalAmount: -40,
+      notes: 'Deposit returned',
+    })
+  })
+
+  it('refuses a new negative amount on a saved refund', async () => {
+    const user = userEvent.setup()
+    getExpense.mockResolvedValue(baseExpense({ amount: -40 }))
+    render(<ExpenseEditor reportId="report-1" expenseId="expense-1" onDone={vi.fn()} />)
+
+    const amount = screen.getByLabelText('Amount')
+    await waitFor(() => expect(amount).toHaveValue(-40))
+    fireEvent.change(amount, { target: { value: '-30' } })
+    await user.click(screen.getByRole('button', SAVE))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent("The amount can't be negative")
+    expect(saveExpenseWithImage).not.toHaveBeenCalled()
+  })
+
+  it("refuses a saved refund's personal amount outside the refund", async () => {
+    const user = userEvent.setup()
+    getExpense.mockResolvedValue(baseExpense({ amount: -40, personalAmount: -40 }))
+    render(<ExpenseEditor reportId="report-1" expenseId="expense-1" onDone={vi.fn()} />)
+
+    const personal = screen.getByLabelText('Personal amount (pay back to company)')
+    await waitFor(() => expect(personal).toHaveValue(-40))
+    fireEvent.change(personal, { target: { value: '5' } })
+    await user.click(screen.getByRole('button', SAVE))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'For this refund, the personal amount has to be between -40.00 and 0.00.',
+    )
+    expect(saveExpenseWithImage).not.toHaveBeenCalled()
+  })
+
   it('accepts a personal amount equal to the whole expense', async () => {
     const user = userEvent.setup()
     render(<ExpenseEditor reportId="report-1" onDone={vi.fn()} />)

@@ -1,0 +1,47 @@
+{
+  "app": "best-receipts",
+  "version": 1,
+  "exportedAt": "2026-07-18T20:00:00.000Z",
+  "reports": [
+    {
+      "id": "fx0-r1",
+      "name": "Sample conference trip",
+      "createdAt": 1784330000000
+    }
+  ],
+  "expenses": [
+    {
+      "title": "Taxi to venue",
+      "merchant": "Example Cabs",
+      "amount": 23.5,
+      "currency": "USD",
+      "date": "2026-07-14",
+      "category": "Transport",
+      "notes": "",
+      "createdAt": 1784340000000,
+      "id": "fx0-e1",
+      "reportId": "fx0-r1",
+      "position": 0,
+      "imageId": "fx0-i1"
+    },
+    {
+      "title": "Refund for cancelled taxi",
+      "merchant": "Example Cabs",
+      "amount": -12,
+      "currency": "USD",
+      "date": "2026-07-15",
+      "category": "Transport",
+      "notes": "",
+      "createdAt": 1784340000000,
+      "id": "fx0-e2",
+      "reportId": "fx0-r1",
+      "position": 1
+    }
+  ],
+  "images": [
+    {
+      "id": "fx0-i1",
+      "dataUrl": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAMCAgICAgMCAgIDAwMDBAYEBAQEBAgGBgUGCQgKCgkICQkKDA8MCgsOCwkJDRENDg8QEBEQCgwSExIQEw8QEBD/2wBDAQMDAwQDBAgEBAgQCwkLEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBD/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k="
+    }
+  ]
+}

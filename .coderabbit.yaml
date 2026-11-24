@@ -30,6 +30,12 @@ reviews:
     - path: "src/**"
       instructions: >-
         Client-only app with no server. Flag any new network path: fetch, XMLHttpRequest, WebSocket, EventSource, sendBeacon, or a URL on another origin (src/noNetwork.test.ts and the CSP in vite.config.ts enforce this and the published privacy policy depends on it). User data lives only in IndexedDB: flag changes to src/db.ts or src/backup.ts that could drop or rewrite stored records without a migration, and any destructive action without confirmation. A change to app behaviour needs a version bump in package.json and a CHANGELOG.md entry in the same PR.
+    - path: "src/backup.ts"
+      instructions: >-
+        Restore must take every backup any earlier version wrote (CLAUDE.md, Backups). Flag a check in validateBackup or an isValid* function made stricter, and a refusal of a whole file over a value an earlier version could have saved: such values are repaired and counted in BackupPlan.counts instead. Flag a field in a type in src/types.ts or src/profile.ts that has no matching isValid* check and pick* line, since a restore drops it silently.
+    - path: "src/test/fixtures/backups/**"
+      instructions: >-
+        Backups as earlier versions wrote them, restored by src/backupCompat.test.ts. Files are added, never edited or deleted: flag any change to an existing file, and a new file holding anything that looks like real receipt data rather than invented values.
     - path: "package.json"
       instructions: >-
         A changed or added runtime dependency needs a matching change to THIRD_PARTY_NOTICES.md in the same PR. A new entry under overrides needs a stated reason in the PR description. version must match the newest heading in CHANGELOG.md.
@@ -62,4 +68,4 @@ chat:
   allow_non_org_members: false
 knowledge_base:
   code_guidelines:
-    filePatterns: ["CONTRIBUTING.md", "ci/README.md"]
+    filePatterns: ["CONTRIBUTING.md", "ci/README.md", "CLAUDE.md"]

@@ -8,6 +8,57 @@ user-facing features, and `PATCH` for fixes with no visible feature change. The
 version lives in `package.json` and is shown in the app under Menu → About. Every
 merge to `main` that changes app behavior gets a version bump and a tag.
 
+## [1.23.1] - 2026-11-23
+
+### Fixed
+- Restore takes every backup an earlier version wrote. It used to refuse a
+  whole file over one value that an earlier version had let someone save,
+  and backups made today from records saved back then were refused the same
+  way. Now restored:
+  - a refund saved as a negative amount before 1.13.0, as it was saved;
+  - an exchange rate for a currency typed as something other than three
+    letters, such as "€", "EU" or "C$";
+  - a date whose year was typed as two digits in Chrome, which stores it as
+    0026, or with five or six digits;
+  - text longer than 2,000 characters, typed before 1.13.0 capped it;
+  - an amount typed as "1e999" before 1.13.0, which a backup holds as null
+    and now restores as 0.
+- An expense whose report is not in the backup is left out of a restore
+  instead of making the whole file fail. Exports before 1.16.0 could carry
+  one, saved by a second tab into a report the first had just deleted.
+- The restore prompt says how many expenses will be left out, how many
+  amounts come back as 0, and how many meal allowances come back unset.
+  Receipt pages no restored expense points at are no longer written.
+- A date saved with a year typed as two digits was shown, and counted, as
+  1926. A date with a year outside 1900 to 2099 is now shown as it is stored,
+  so the mistake can be seen, and a trip start like that no longer labels the
+  days "Day 36526": they are numbered in order instead, until it is corrected.
+  Dates are put in calendar order, so a five-digit year comes after 9999 in
+  the list and in the day numbers alike.
+- A refund saved as a negative amount before 1.13.0 can be edited and saved
+  again while its amount is left alone. Its personal amount stays between the
+  refund and zero.
+
+### Changed
+- The currency field takes a three-letter code, such as USD, EUR or GBP.
+- A date typed into an expense, a new report or the report menu needs a year
+  between 1900 and 2099. Chrome's date field keeps a year typed as two digits
+  as 0026, and takes years of up to six digits.
+- On an expense or a report saved earlier, a currency or date that would now
+  be refused keeps saving while its field is left alone. In the report menu,
+  a date typed with such a year shows the message, and the other fields still
+  save.
+- A backup from each version that changed what a backup can hold is kept in
+  `src/test/fixtures/backups/`, and the tests restore every one, so a later
+  change cannot start refusing them again. A record with every field set is
+  backed up and restored, and a new field fails the type check until it is
+  added there and to a new backup file.
+- The figures on one invented report are pinned exactly: totals, the USD
+  conversion, personal amounts, meal allowance balances, day labels, the CSV
+  and the PDF summary. A change that moves one has to update the pin.
+- `CLAUDE.md` sets out the rules for changes that touch stored data, backups
+  or report figures, and the code review follows them.
+
 ## [1.23.0] - 2026-11-23
 
 ### Added
