@@ -110,12 +110,29 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
   const [exchangeRateDrafts, setExchangeRateDrafts] = useState<Record<string, string>>({})
   const dragIndex = useRef<number | null>(null)
   const thumbsRef = useRef<Map<string, string>>(new Map())
+  const tripStartInput = useRef<HTMLInputElement>(null)
+  const tripEndInput = useRef<HTMLInputElement>(null)
   // Fields in the drawer save when they lose focus. Closing it with Escape,
   // the backdrop or the close button used to remove the field without it
   // ever losing focus, so the edit was dropped. Blur it first.
   const closeMenu = () => {
     const active = document.activeElement
     if (active instanceof HTMLElement && menuRef.current?.contains(active)) active.blur()
+    // Closing saves, and a trip date with a year that can't be used is not
+    // saved. The message saying so closed with the menu, and reopening showed
+    // the old date, so the change vanished without a word. Ask first; staying
+    // leaves the menu open on the date.
+    const startOk = tripDateOk(tripStartDraft, report?.startDate)
+    if (!startOk || !tripDateOk(tripEndDraft, report?.endDate)) {
+      const close = window.confirm(
+        `${ENTRY_YEAR_MESSAGE} Close the menu and keep the trip dates already saved?`,
+      )
+      if (!close) {
+        setTripDateError(ENTRY_YEAR_MESSAGE)
+        ;(startOk ? tripEndInput : tripStartInput).current?.focus()
+        return
+      }
+    }
     setMenuOpen(false)
   }
   const menuRef = useModal<HTMLElement>(menuOpen, () => closeMenu())
@@ -534,6 +551,7 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
                   <label className="field">
                     <span>Trip start</span>
                     <input
+                      ref={tripStartInput}
                       type="date"
                       aria-invalid={tripStartBad || undefined}
                       aria-describedby={tripStartBad ? tripDateErrorId : undefined}
@@ -553,6 +571,7 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
                   <label className="field">
                     <span>Trip end</span>
                     <input
+                      ref={tripEndInput}
                       type="date"
                       min={tripStartDraft}
                       aria-invalid={tripEndBad || undefined}
