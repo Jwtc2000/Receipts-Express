@@ -26,13 +26,15 @@ merge to `main` that changes app behavior gets a version bump and a tag.
 - An expense whose report is not in the backup is left out of a restore
   instead of making the whole file fail. Exports before 1.16.0 could carry
   one, saved by a second tab into a report the first had just deleted.
-- The restore prompt says how many expenses will be left out and how many
-  amounts come back as 0. Receipt pages no restored expense points at are no
-  longer written.
+- The restore prompt says how many expenses will be left out, how many
+  amounts come back as 0, and how many meal allowances come back unset.
+  Receipt pages no restored expense points at are no longer written.
 - A date saved with a year typed as two digits was shown, and counted, as
   1926. A date with a year outside 1900 to 2099 is now shown as it is stored,
   so the mistake can be seen, and a trip start like that no longer labels the
   days "Day 36526": they are numbered in order instead, until it is corrected.
+  Dates are put in calendar order, so a five-digit year comes after 9999 in
+  the list and in the day numbers alike.
 - A refund saved as a negative amount before 1.13.0 can be edited and saved
   again while its amount is left alone. Its personal amount stays between the
   refund and zero.
@@ -42,9 +44,10 @@ merge to `main` that changes app behavior gets a version bump and a tag.
 - A date typed into an expense, a new report or the report menu needs a year
   between 1900 and 2099. Chrome's date field keeps a year typed as two digits
   as 0026, and takes years of up to six digits.
-- On an expense saved earlier, a currency or date that would now be refused
-  keeps saving while its field is left alone. In the report menu, such a trip
-  date shows the message, and the meal allowance beside it still saves.
+- On an expense or a report saved earlier, a currency or date that would now
+  be refused keeps saving while its field is left alone. In the report menu,
+  a date typed with such a year shows the message, and the other fields still
+  save.
 - A backup from each version that changed what a backup can hold is kept in
   `src/test/fixtures/backups/`, and the tests restore every one, so a later
   change cannot start refusing them again. A record with every field set is

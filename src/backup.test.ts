@@ -149,12 +149,13 @@ describe('validateBackup', () => {
     expect(plan.counts.unreadableAmounts).toBe(0)
   })
 
-  it('restores a meal allowance the file holds as null as unset', async () => {
+  it('restores a meal allowance the file holds as null as unset, and counts it', async () => {
     const { validateBackup } = await import('./backup')
     const backup = validBackup()
     ;(backup.reports[0] as unknown as Record<string, unknown>).dailyMealAllowance = null
-    const { reports } = await validateBackup(asFile(backup))
-    expect(reports[0]).not.toHaveProperty('dailyMealAllowance')
+    const plan = await validateBackup(asFile(backup))
+    expect(plan.reports[0]).not.toHaveProperty('dailyMealAllowance')
+    expect(plan.counts.clearedAllowances).toBe(1)
   })
 
   it('rejects two expenses with the same id', async () => {
@@ -407,6 +408,7 @@ describe('validateBackup / commitBackup split', () => {
       missingImages: 0,
       skippedExpenses: 0,
       unreadableAmounts: 0,
+      clearedAllowances: 0,
     })
     expect(await db.getReport('r1')).toBeUndefined()
     expect(await db.getExpense('e1')).toBeUndefined()
@@ -471,11 +473,12 @@ describe('validateBackup / commitBackup split', () => {
 
 /**
  * A corrupt or hostile file can be arbitrarily large in ways the per-image
- * limits never see: millions of tiny records, or a handful of records carrying
- * megabyte-long strings. Either exhausts the origin's storage quota — or
- * wedges the tab building the transaction — before anything else catches it.
+ * limits never see: millions of tiny records exhaust the origin's storage
+ * quota — or wedge the tab building the transaction — before anything else
+ * catches them. Text has no ceiling of its own, since releases before 1.13.0
+ * capped none; the file-size ceiling bounds it.
  */
-describe('validateBackup record and text ceilings', () => {
+describe('validateBackup record and size ceilings', () => {
   it('rejects a file with more than 1000 reports', async () => {
     const { validateBackup } = await import('./backup')
     // The count check runs before per-record validation, so these need no shape.
@@ -495,49 +498,34 @@ describe('validateBackup record and text ceilings', () => {
     ).rejects.toThrow(/more than 10000 expenses/)
   })
 
-  it('rejects a report carrying a string over the 100000-character limit', async () => {
-    const { validateBackup } = await import('./backup')
-    const bad = validBackup({ reports: [{ id: 'r1', name: 'x'.repeat(100_001), createdAt: 1 }] })
-    await expect(validateBackup(asFile(bad))).rejects.toThrow(/text longer than the 100000-character limit/)
-  })
-
-  it('rejects an expense carrying a string over the 100000-character limit', async () => {
-    const { validateBackup } = await import('./backup')
-    const bad = validBackup()
-    bad.expenses[0].notes = 'x'.repeat(100_001)
-    await expect(validateBackup(asFile(bad))).rejects.toThrow(/text longer than the 100000-character limit/)
-  })
-
-  // exchangeRates keeps currency codes in its object keys, and the shape
-  // checks accept unknown extra properties, so a cap that only looked at
-  // values would leave the obvious hiding place open.
-  it('rejects an overlong string hiding in an object key', async () => {
-    const { validateBackup } = await import('./backup')
-    const bad = validBackup({
-      reports: [{ id: 'r1', name: 'Trip', createdAt: 1, exchangeRates: { ['E'.repeat(100_001)]: 1.08 } }],
-    })
-    await expect(validateBackup(asFile(bad))).rejects.toThrow(/text longer than the 100000-character limit/)
-  })
-
-  it('accepts a string of exactly 100000 characters', async () => {
-    const { validateBackup } = await import('./backup')
-    const backup = validBackup({ reports: [{ id: 'r1', name: 'x'.repeat(100_000), createdAt: 1 }] })
-    const { reports } = await validateBackup(asFile(backup))
-    expect(reports[0].name).toHaveLength(100_000)
-  })
-
   // The screens cap text at 2,000 characters from 1.13.0; before that nothing
-  // did, and 1.13.0's restore refused every file holding a longer note.
-  it('restores a note longer than the screens now allow, as typed before 1.13.0', async () => {
-    const { validateBackup, MAX_STRING_LENGTH } = await import('./backup')
-    const backup = validBackup()
-    backup.expenses[0].notes = 'n'.repeat(MAX_STRING_LENGTH + 1000)
-    const { expenses } = await validateBackup(asFile(backup))
-    expect(expenses[0].notes).toHaveLength(MAX_STRING_LENGTH + 1000)
+  // did, and 1.13.0's restore refused every file holding a longer note. Any
+  // limit at all would refuse one that someone pasted in back then.
+  it('restores text of any length, as typed before 1.13.0', async () => {
+    const { validateBackup } = await import('./backup')
+    const long = 'n'.repeat(250_000)
+    const backup = validBackup({
+      reports: [{ id: 'r1', name: long, createdAt: 1, exchangeRates: { [long]: 1.08 } }],
+      profile: makeProfile({ name: long }),
+    })
+    backup.expenses[0].notes = long
+    const plan = await validateBackup(asFile(backup))
+    expect(plan.reports[0].name).toHaveLength(250_000)
+    expect(Object.keys(plan.reports[0].exchangeRates!)[0]).toHaveLength(250_000)
+    expect(plan.expenses[0].notes).toHaveLength(250_000)
+    expect(plan.profile!.name).toHaveLength(250_000)
   })
 
-  // The string cap limits how long each id is, not how many there are, so the
-  // one unbounded list inside an otherwise-valid record needs its own ceiling.
+  it('refuses a file larger than any backup the app can write, without reading it', async () => {
+    const { validateBackup } = await import('./backup')
+    const text = vi.fn()
+    const huge = { size: 600 * 1024 * 1024 + 1, text } as unknown as File
+    await expect(validateBackup(huge)).rejects.toThrow(/larger than any Receipts Express backup/)
+    expect(text).not.toHaveBeenCalled()
+  })
+
+  // The one unbounded list inside an otherwise-valid record needs its own
+  // ceiling.
   it('rejects an expense listing more receipt pages than the image cap allows', async () => {
     const { validateBackup } = await import('./backup')
     const bad = validBackup()
@@ -601,14 +589,6 @@ describe('the profile in a backup', () => {
     const projects = Array.from({ length: 51 }, (_, i) => `PRJ-${i}`)
     const bad = validBackup({ profile: makeProfile({ projects }) })
     await expect(validateBackup(asFile(bad))).rejects.toThrow(/more than 50 project numbers/)
-  })
-
-  it('rejects a profile carrying a string over the 100000-character limit', async () => {
-    const { validateBackup } = await import('./backup')
-    const bad = validBackup({ profile: makeProfile({ name: 'x'.repeat(100_001) }) })
-    await expect(validateBackup(asFile(bad))).rejects.toThrow(
-      /profile has text longer than the 100000-character limit/,
-    )
   })
 
   it('round-trips the profile through a real export and back', async () => {

@@ -143,10 +143,20 @@ export function todayIso(): string {
  */
 export function sortExpensesByDate(expenses: Expense[]): Expense[] {
   return [...expenses].sort((a, b) => {
-    const ad = a.date || '9999-99-99'
-    const bd = b.date || '9999-99-99'
-    return ad.localeCompare(bd) || a.position - b.position
+    if (!a.date || !b.date) return Number(!a.date) - Number(!b.date) || a.position - b.position
+    return compareIsoDates(a.date, b.date) || a.position - b.position
   })
+}
+
+/**
+ * Calendar order of two yyyy-mm-dd dates, compared as numbers. Compared as
+ * text, which is the same for four-digit years, a five-digit year saved by an
+ * earlier version (20266) came before 9999.
+ */
+export function compareIsoDates(a: string, b: string): number {
+  const [ay, am, ad] = a.split('-').map(Number)
+  const [by, bm, bd] = b.split('-').map(Number)
+  return ay - by || am - bm || ad - bd
 }
 
 /**
@@ -221,7 +231,7 @@ export function dayNumbersByDate(expenses: { date: string }[], tripStartDate?: s
       map.set(date, offsetDays + 1)
     }
   } else {
-    uniqueDates.sort()
+    uniqueDates.sort(compareIsoDates)
     uniqueDates.forEach((date, i) => map.set(date, i + 1))
   }
   return map

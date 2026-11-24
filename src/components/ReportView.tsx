@@ -99,8 +99,13 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
   // A trip date with a year outside what the app takes (see isEntryDate).
   const [tripDateError, setTripDateError] = useState<string | null>(null)
   const tripDateErrorId = useId()
-  const tripStartBad = !!tripDateError && !!tripStartDraft && !isEntryDate(tripStartDraft)
-  const tripEndBad = !!tripDateError && !!tripEndDraft && !isEntryDate(tripEndDraft)
+  // As on an expense, a date saved by an earlier version keeps saving while it
+  // is left alone, even with a year that could not be typed now; only a date
+  // typed here is held to the range. Otherwise an old mistyped start stopped a
+  // correction to the end from saving.
+  const tripDateOk = (draft: string, stored: string | undefined) => !draft || isEntryDate(draft) || draft === stored
+  const tripStartBad = !!tripDateError && !tripDateOk(tripStartDraft, report?.startDate)
+  const tripEndBad = !!tripDateError && !tripDateOk(tripEndDraft, report?.endDate)
   const [profile, setProfile] = useState<Profile>(() => getProfile())
   const [exchangeRateDrafts, setExchangeRateDrafts] = useState<Record<string, string>>({})
   const dragIndex = useRef<number | null>(null)
@@ -340,10 +345,8 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
     if (!report) return
     const dailyMealAllowance = Math.max(0, parseFloat(mealAllowanceDraft)) || 0
     // A mistyped year is not saved, and the message stays until it is
-    // corrected. The allowance beside it still saves. A trip date saved with
-    // such a year by an earlier version shows the same message here, which is
-    // where it can be put right.
-    const datesOk = [tripStartDraft, tripEndDraft].every((d) => !d || isEntryDate(d))
+    // corrected. The allowance beside it still saves.
+    const datesOk = tripDateOk(tripStartDraft, report.startDate) && tripDateOk(tripEndDraft, report.endDate)
     setTripDateError(datesOk ? null : ENTRY_YEAR_MESSAGE)
     if (!datesOk) {
       await updateReport((latest) =>
@@ -352,7 +355,11 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
       return
     }
     const startDate = tripStartDraft
-    const endDate = tripEndDraft < startDate ? startDate : tripEndDraft
+    // The end is held to the start only when both have years that can be
+    // typed. An old start of 20266 would otherwise drag a corrected end with
+    // it, and an old end of 0026 would be moved without anyone touching it.
+    const endDate =
+      isEntryDate(startDate) && isEntryDate(tripEndDraft) && tripEndDraft < startDate ? startDate : tripEndDraft
     setTripEndDraft(endDate)
     await updateReport((latest) =>
       startDate !== latest.startDate ||

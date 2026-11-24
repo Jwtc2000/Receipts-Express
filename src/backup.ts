@@ -77,34 +77,28 @@ export class BackupTooLargeError extends Error {
 // - Before 1.16.0 an export carried any expense whose report another tab had
 //   just deleted.
 //
-// Record and text ceilings. Without them a corrupt or hostile file can hold
-// millions of records, or a handful of records carrying megabyte-long
-// strings, and the restore exhausts the origin's storage quota (or wedges
-// the tab building the transaction) before anything catches it. The numbers
-// are far above any real expense library — 10,000 expenses is more receipts
-// than the 5,000-image cap can even illustrate — so a genuine backup never
-// meets them. Worst case they still admit is on the order of the 500MB total
-// image ceiling above, which is the point: no single limit is the only thing
-// standing between a bad file and a full disk.
+// Record and size ceilings. Without them a corrupt or hostile file can hold
+// millions of records, and the restore exhausts the origin's storage quota (or
+// wedges the tab building the transaction) before anything catches it. The
+// numbers are far above any real expense library — 10,000 expenses is more
+// receipts than the 5,000-image cap can even illustrate — so a genuine backup
+// never meets them. Worst case they still admit is on the order of the 500MB
+// total image ceiling above, which is the point: no single limit is the only
+// thing standing between a bad file and a full disk.
+//
+// Text has no ceiling of its own. Releases before 1.13.0 capped nothing, so a
+// note of any length can be on someone's phone and in their backups, and any
+// limit here would refuse one of them. Fields the app does not know are
+// dropped (see pickReport), and the file-size ceiling bounds the rest.
 const MAX_REPORTS = 1000
 const MAX_EXPENSES = 10000
 /**
  * Longest text the screens let anyone type into a field. ReportList.tsx and
  * ReportView.tsx import it; ExpenseEditor.tsx repeats it as MAX_FIELD_LENGTH
- * rather than pull this module into the editor for one number. It has to stay
- * at or below MAX_RESTORED_STRING_LENGTH, so that whatever can be typed can be
- * restored.
+ * rather than pull this module into the editor for one number. A restore
+ * takes text of any length, so whatever can be typed can be restored.
  */
 export const MAX_STRING_LENGTH = 2000
-/**
- * Longest string a restored record may carry. Higher than MAX_STRING_LENGTH
- * because releases before 1.13.0 capped nothing, and a note pasted in then is
- * still on someone's phone and in their backups. 100,000 characters is some
- * fifty pages in one field, past anything typed or pasted into a receipt;
- * longer than that, the file is damaged or was not written by this app. The
- * file-size ceiling below bounds the total either way.
- */
-const MAX_RESTORED_STRING_LENGTH = 100_000
 // A file this large cannot be a backup the app wrote: the export refuses past
 // MAX_EXPORT_IMAGE_BYTES of images, and base64 adds a third. Checked before
 // the file is read, so an oversized file is refused without loading it.
@@ -121,27 +115,6 @@ const BACKUP_VERSION = 1
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v)
-}
-
-/**
- * True when any string anywhere in `value` is longer than
- * MAX_RESTORED_STRING_LENGTH — object keys included, since a report's
- * `exchangeRates` map keeps currency codes in its keys. Walked recursively
- * rather than field by field so a field added later can't quietly escape the
- * cap. Depth-limited because the shape checks below accept unknown extra
- * properties, and a deeply nested one would otherwise recurse until the stack
- * overflows.
- */
-function hasOverlongString(value: unknown, depth = 0): boolean {
-  if (typeof value === 'string') return value.length > MAX_RESTORED_STRING_LENGTH
-  if (depth >= 6) return false
-  if (Array.isArray(value)) return value.some((v) => hasOverlongString(v, depth + 1))
-  if (isPlainObject(value)) {
-    return Object.entries(value).some(
-      ([key, v]) => key.length > MAX_RESTORED_STRING_LENGTH || hasOverlongString(v, depth + 1),
-    )
-  }
-  return false
 }
 
 function isFiniteNumber(v: unknown): v is number {
@@ -255,7 +228,8 @@ function pickReport(r: FileReport): Report {
     ...(r.startDate !== undefined ? { startDate: r.startDate } : {}),
     ...(r.endDate !== undefined ? { endDate: r.endDate } : {}),
     // null was an allowance of "1e999". Unset turns the allowance off, the
-    // closest the app can now come to no limit at all.
+    // closest the app can now come to no limit at all; the restore prompt
+    // says so (counts.clearedAllowances).
     ...(isFiniteNumber(r.dailyMealAllowance) ? { dailyMealAllowance: r.dailyMealAllowance } : {}),
     ...(r.projectNumber !== undefined ? { projectNumber: r.projectNumber } : {}),
     ...(r.exchangeRates !== undefined ? { exchangeRates: { ...r.exchangeRates } } : {}),
@@ -375,6 +349,8 @@ export interface BackupPlan {
     skippedExpenses: number
     /** Expenses restored with an amount of 0 because the file holds it as null. */
     unreadableAmounts: number
+    /** Reports whose daily meal allowance the file holds as null, restored with none. */
+    clearedAllowances: number
   }
 }
 
@@ -434,11 +410,10 @@ export async function validateBackup(file: File): Promise<BackupPlan> {
   }
   if (rawImages.length > MAX_IMAGES) throw new Error('Backup file has too many images')
 
+  let clearedAllowances = 0
   const reports = rawReports.map((r, i) => {
     if (!isValidReport(r)) throw new Error(`Backup report #${i} is malformed`)
-    if (hasOverlongString(r)) {
-      throw new Error(`Backup report #${i} has text longer than the ${MAX_RESTORED_STRING_LENGTH}-character limit`)
-    }
+    if (r.dailyMealAllowance === null) clearedAllowances++
     return pickReport(r)
   })
   rejectDuplicateIds(reports, 'reports')
@@ -448,13 +423,9 @@ export async function validateBackup(file: File): Promise<BackupPlan> {
   let unreadableAmounts = 0
   rawExpenses.forEach((e, i) => {
     if (!isValidExpense(e)) throw new Error(`Backup expense #${i} is malformed`)
-    if (hasOverlongString(e)) {
-      throw new Error(`Backup expense #${i} has text longer than the ${MAX_RESTORED_STRING_LENGTH}-character limit`)
-    }
     // The one unbounded list inside a record. An expense can't hold more
-    // receipt pages than the whole file is allowed to carry images, and the
-    // string cap above only limits how long each id is, not how many there
-    // are, so the count needs its own ceiling.
+    // receipt pages than the whole file is allowed to carry images, so the
+    // count has its own ceiling.
     if ((e.extraImageIds?.length ?? 0) > MAX_IMAGES) {
       throw new Error(`Backup expense #${i} lists more than ${MAX_IMAGES} receipt pages`)
     }
@@ -500,9 +471,6 @@ export async function validateBackup(file: File): Promise<BackupPlan> {
     if (parsed.profile.projects.length > MAX_PROJECTS) {
       throw new Error(`Backup profile has more than ${MAX_PROJECTS} project numbers`)
     }
-    if (hasOverlongString(parsed.profile)) {
-      throw new Error(`Backup profile has text longer than the ${MAX_RESTORED_STRING_LENGTH}-character limit`)
-    }
     profile = pickProfile(parsed.profile)
   }
 
@@ -526,6 +494,7 @@ export async function validateBackup(file: File): Promise<BackupPlan> {
       missingImages,
       skippedExpenses,
       unreadableAmounts,
+      clearedAllowances,
     },
   }
 }

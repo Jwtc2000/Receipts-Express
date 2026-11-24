@@ -27,6 +27,8 @@ interface Expected {
   skippedExpenses: number
   /** Expenses whose amount the file holds as null. */
   unreadableAmounts: number
+  /** Reports whose meal allowance the file holds as null. */
+  clearedAllowances: number
   missingImages: number
   profile: boolean
 }
@@ -34,19 +36,19 @@ interface Expected {
 const FIXTURES: Record<string, { sha256: string; expected: Expected }> = {
   'best-receipts-2026-07-18.json': {
     sha256: 'e85d83c2dbae02fda27a3c4e51fb1712bab0e4d06de361d28eff22fc9d6e4413',
-    expected: { reports: 1, expenses: 2, skippedExpenses: 0, unreadableAmounts: 0, missingImages: 0, profile: false },
+    expected: { reports: 1, expenses: 2, skippedExpenses: 0, unreadableAmounts: 0, clearedAllowances: 0, missingImages: 0, profile: false },
   },
   'v1.11.1.json': {
     sha256: '329f3424ca065bf177a4d0b6be8d0dc5999aaadea3c1f328a58699f438be0af5',
-    expected: { reports: 1, expenses: 4, skippedExpenses: 1, unreadableAmounts: 1, missingImages: 0, profile: false },
+    expected: { reports: 1, expenses: 4, skippedExpenses: 1, unreadableAmounts: 1, clearedAllowances: 1, missingImages: 0, profile: false },
   },
   'v1.14.0.json': {
     sha256: '414345e329b4b821fbc48d7ee09e49636a3b565af15c75ba51e9eb3ef641747a',
-    expected: { reports: 1, expenses: 2, skippedExpenses: 0, unreadableAmounts: 0, missingImages: 0, profile: true },
+    expected: { reports: 1, expenses: 2, skippedExpenses: 0, unreadableAmounts: 0, clearedAllowances: 0, missingImages: 0, profile: true },
   },
   'v1.23.0.json': {
     sha256: '887116c68af9e4c73b758e84ccfcd14e298af60deb1e490debb1bb576ca19642',
-    expected: { reports: 1, expenses: 2, skippedExpenses: 0, unreadableAmounts: 0, missingImages: 0, profile: true },
+    expected: { reports: 1, expenses: 2, skippedExpenses: 0, unreadableAmounts: 0, clearedAllowances: 0, missingImages: 0, profile: true },
   },
 }
 
@@ -128,6 +130,7 @@ describe('backups written by earlier releases', () => {
         expenses: expected.expenses,
         skippedExpenses: expected.skippedExpenses,
         unreadableAmounts: expected.unreadableAmounts,
+        clearedAllowances: expected.clearedAllowances,
         missingImages: expected.missingImages,
       })
       await commitBackup(plan)
@@ -175,7 +178,7 @@ describe('backups written by earlier releases', () => {
       const freshDb = await import('./db')
       const fresh = await import('./backup')
       const plan = await fresh.validateBackup(exported)
-      expect(plan.counts).toMatchObject({ skippedExpenses: 0, unreadableAmounts: 0, missingImages: 0 })
+      expect(plan.counts).toMatchObject({ skippedExpenses: 0, unreadableAmounts: 0, clearedAllowances: 0, missingImages: 0 })
       await fresh.commitBackup(plan)
 
       expect(byId(await freshDb.listReports())).toEqual(byId(before.reports))

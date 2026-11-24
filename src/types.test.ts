@@ -177,6 +177,13 @@ describe('dayNumbersByDate', () => {
     expect(map.get('2026-07-18')).toBe(1)
     expect(map.get('2026-07-20')).toBe(2)
   })
+
+  // As text, "10000-07-18" sorts before "9999-07-18".
+  it('ranks a five-digit year after a four-digit one', () => {
+    const map = dayNumbersByDate([{ date: '10000-07-18' }, { date: '9999-07-18' }], '10000-07-18')
+    expect(map.get('9999-07-18')).toBe(1)
+    expect(map.get('10000-07-18')).toBe(2)
+  })
 })
 
 describe('isEntryDate', () => {
@@ -215,6 +222,18 @@ describe('formatDate', () => {
 })
 
 describe('sortExpensesByDate', () => {
+  // As text, "20266-07-18" sorts before "2027-01-01". In calendar order, and
+  // so in the same order as the day numbers, it comes after.
+  it('puts a five-digit year after every four-digit one, and an undated expense last', () => {
+    const sorted = sortExpensesByDate([
+      makeExpense({ id: 'undated', date: '' }),
+      makeExpense({ id: 'far', date: '20266-07-18' }),
+      makeExpense({ id: 'near', date: '2027-01-01' }),
+      makeExpense({ id: 'old', date: '0026-07-18' }),
+    ])
+    expect(sorted.map((e) => e.id)).toEqual(['old', 'near', 'far', 'undated'])
+  })
+
   it('sorts by date ascending', () => {
     const sorted = sortExpensesByDate([
       makeExpense({ id: 'b', date: '2026-07-19' }),

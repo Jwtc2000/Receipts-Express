@@ -169,7 +169,8 @@ export default function ReportList({ onOpenReport, onEditExpense }: Props) {
     setBackupNote(null)
     try {
       const plan = await validateBackup(file)
-      const { reports, expenses, overwrites, missingImages, skippedExpenses, unreadableAmounts } = plan.counts
+      const { reports, expenses, overwrites, missingImages, skippedExpenses, unreadableAmounts, clearedAllowances } =
+        plan.counts
       const exported = plan.exportedAt ? new Date(plan.exportedAt) : null
       const taken =
         exported && !Number.isNaN(exported.getTime())
@@ -191,6 +192,9 @@ export default function ReportList({ onOpenReport, onEditExpense }: Props) {
           : []),
         ...(unreadableAmounts > 0
           ? ['', `${unreadableAmounts} expense${unreadableAmounts === 1 ? ' has an amount' : 's have amounts'} this file couldn't hold, so ${unreadableAmounts === 1 ? 'it' : 'they'} will be restored as 0. Check ${unreadableAmounts === 1 ? 'it' : 'them'} after the restore.`]
+          : []),
+        ...(clearedAllowances > 0
+          ? ['', `${clearedAllowances} report${clearedAllowances === 1 ? ' has a daily meal allowance' : 's have daily meal allowances'} this file couldn't hold, so ${clearedAllowances === 1 ? 'it' : 'they'} will be restored with none. Set ${clearedAllowances === 1 ? 'it' : 'them'} again in the report menu.`]
           : []),
         // The profile is not one of those records: it has no id to match on,
         // and the backup's copy simply takes the place of this device's.
