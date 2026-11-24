@@ -540,7 +540,12 @@ export default function ReportView({ reportId, onBack, onAddExpense, onEditExpen
                       value={tripStartDraft}
                       onChange={(e) => {
                         setTripStartDraft(e.target.value)
-                        if (tripEndDraft < e.target.value) setTripEndDraft(e.target.value)
+                        // As on save: an end saved with a mistyped year by an
+                        // earlier version is not moved along with the start.
+                        const start = e.target.value
+                        if (isEntryDate(start) && isEntryDate(tripEndDraft) && tripEndDraft < start) {
+                          setTripEndDraft(start)
+                        }
                       }}
                       onBlur={() => void saveTripSettings()}
                     />
